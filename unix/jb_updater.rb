@@ -12,8 +12,10 @@ require 'cgi'
 require 'digest'
 require 'json'
 
+# Infinity
 INF = 1.0 / 0.0
 
+# Map product code to config base name
 PRODUCT_CODE_GUESS = {
   'IntelliJ IDEA Ultimate' => 'IU',
   'IntelliJ IDEA Community' => 'IC',
@@ -276,7 +278,9 @@ class JBUpdater
   end
 
   # This method lists all installed plugins for the current build
+  #
   # @see JBUpdater#installed_plugins
+  # @return [void]
   def list_plugins
     plugins = installed_plugins
     if plugins.empty?
@@ -291,67 +295,48 @@ class JBUpdater
       since = meta['since'] || ''
       untl = meta['until'] || ''
       status = build_in_range?(build, since, untl) ? 'OK' : 'incompatible'
-      printf("- %-#{id_w}s  %-#{ver_w}s  [since=%-10s until=%-10s]  %s\n",
+      printf("- %-#{id_w}str  %-#{ver_w}str  [since=%-10s until=%-10s]  %str\n",
              pid, ver, since.empty? ? '-' : since, untl.empty? ? '-' : untl, status)
     end
   end
 
+  # This method updates all installed plugins for the current build.
+  #
+  # @return [void]
   def update_plugins
-    candidates = filter_targets(installed_plugins)
+    candidates = filter_targets
     if candidates.empty?
       puts "No matching plugins to update in #{opts[:plugins_dir]}"
       return
     end
 
     puts "Build: #{build}"
-    puts "Checking #{candidates.size} plugin(s)"
+    puts "Checking #{candidates.size} plugin(str)"
 
-    candidates.each do |xml_id, meta|
-      current_ver = meta['version'] || 'unknown'
-      target_dir = meta['path']
-
-      begin
-        final_uri =
-          if opts[:direct_urls][xml_id]
-            URI(opts[:direct_urls][xml_id])
-          elsif (ver = opts[:pin_versions][xml_id])
-            resolve_download_url_for_version(xml_id, ver)
-          else
-            resolve_download_url_via_plugin_manager(xml_id, build)
-          end
-
-        final_uri = rewrite_to_downloads_host(final_uri, opts[:downloads_host])
-
-        want_ver = opts[:pin_versions][xml_id] || File.basename(final_uri.path).sub(/\.zip\z/, '').split('-').last
-
-        puts "[#{xml_id}] #{current_ver} -> #{want_ver || '?'}"
-        puts "  URL: #{final_uri}"
-
-        if opts[:dry_run]
-          puts "  (dry-run) would download and install into #{target_dir}"
-          next
-        end
-
-        tmp_zip = File.join(Dir.tmpdir, "jb-#{safe(xml_id)}-#{Time.now.to_i}.zip")
-        begin
-          http_download(final_uri, tmp_zip)
-          extract_zip_install(tmp_zip, target_dir)
-          post_id, post_ver, post_since, post_until = parse_plugin_meta_from_dir(target_dir)
-          compat = build_in_range?(build, post_since, post_until)
-          puts "  installed: #{post_id} #{post_ver} [since=#{post_since || '-'} until=#{post_until || '-'}] #{
-            '(still incompatible!)' unless compat}"
-        ensure
-          FileUtils.rm_f(tmp_zip)
-        end
-      rescue StandardError => e
-        warn "[#{xml_id}] failed: #{e}"
-      end
-    end
+    candidates.each { |xml_id, meta| update_plugin(xml_id, meta) }
 
     puts 'Done. Start the IDE to load updated plugins.'
   end
 
-  # ---------- plugin scanning ----------
+  # This method filters installed plugins based on the options
+  #
+  # @return [Hash] filtered plugins
+  def filter_targets
+    filtered = installed_plugins.dup
+    unless (only = Array(opts[:only])).empty?
+      filtered.select! { |k, _| only.include?(k) }
+    end
+    if opts[:only_incompatible]
+      filtered.reject! do |_, meta|
+        build_in_range?(build, meta['since'], meta['until'])
+      end
+    end
+    filtered
+  end
+
+  # This method returns a hash of all installed plugins
+  #
+  # @return [Hash] hash with all installed plugins.
   def installed_plugins
     @installed_plugins ||= begin
       result = {}
@@ -365,87 +350,71 @@ class JBUpdater
         next unless id
 
         result[id] =
-          { 'version' => ver, 'path' => path, 'folder' => entry, 'since' => since,
-            'until' => untl }
+          { 'version' => ver, 'path' => path, 'folder' => entry, 'since' => since, 'until' => untl }
       end
       result
     end
   end
 
-  def parse_plugin_meta_from_dir(plugin_dir)
-    # unpacked META-INF/plugin.xml
-    xml_path = File.join(plugin_dir, 'META-INF', 'plugin.xml')
-    if File.file?(xml_path)
-      xml = File.read(xml_path, encoding: 'UTF-8')
-      return parse_plugin_xml(xml)
-    end
-    # inside jars
-    Dir.glob(File.join(plugin_dir, 'lib', '*.jar')).each do |jar|
-      xml = read_text_from_jar(jar, 'META-INF/plugin.xml')
-      next unless xml && !xml.empty?
+  # This method updates a single plugin
+  #
+  # @param xml_id [String] plugin xmlId
+  # @param meta [Hash] plugin metadata
+  # @return [void]
+  def update_plugin(xml_id, meta)
+    current_ver = meta['version'] || 'unknown'
+    target_dir = meta['path']
 
-      return parse_plugin_xml(xml)
-    end
-    [nil, nil, nil, nil]
-  end
+    begin
+      final_uri = final_uri(xml_id)
+      final_uri = override_plugin_repo_host(final_uri, opts[:downloads_host])
 
-  def parse_plugin_xml(xml)
-    doc = REXML::Document.new(xml)
-    id = REXML::XPath.first(doc, '//id')&.text&.strip
-    version = REXML::XPath.first(doc, '//version')&.text&.strip
-    id ||= REXML::XPath.first(doc, '//name')&.text&.strip
-    iv = REXML::XPath.first(doc, '//idea-version')
-    since = iv&.attributes&.[]('since-build') || iv&.attributes&.[]('sinceBuild')
-    untl = iv&.attributes&.[]('until-build') || iv&.attributes&.[]('untilBuild')
-    [id, version, since, untl]
-  rescue REXML::ParseException
-    [nil, nil, nil, nil]
-  end
+      want_ver = opts[:pin_versions][xml_id] || File.basename(final_uri.path).sub(/\.zip\z/, '').split('-').last
 
-  # ---------- build compare ----------
+      puts "[#{xml_id}] #{current_ver} -> #{want_ver || '?'}"
+      puts "  URL: #{final_uri}"
 
-  def build_in_range?(build_str, since_str, until_str)
-    b = parse_build_string(build_str)
-    s = since_str && !since_str.empty? ? parse_build_string(since_str) : [0, 0, 0]
-    u = until_str && !until_str.empty? ? parse_build_string(until_str) : [INF, INF, INF]
-    ((s <=> b) <= 0) && ((b <=> u) <= 0)
-  end
+      if opts[:dry_run]
+        puts "  (dry-run) would download and install into #{target_dir}"
+        return
+      end
 
-  def parse_build_string(str)
-    return nil if str.nil? || str.empty?
-
-    core = str.sub(/\A[A-Z]+-/, '')
-    parts = core.split('.', 3)
-    parts.map! { |p| p == '*' ? INF : p.to_i }
-    parts.fill(0, parts.length...3)
-  end
-
-  # ---------- HTTP / downloads ----------
-
-  def http_head_or_get(url, method: :get)
-    uri = URI(url)
-    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
-      req = method == :head ? Net::HTTP::Head.new(uri.request_uri) : Net::HTTP::Get.new(uri.request_uri)
-      req['User-Agent'] = 'jb-updater/mac/1.0 (+ruby)'
-      http.request(req)
+      tmp_zip = File.join(Dir.tmpdir, "jb-#{safe(xml_id)}-#{Time.now.to_i}.zip")
+      begin
+        http_download(final_uri, tmp_zip)
+        extract_zip_install(tmp_zip, target_dir)
+        post_id, post_ver, post_since, post_until = parse_plugin_meta_from_dir(target_dir)
+        compat = build_in_range?(build, post_since, post_until)
+        puts "  installed: #{post_id} #{post_ver} [since=#{post_since || '-'} until=#{post_until || '-'}] #{unless compat
+                                                                                                              '(still incompatible!)'
+                                                                                                            end}"
+      ensure
+        FileUtils.rm_f(tmp_zip)
+      end
+    rescue StandardError => e
+      warn "[#{xml_id}] failed: #{e}"
     end
   end
 
-  def resolve_download_url_via_plugin_manager(xml_id, bld)
-    base = "https://plugins.jetbrains.com/pluginManager?action=download&id=#{CGI.escape(xml_id)}&build=#{CGI.escape(bld)}"
-    res = http_head_or_get(base, method: :get)
-    case res
-    when Net::HTTPRedirection
-      loc = res['location'] or raise 'Missing Location header from pluginManager'
-      loc_uri = URI.parse(loc)
-      loc_uri.absolute? ? loc_uri : URI.join('https://plugins.jetbrains.com', loc)
-    when Net::HTTPSuccess
-      URI(base)
+  # This method returns the final URI for a plugin
+  #
+  # @param xml_id [String] plugin xmlId
+  # @return [URI] final URI
+  def final_uri(xml_id)
+    if opts[:direct_urls][xml_id]
+      URI(opts[:direct_urls][xml_id])
+    elsif (ver = opts[:pin_versions][xml_id])
+      resolve_download_url_for_version(xml_id, ver)
     else
-      raise "pluginManager failed (HTTP #{res.code}) for #{xml_id} build #{bld}"
+      resolve_download_url_via_plugin_manager(xml_id, build)
     end
   end
 
+  # This method returns the final URI for the +latest version+ of plugin.
+  #
+  # @param xml_id [String] plugin xmlId
+  # @param version [String] plugin version
+  # @return [URI] final URI
   def resolve_download_url_for_version(xml_id, version)
     base = "https://plugins.jetbrains.com/plugin/download?pluginId=#{CGI.escape(xml_id)}&version=#{CGI.escape(version)}"
     res = http_head_or_get(base, method: :get)
@@ -461,7 +430,45 @@ class JBUpdater
     end
   end
 
-  def rewrite_to_downloads_host(uri, downloads_host)
+  # This method returns the final URI of the +latest compatible+ version for plugin.
+  #
+  # @param xml_id [String] plugin xmlId
+  # @param bld [String] build
+  # @return [URI] final URI
+  def resolve_download_url_via_plugin_manager(xml_id, bld)
+    base = "https://plugins.jetbrains.com/pluginManager?action=download&id=#{CGI.escape(xml_id)}&build=#{CGI.escape(bld)}"
+    res = http_head_or_get(base, method: :get)
+    case res
+    when Net::HTTPRedirection
+      loc = res['location'] or raise 'Missing Location header from pluginManager'
+      loc_uri = URI.parse(loc)
+      loc_uri.absolute? ? loc_uri : URI.join('https://plugins.jetbrains.com', loc)
+    when Net::HTTPSuccess then URI(base)
+    else raise "pluginManager failed (HTTP #{res.code}) for #{xml_id} build #{bld}"
+    end
+  end
+
+  # A helper method to make HEAD and GET requests. It makes one lightweight HTTP request (HEAD or GET) to a URL and
+  # returns the raw Net::HTTPResponse so callers can inspect status and headers (especially Location) without
+  # downloading the file.
+  #
+  # @param url [String] URL
+  # @option params [Symbol] :method (:get or :head)
+  # @return [Net::HTTPResponse]
+  def http_head_or_get(url, method: :get)
+    uri = URI(url)
+    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
+      req = method == :head ? Net::HTTP::Head.new(uri.request_uri) : Net::HTTP::Get.new(uri.request_uri)
+      req['User-Agent'] = 'jb-updater/mac/1.0 (+ruby)'
+      http.request(req)
+    end
+  end
+
+  # This method overrides the plugin repo host for a given URI.
+  #
+  # @param uri [URI] URI to override
+  # @param downloads_host [String] downloads host
+  def override_plugin_repo_host(uri, downloads_host)
     return uri unless downloads_host && !downloads_host.empty?
 
     if uri.host =~ /\Aplugins\.jetbrains\.com\z/i && uri.path.start_with?('/files/')
@@ -471,6 +478,16 @@ class JBUpdater
     end
   end
 
+  # This method returns a safe name for plugin zip archive.
+  #
+  # @param str [String] string to sanitize.
+  # @return [String] sanitized string.
+  def safe(str) = str.to_s.gsub(/[^\w.-]/, '_')
+
+  # This method downloads a file from a given URI.
+  #
+  # @param uri [URI] URI to download
+  # @param dest_path [String] destination path
   def http_download(uri, dest_path)
     Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
       req = Net::HTTP::Get.new(uri.request_uri)
@@ -490,6 +507,10 @@ class JBUpdater
     end
   end
 
+  # This method unpacks a zip file into a given directory.
+  #
+  # @param zip_path [String] path to zip file
+  # @param dest_dir [String] destination directory
   def extract_zip_install(zip_path, dest_dir)
     raise "'unzip' not found in PATH" unless unzip_available?
 
@@ -514,27 +535,58 @@ class JBUpdater
     true
   end
 
-  # ---------- misc utils ----------
+  # This method checks if unzip is available.
+  #
+  # @return [true] true if unzip is available.
+  # @return [false] false if unzip is not available.
+  def unzip_available? = @unzip_available ||= system('which', 'unzip', out: File::NULL, err: File::NULL)
 
-  def filter_targets(plugins)
-    filtered = plugins.dup
-    unless (only = Array(opts[:only])).empty?
-      filtered.select! { |k, _| only.include?(k) }
+  # This method parses plugin metadata from a given directory.
+  #
+  # @param plugin_dir [String] directory to parse
+  # @return [Array] parsed metadata
+  def parse_plugin_meta_from_dir(plugin_dir)
+    # unpacked META-INF/plugin.xml
+    xml_path = File.join(plugin_dir, 'META-INF', 'plugin.xml')
+    if File.file?(xml_path)
+      xml = File.read(xml_path, encoding: 'UTF-8')
+      return parse_plugin_xml(xml)
     end
-    if opts[:only_incompatible]
-      filtered.reject! do |_, meta|
-        build_in_range?(build, meta['since'], meta['until'])
-      end
+    # inside jars
+    Dir.glob(File.join(plugin_dir, 'lib', '*.jar')).each do |jar|
+      xml = read_text_from_jar(jar, 'META-INF/plugin.xml')
+      next unless xml && !xml.empty?
+
+      return parse_plugin_xml(xml)
     end
-    filtered
+    [nil, nil, nil, nil]
   end
 
-  def unzip_available?
-    system('which', 'unzip', out: File::NULL, err: File::NULL)
+  # This method parses plugin metadata from a given XML.
+  #
+  # @param xml [String] XML to parse
+  # @return [Array] parsed metadata
+  def parse_plugin_xml(xml)
+    doc = REXML::Document.new(xml)
+    id = REXML::XPath.first(doc, '//id')&.text&.strip
+    version = REXML::XPath.first(doc, '//version')&.text&.strip
+    id ||= REXML::XPath.first(doc, '//name')&.text&.strip
+    iv = REXML::XPath.first(doc, '//idea-version')
+    since = iv&.attributes&.[]('since-build') || iv&.attributes&.[]('sinceBuild')
+    untl = iv&.attributes&.[]('until-build') || iv&.attributes&.[]('untilBuild')
+    [id, version, since, untl]
+  rescue REXML::ParseException
+    [nil, nil, nil, nil]
   end
 
-  def safe(s) = s.to_s.gsub(/[^\w.-]/, '_')
-
+  # This method reads a text file from a given JAR without extracting it to disk. It's used to read META-INF/plugin.xml
+  # from a plugin’s JAR so we can parse the plugin’s id, version, and since/until build
+  #
+  # @param jar_path [String] path to jar file.
+  # @param inner_path [String] path to file inside jar.
+  # @return [String] file content.
+  # @return [nil] if file is not found.
+  # @raise [Errno::ENOENT] if file is not found.
   def read_text_from_jar(jar_path, inner_path)
     out, st = run_cmd('unzip', '-p', jar_path, inner_path)
     st.success? ? out : nil
@@ -542,25 +594,50 @@ class JBUpdater
     nil
   end
 
+  # This method runs a command and returns its output and status.
+  #
+  # @param cmd [String] command to run
+  # @param * [Array<String>] arguments to pass to the command.
+  # @return [Array] output and status
   def run_cmd(cmd, *) = Open3.capture2e(cmd, *)
 
-  def which(cmd)
-    out, st = Open3.capture2e('which', cmd)
-    st.success? ? out.strip : nil
+  # This method checks if a given build is in a given range.
+  #
+  # @param build_str [String] build to check.
+  # @param since_str [String] since build.
+  # @param until_str [String] until build.
+  # @return [Boolean] true if the build is in the range.
+  def build_in_range?(build_str, since_str, until_str)
+    b = parse_build_string(build_str)
+    s = since_str && !since_str.empty? ? parse_build_string(since_str) : [0, 0, 0]
+    u = until_str && !until_str.empty? ? parse_build_string(until_str) : [INF, INF, INF]
+    ((s <=> b) <= 0) && ((b <=> u) <= 0)
+  end
+
+  # This method parses a build string. INF constant is used to represent "*" numbers to compare them.
+  #
+  # @example
+  #   parse_build_string('2021.1.1') # => [2021, 1, 1]
+  #   parse_build_string('2021.1.*') # => [2021, 1, INF]
+  #
+  # @param str [String] build string to parse.
+  # @return [Array] parsed build version.
+  def parse_build_string(str)
+    return nil if str.nil? || str.empty?
+
+    core = str.sub(/\A[A-Z]+-/, '')
+    parts = core.split('.', 3)
+    parts.map! { |p| p == '*' ? INF : p.to_i }
+    parts.fill(0, parts.length...3)
   end
 end
 
-# ----------------------------
-# CLI wrapper (macOS-only)
-# ----------------------------
 if __FILE__ == $PROGRAM_NAME
-  # binding.irb
-  # TracePoint.trace(:return) do |tp|
-  #   unless tp.return_value.instance_of?(OptionParser) || tp.return_value.instance_of?(REXML::Element) || %i[filter_targets
-  #                                                                                                           installed_plugins read_text_from_jar run_cmd rewrite_to_downloads_host resolve_download_url_via_plugin_manager].include?(tp.method_id) || !JBUpdater.instance_methods(false).include?(tp.method_id)
-  #     puts "method `#{tp.method_id}' returned #{tp.return_value.inspect} on line ##{tp.lineno}"
-  #   end
-  # end
+  if Gem::Platform.local.os == 'darwin'
+    at_exit { warn 'Runs only under macOS at this moment.' }
+    exit(1)
+  end
+
   cli_opts = { pin_versions: {}, direct_urls: {} }
   OptionParser.new do |o|
     o.banner = 'Usage: ruby jb_updater_mac.rb --plugins-dir DIR [--build BUILD] [options]'
