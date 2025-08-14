@@ -212,6 +212,5 @@ List showing [bundled] markers:
 
 - Add support for Windows.
 - Add support for Linux.
-- Add support for bundled plugins.
 - Move to RubyGems.org.
 - Refactor code.
