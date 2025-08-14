@@ -47,4 +47,4 @@ TamperMonkey FAQ page.
 This repository is distributed under
 the [MIT License](https://github.com/unurgunite/JetBrains451Bypasser/blob/main/LICENSE.txt)
 
-[1]: https://github.com/unurgunite/JetBrains451Bypasser/raw/master/jetbrains451bypasser.user.js
+[1]: https://github.com/unurgunite/JetBrains451Bypasser/raw/refs/heads/master/tampermonkey/redirect_on_451.user.js
