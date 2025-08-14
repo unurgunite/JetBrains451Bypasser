@@ -24,14 +24,22 @@ This repository contains scripts to bypass 451 error in JetBrains
 If any questions, please [open an issue](https://github.com/unurgunite/JetBrains451Bypasser/issues) or navigate to
 TamperMonkey FAQ page.
 
+### UNIX utility
+
+1. Install Ruby 3.0 or newer;
+2. Clone this repository;
+3. Run `./unix/jb_updater --help` to see available options;
+4. For additional information, navigate
+   to [README.md](https://github.com/unurgunite/JetBrains451Bypasser/blob/master/unix/README.md).
+
 ## TODO
 
-| Script                  | Completed                             |
-|-------------------------|---------------------------------------|
-| Tampermonkey            | :white_check_mark:                    |
-| Windows PS script       | In progress :arrows_counterclockwise: |
-| Linux/UNIX shell script | In progress :arrows_counterclockwise: |
-| JetBrains plugin        | In progress :arrows_counterclockwise: |
+| Script            | Completed                             |
+|-------------------|---------------------------------------|
+| Tampermonkey      | :white_check_mark:                    |
+| macOS utility     | :white_check_mark:                    |
+| Windows PS script | In progress :arrows_counterclockwise: |
+| Linux             | In progress :arrows_counterclockwise: |
 
 ## License
 
