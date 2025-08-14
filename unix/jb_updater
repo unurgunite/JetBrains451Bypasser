@@ -13,7 +13,7 @@ require 'digest'
 require 'json'
 
 # Infinity
-INF = 1.0 / 0.0
+INF = Float::INFINITY
 
 # Map product code to config base name
 PRODUCT_CODE_GUESS = {
@@ -295,7 +295,7 @@ class JBUpdater
       since = meta['since'] || ''
       untl = meta['until'] || ''
       status = build_in_range?(build, since, untl) ? 'OK' : 'incompatible'
-      printf("- %-#{id_w}str  %-#{ver_w}str  [since=%-10s until=%-10s]  %str\n",
+      printf("- %-#{id_w}s  %-#{ver_w}s  [since=%-10s until=%-10s]  %s\n",
              pid, ver, since.empty? ? '-' : since, untl.empty? ? '-' : untl, status)
     end
   end
@@ -311,7 +311,7 @@ class JBUpdater
     end
 
     puts "Build: #{build}"
-    puts "Checking #{candidates.size} plugin(str)"
+    puts "Checking #{candidates.size} plugin(s)"
 
     candidates.each { |xml_id, meta| update_plugin(xml_id, meta) }
 
@@ -366,7 +366,7 @@ class JBUpdater
     target_dir = meta['path']
 
     begin
-      final_uri = final_uri(xml_id)
+      final_uri = download_uri(xml_id)
       final_uri = override_plugin_repo_host(final_uri, opts[:downloads_host])
 
       want_ver = opts[:pin_versions][xml_id] || File.basename(final_uri.path).sub(/\.zip\z/, '').split('-').last
@@ -385,9 +385,8 @@ class JBUpdater
         extract_zip_install(tmp_zip, target_dir)
         post_id, post_ver, post_since, post_until = parse_plugin_meta_from_dir(target_dir)
         compat = build_in_range?(build, post_since, post_until)
-        puts "  installed: #{post_id} #{post_ver} [since=#{post_since || '-'} until=#{post_until || '-'}] #{unless compat
-                                                                                                              '(still incompatible!)'
-                                                                                                            end}"
+        suffix = compat ? '' : ' (still incompatible!)'
+        puts "  installed: #{post_id} #{post_ver} [since=#{post_since || '-'} until=#{post_until || '-'}]#{suffix}"
       ensure
         FileUtils.rm_f(tmp_zip)
       end
@@ -400,7 +399,7 @@ class JBUpdater
   #
   # @param xml_id [String] plugin xmlId
   # @return [URI] final URI
-  def final_uri(xml_id)
+  def download_uri(xml_id)
     if opts[:direct_urls][xml_id]
       URI(opts[:direct_urls][xml_id])
     elsif (ver = opts[:pin_versions][xml_id])
@@ -457,7 +456,8 @@ class JBUpdater
   # @return [Net::HTTPResponse]
   def http_head_or_get(url, method: :get)
     uri = URI(url)
-    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
+    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',
+                    open_timeout: 10, read_timeout: 20) do |http|
       req = method == :head ? Net::HTTP::Head.new(uri.request_uri) : Net::HTTP::Get.new(uri.request_uri)
       req['User-Agent'] = 'jb-updater/mac/1.0 (+ruby)'
       http.request(req)
@@ -599,7 +599,7 @@ class JBUpdater
   # @param cmd [String] command to run
   # @param * [Array<String>] arguments to pass to the command.
   # @return [Array] output and status
-  def run_cmd(cmd, *) = Open3.capture2e(cmd, *)
+  def run_cmd(cmd, ...) = Open3.capture2e(cmd, ...)
 
   # This method checks if a given build is in a given range.
   #
@@ -633,9 +633,9 @@ class JBUpdater
 end
 
 if __FILE__ == $PROGRAM_NAME
-  if Gem::Platform.local.os == 'darwin'
-    at_exit { warn 'Runs only under macOS at this moment.' }
-    exit(1)
+  if Gem::Platform.local.os != 'darwin'
+    warn 'This script currently supports macOS only.'
+    exit 1
   end
 
   cli_opts = { pin_versions: {}, direct_urls: {} }
