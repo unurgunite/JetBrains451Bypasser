@@ -8,6 +8,7 @@ This repository contains scripts to bypass 451 error in JetBrains
 * [JetBrains451Bypasser](#jetbrains451bypasser)
     * [Usage](#usage)
         * [Tampermonkey](#tampermonkey)
+        * [UNIX utility](#unix-utility)
     * [TODO](#todo)
     * [License](#license)
 
@@ -17,7 +18,7 @@ This repository contains scripts to bypass 451 error in JetBrains
 
 1. Install [Tampermonkey](https://tampermonkey.net/) extension;
 2. In your browser settings (`chrome://extensions`, for example) turn on developer mode;
-3. Copy content from `tampermonkey/redirect_on_451.user.js` script and install into Tampermonkey;
+3. Click [here][1] to install script;
 4. After the installation, navigate to the download page of any plugin or IDE under the `https://jetbrains.com` domain,
    and you will see successful downloading process.
 
@@ -45,3 +46,5 @@ TamperMonkey FAQ page.
 
 This repository is distributed under
 the [MIT License](https://github.com/unurgunite/JetBrains451Bypasser/blob/main/LICENSE.txt)
+
+[1]: https://github.com/unurgunite/JetBrains451Bypasser/raw/master/jetbrains451bypasser.user.js
