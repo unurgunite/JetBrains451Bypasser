@@ -4,18 +4,24 @@ A tiny Ruby CLI to list and update JetBrains IDE plugins on macOS without going 
 directory, detects your IDE build, resolves the latest compatible plugin versions via the Marketplace, downloads them (
 optionally via the downloads CDN), and installs them safely with backups.
 
+> [!WARNING]
+> This tool is still in development and may not work as expected. Use at your own risk.
+> Only macOS is supported. In near future, support for Linux and Windows will be added.
+
 - macOS only (by design in this version)
 - No extra gems required
 - Uses system `unzip`
 
-
-* [JBUpdater](#jbupdater-macos)
+* [JBUpdater (macOS)](#jbupdater-macos)
     * [Why](#why)
     * [Requirements](#requirements)
     * [Installation](#installation)
     * [Typical paths (macOS)](#typical-paths-macos)
     * [Usage](#usage)
     * [Examples](#examples)
+        * [Plugins updating](#plugins-updating)
+        * [Plugins installation](#plugins-installation)
+        * [Working with bundled plugins](#working-with-bundled-plugins)
     * [How it works](#how-it-works)
     * [Notes](#notes)
     * [Troubleshooting](#troubleshooting)
@@ -85,6 +91,8 @@ List installed plugins (with compatibility):
 --list
 ```
 
+### Plugins updating
+
 Update everything (auto-detect build from /Applications):
 
 ```bash
@@ -129,6 +137,48 @@ Specify build or binary manually (if auto-detection can’t find the app):
 --bin-path /Applications/RubyMine.app/Contents/MacOS/rubymine
 ```
 
+### Plugins installation
+
+Also script can be used to download plugins from the Marketplace:
+
+Install latest compatible for given xmlId(s):
+
+```bash
+./jb_updater --plugins-dir "<.../plugins>" --install-plugin org.jetbrains.plugins.yaml,ignore
+```
+
+Install specific version(s) with shorthand:
+
+```bash
+./jb_updater --plugins-dir "<.../plugins>" --install-plugin org.jetbrains.plugins.yaml@2024.1.3
+```
+
+Or with `--pin`:
+
+```bash
+./jb_updater --plugins-dir "<.../plugins>" --install-plugin org.jetbrains.plugins.yaml --pin org.jetbrains.plugins.yaml=2024.1.3
+```
+
+Provide a direct file URL:
+
+```bash
+./jb_updater --plugins-dir "<.../plugins>" --install-plugin org.jetbrains.plugins.yaml --direct org.jetbrains.plugins.yaml=https://downloads.marketplace.jetbrains.com/files/123456/yaml-2024.1.3.zip
+```
+
+### Working with bundled plugins
+
+By default, bundled plugins are not updated, but they can be enabled with `--include-bundled`:
+
+```bash
+./jb_updater --plugins-dir "<.../plugins>" --include-bundled
+```
+
+List showing [bundled] markers:
+
+```bash
+./jb_updater --plugins-dir "<.../plugins>" --list --include-bundled
+```
+
 ## How it works
 
 - Detects the IDE and build:
@@ -162,5 +212,5 @@ Specify build or binary manually (if auto-detection can’t find the app):
 
 - Add support for Windows.
 - Add support for Linux.
-- Add support for bundled plugins.
 - Move to RubyGems.org.
+- Refactor code.

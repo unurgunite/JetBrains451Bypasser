@@ -119,11 +119,12 @@ class JBUpdater
       only: [],
       only_incompatible: false,
       dry_run: false,
-      downloads_host: nil,
+      downloads_host: 'downloads.marketplace.jetbrains.com',
       pin_versions: {},
       direct_urls: {},
       list: false,
-      bin_path: nil # optional override
+      bin_path: nil,
+      include_bundled: false
     }.merge((opts || {}).transform_keys(&:to_sym))
     @build = @opts[:build]
     @installed_plugins = nil
@@ -137,8 +138,17 @@ class JBUpdater
     self.build ||= detect_build_info_macos
     raise 'Could not detect IDE build; pass --build' unless self.build
 
-    case action || (opts[:list] ? :list : :update)
+    action ||= if opts[:list]
+                 :list
+               elsif !Array(opts[:install_ids]).empty?
+                 :install
+               else
+                 :update
+               end
+
+    case action
     when :list then list_plugins
+    when :install then install_plugins
     when :update then update_plugins
     else raise "Unknown action: #{action}"
     end
@@ -253,10 +263,10 @@ class JBUpdater
   # @see JBUpdater#display_name_for_base
   def app_bundle_path
     @app_bundle_path ||= begin
-      app_name = BASE_TO_APP[ide_name_from_plugins_dir] || "#{display_name_for_base}.app"
-      candidate = File.join('/Applications', app_name)
-      candidate if File.directory?(candidate)
-    end
+                           app_name = BASE_TO_APP[ide_name_from_plugins_dir] || "#{display_name_for_base}.app"
+                           candidate = File.join('/Applications', app_name)
+                           candidate if File.directory?(candidate)
+                         end
   end
 
   # This method returns displayed app name for the current IDE. This is used to get the code of IDE in next steps
@@ -295,8 +305,69 @@ class JBUpdater
       since = meta['since'] || ''
       untl = meta['until'] || ''
       status = build_in_range?(build, since, untl) ? 'OK' : 'incompatible'
-      printf("- %-#{id_w}s  %-#{ver_w}s  [since=%-10s until=%-10s]  %s\n",
-             pid, ver, since.empty? ? '-' : since, untl.empty? ? '-' : untl, status)
+      origin = meta['origin'] == 'bundled' ? ' [bundled]' : ''
+      printf("- %-#{id_w}s %-#{ver_w}s [since=%-10s until=%-10s] %s%s\n",
+             pid, ver, since.empty? ? '-' : since, untl.empty? ? '-' : untl, status, origin)
+    end
+  end
+
+  # This method installs plugins for the current build
+  #
+  # @see JBUpdater#installed_plugins
+  # @return [void]
+  def install_plugins
+    ids = Array(opts[:install_ids]).uniq
+    if ids.empty?
+      puts 'No plugin IDs provided to --install-plugin'
+      return
+    end
+    puts "Build: #{build}"
+    puts "Installing #{ids.size} plugin(s)"
+
+    ids.each do |xml_id|
+      if installed_plugins.key?(xml_id)
+        # Already installed — treat as update to latest (or pinned) version
+        update_plugin(xml_id, installed_plugins[xml_id])
+        next
+      end
+      install_plugin(xml_id)
+    end
+    puts 'Done. Start the IDE to load newly installed plugins.'
+  end
+
+  # This method installs a single plugin
+  #
+  # @param xml_id [String] plugin xmlId
+  # @return [void]
+  def install_plugin(xml_id)
+    target_dir = File.join(opts[:plugins_dir], xml_id)
+
+    begin
+      download_uri = final_uri(xml_id)
+      download_uri = override_plugin_repo_host(download_uri, opts[:downloads_host])
+
+      want_ver = opts[:pin_versions][xml_id] || File.basename(download_uri.path).sub(/\.zip\z/, '').split('-').last
+      puts "[#{xml_id}] install -> #{want_ver || '?'}"
+      puts "  URL: #{download_uri}"
+
+      if opts[:dry_run]
+        puts "  (dry-run) would download and install into #{target_dir}"
+        return
+      end
+
+      tmp_zip = File.join(Dir.tmpdir, "jb-#{safe(xml_id)}-#{Time.now.to_i}.zip")
+      begin
+        http_download(download_uri, tmp_zip)
+        extract_zip_install(tmp_zip, target_dir)
+        post_id, post_ver, post_since, post_until = parse_plugin_meta_from_dir(target_dir)
+        compat = build_in_range?(build, post_since, post_until)
+        suffix = compat ? '' : ' (installed but incompatible!)'
+        puts "  installed: #{post_id} #{post_ver} [since=#{post_since || '-'} until=#{post_until || '-'}]#{suffix}"
+      ensure
+        FileUtils.rm_f(tmp_zip)
+      end
+    rescue StandardError => e
+      warn "[#{xml_id}] install failed: #{e}"
     end
   end
 
@@ -338,22 +409,50 @@ class JBUpdater
   #
   # @return [Hash] hash with all installed plugins.
   def installed_plugins
-    @installed_plugins ||= begin
-      result = {}
-      Dir.children(opts[:plugins_dir]).sort.each do |entry|
-        next if entry.start_with?('.')
+    return @installed_plugins if @installed_plugins
 
-        path = File.join(opts[:plugins_dir], entry)
-        next unless File.directory?(path)
+    # User plugins
+    user = scan_plugins_dir(opts[:plugins_dir], origin: 'user')
 
-        id, ver, since, untl = parse_plugin_meta_from_dir(path)
-        next unless id
-
-        result[id] =
-          { 'version' => ver, 'path' => path, 'folder' => entry, 'since' => since, 'until' => untl }
-      end
-      result
+    # Bundled plugins (if requested)
+    if opts[:include_bundled] && (bund = bundled_plugins_dir)
+      bundled = scan_plugins_dir(bund, origin: 'bundled')
+      # User-installed overrides bundled if both exist
+      bundled.each { |id, meta| user[id] ||= meta }
     end
+    @installed_plugins = user
+  end
+
+  # Root folder for bundled plugins in the app bundle
+  def bundled_plugins_dir
+    return nil unless app_bundle_path
+
+    dir = File.join(app_bundle_path, 'Contents', 'plugins')
+    File.directory?(dir) ? dir : nil
+  end
+
+  # Scan any plugins directory and return a map of xmlId => meta (with origin)
+  def scan_plugins_dir(root, origin:)
+    result = {}
+    Dir.children(root).sort.each do |entry|
+      next if entry.start_with?('.')
+
+      path = File.join(root, entry)
+      next unless File.directory?(path)
+
+      id, ver, since, untl = parse_plugin_meta_from_dir(path)
+      next unless id
+
+      result[id] = {
+        'version' => ver,
+        'path' => path,
+        'folder' => entry,
+        'since' => since,
+        'until' => untl,
+        'origin' => origin
+      }
+    end
+    result
   end
 
   # This method updates a single plugin
@@ -363,16 +462,17 @@ class JBUpdater
   # @return [void]
   def update_plugin(xml_id, meta)
     current_ver = meta['version'] || 'unknown'
-    target_dir = meta['path']
+
+    # If bundled, install into user plugins dir to override; do not touch the .app
+    target_dir = meta['origin'] == 'bundled' ? File.join(opts[:plugins_dir], xml_id) : meta['path']
 
     begin
-      final_uri = download_uri(xml_id)
-      final_uri = override_plugin_repo_host(final_uri, opts[:downloads_host])
-
-      want_ver = opts[:pin_versions][xml_id] || File.basename(final_uri.path).sub(/\.zip\z/, '').split('-').last
+      download_uri = final_uri(xml_id)
+      download_uri = override_plugin_repo_host(download_uri, opts[:downloads_host])
+      want_ver = opts[:pin_versions][xml_id] || File.basename(download_uri.path).sub(/.zip\z/, '').split('-').last
 
       puts "[#{xml_id}] #{current_ver} -> #{want_ver || '?'}"
-      puts "  URL: #{final_uri}"
+      puts "  URL: #{download_uri}"
 
       if opts[:dry_run]
         puts "  (dry-run) would download and install into #{target_dir}"
@@ -381,7 +481,7 @@ class JBUpdater
 
       tmp_zip = File.join(Dir.tmpdir, "jb-#{safe(xml_id)}-#{Time.now.to_i}.zip")
       begin
-        http_download(final_uri, tmp_zip)
+        http_download(download_uri, tmp_zip)
         extract_zip_install(tmp_zip, target_dir)
         post_id, post_ver, post_since, post_until = parse_plugin_meta_from_dir(target_dir)
         compat = build_in_range?(build, post_since, post_until)
@@ -399,7 +499,7 @@ class JBUpdater
   #
   # @param xml_id [String] plugin xmlId
   # @return [URI] final URI
-  def download_uri(xml_id)
+  def final_uri(xml_id)
     if opts[:direct_urls][xml_id]
       URI(opts[:direct_urls][xml_id])
     elsif (ver = opts[:pin_versions][xml_id])
@@ -638,7 +738,7 @@ if __FILE__ == $PROGRAM_NAME
     exit 1
   end
 
-  cli_opts = { pin_versions: {}, direct_urls: {} }
+  cli_opts = { pin_versions: {}, direct_urls: {}, install_ids: [] }
   OptionParser.new do |o|
     o.banner = 'Usage: ruby jb_updater_mac.rb --plugins-dir DIR [--build BUILD] [options]'
     o.on('--plugins-dir DIR', 'Path to ~/Library/Application Support/JetBrains/<ProductYYYY.X>/plugins') do |v|
@@ -661,8 +761,22 @@ if __FILE__ == $PROGRAM_NAME
       id, url = v.split('=', 2)
       cli_opts[:direct_urls][id] = url if id && url
     end
+    o.on('--install-plugin IDS', Array, 'Install plugin(s) by xmlId (CSV or repeat), supports xmlId@version') do |arr|
+      arr.each do |token|
+        if token.include?('@')
+          id, ver = token.split('@', 2)
+          cli_opts[:pin_versions][id] = ver if id && ver
+          cli_opts[:install_ids] << id
+        else
+          cli_opts[:install_ids] << token
+        end
+      end
+    end
     o.on('--dry-run', 'Show actions without downloading/installing') { cli_opts[:dry_run] = true }
     o.on('--list', 'List installed plugins with compatibility status and exit') { cli_opts[:list] = true }
+    o.on('--[no-]include-bundled', 'Scan bundled plugins inside the app bundle (default: true)') do |v|
+      cli_opts[:include_bundled] = v
+    end
     o.on('-h', '--help', 'Show help') do
       puts o
       exit 0
