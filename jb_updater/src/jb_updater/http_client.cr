@@ -3,7 +3,7 @@ require "uri"
 
 module JBUpdater
   class HTTPClient
-    USER_AGENT = "jb-updater/crystal/1.0 (+https://github.com/you)"
+    USER_AGENT = "jb-updater/crystal/1.0 (+https://github.com/unurgunite)"
 
     # Perform a HEAD or GET and return the Response
     def self.head_or_get(url : String, method : Symbol = :get) : HTTP::Client::Response
@@ -46,8 +46,15 @@ module JBUpdater
           when 301, 302
             if loc = response.headers["Location"]?
               next_uri = URI.parse(loc)
-              next_uri = URI.parse("#{uri.scheme}://#{uri.host}#{loc}") unless next_uri.absolute?
-              download(next_uri, dest_path)
+              unless next_uri.absolute?
+                next_uri = URI.new(
+                  scheme: uri.scheme,
+                  host: uri.host,
+                  port: uri.port, # ← keep same port!
+                  path: loc
+                )
+              end
+              return download(next_uri, dest_path)
             else
               raise "redirect without Location header for #{uri}"
             end

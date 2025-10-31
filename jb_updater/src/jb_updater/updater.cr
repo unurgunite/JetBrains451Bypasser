@@ -25,7 +25,7 @@ module JBUpdater
     def run(action : Symbol? = nil) : Nil
       validate!
 
-      @build ||= detect_build_info_macos
+      @build ||= detect_build_info
       raise "Could not detect IDE build; pass --build" unless @build
 
       act = action || begin
@@ -55,6 +55,18 @@ module JBUpdater
       raise "Plugins dir not found: #{@opts.plugins_dir}" unless Dir.exists?(@opts.plugins_dir.not_nil!)
     end
 
+    private def detect_build_info : String?
+      {% if flag?(:darwin) %}
+        detect_build_info_macos
+      {% elsif flag?(:linux) %}
+        detect_build_info_linux
+      {% elsif flag?(:win32) %}
+        detect_build_info_windows
+      {% else %}
+        raise "Unsupported platform"
+      {% end %}
+    end
+
     private def detect_build_info_macos : String?
       base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
       app_path = "/Applications/#{base}.app"
@@ -82,6 +94,51 @@ module JBUpdater
       nil
     end
 
+    private def detect_build_info_linux : String?
+      base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
+      candidates = [
+        "/opt/#{base}",
+        "/usr/share/#{base}",
+        "/snap/#{base}/current",
+      ]
+
+      candidates.each do |root|
+        info = File.join(root, "bin", "product-info.json")
+        if File.file?(info)
+          data = JSON.parse(File.read(info))
+          code = data["productCode"]?.try(&.as_s?) || data["product"]?.try(&.[]("code")).try(&.as_s?)
+          build = data["buildNumber"]?.try(&.as_s?) || data["build"]?.try(&.as_s?) || data["version"]?.try(&.as_s?)
+          return "#{code}-#{build}" if code && build
+        end
+      end
+      nil
+    end
+
+    private def detect_build_info_windows : String?
+      base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).sub(/\d.*$/, "")
+      roots = [
+        ENV["LOCALAPPDATA"]?,
+        ENV["PROGRAMFILES"]?,
+        ENV["PROGRAMFILES(X86)"]?,
+      ].compact
+
+      roots.each do |root|
+        path = File.join(root, "JetBrains", base)
+        info_json = File.join(path, "bin", "product-info.json")
+        build_txt = File.join(path, "build.txt")
+        if File.file?(info_json)
+          j = JSON.parse(File.read(info_json))
+          code = j["productCode"]?.try(&.as_s?)
+          build = j["buildNumber"]?.try(&.as_s?)
+          return "#{code}-#{build}" if code && build
+        elsif File.file?(build_txt)
+          build = File.read(build_txt).strip
+          return "#{base}-#{build}" unless build.empty?
+        end
+      end
+      nil
+    end
+
     private def list_plugins : Nil
       plugins = installed_plugins
       if plugins.empty?
@@ -96,6 +153,7 @@ module JBUpdater
 
     private def installed_plugins : Hash(String, PluginMeta)
       return @installed_plugins.not_nil! if @installed_plugins
+
       @installed_plugins = PluginMeta.scan_dir(@opts.plugins_dir.not_nil!)
     end
 
