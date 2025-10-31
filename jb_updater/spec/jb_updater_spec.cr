@@ -1,9 +1,7 @@
 require "./spec_helper"
 
 describe JbUpdater do
-  # TODO: Write tests
-
-  it "works" do
-    false.should eq(true)
+  it "loads without crashing" do
+    JbUpdater::VERSION.should match /^\d+\.\d+\.\d+$/
   end
 end

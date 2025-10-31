@@ -9,7 +9,7 @@ module JBUpdater
     def self.head_or_get(url : String, method : Symbol = :get) : HTTP::Client::Response
       uri = URI.parse(url)
       headers = HTTP::Headers{
-        "User-Agent" => USER_AGENT
+        "User-Agent" => USER_AGENT,
       }
 
       client = HTTP::Client.new(uri)
@@ -43,7 +43,6 @@ module JBUpdater
               # Crystal streams the body through the block; just copy as it comes
               IO.copy(response.body_io, f) if response.body_io
             end
-
           when 301, 302
             if loc = response.headers["Location"]?
               next_uri = URI.parse(loc)
@@ -52,12 +51,10 @@ module JBUpdater
             else
               raise "redirect without Location header for #{uri}"
             end
-
           else
             raise "HTTP #{response.status_code} #{response.status_message} for #{uri}"
           end
         end
-
       ensure
         client.close
       end

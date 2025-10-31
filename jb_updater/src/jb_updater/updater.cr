@@ -66,15 +66,14 @@ module JBUpdater
 
         code =
           data["productCode"]?.try(&.as_s?) ||
-          data["product"]?.try(&.[]("code")).try(&.as_s?)
+            data["product"]?.try(&.[]("code")).try(&.as_s?)
 
         build =
           data["buildNumber"]?.try(&.as_s?) ||
-          data["build"]?.try(&.as_s?) ||
-          data["version"]?.try(&.as_s?)
+            data["build"]?.try(&.as_s?) ||
+            data["version"]?.try(&.as_s?)
 
         return "#{code}-#{build}" if code && build
-
       elsif File.file?(build_txt)
         build = File.read(build_txt).strip
         return "RM-#{build}" unless build.empty?
@@ -140,8 +139,62 @@ module JBUpdater
     end
 
     private def update_plugins : Nil
-      puts "Checking for updates..."
-      # stub
+      plugins = installed_plugins
+      if plugins.empty?
+        Log.info "No plugins found in #{@opts.plugins_dir}"
+        return
+      end
+
+      Log.header("Checking #{plugins.size} plugin#{plugins.size > 1 ? "s" : ""} for updates (build #{@build})")
+
+      plugins.each_with_index do |(id, meta), idx|
+        begin
+          Log.info "[#{idx + 1}/#{plugins.size}] #{meta.id} current=#{meta.version}"
+          update_plugin(meta)
+        rescue ex
+          Log.fail "[#{meta.id}] update failed: #{ex.message}"
+        end
+      end
+
+      puts
+      Log.success("Done. Start the IDE to load updated plugins.")
+    end
+
+    private def update_plugin(meta : PluginMeta) : Nil
+      xml_id = meta.id
+      target_dir = meta.path
+      current_ver = meta.version
+      tmp_zip : String? = nil
+
+      begin
+        uri = final_uri(xml_id)
+        uri = HTTPClient.override_plugin_repo_host(uri, @opts.downloads_host)
+        want_ver = @opts.pin_versions[xml_id]? ||
+                   File.basename(uri.path).sub(/\.zip$/, "").split('-').last?
+
+        Log.info "  → #{current_ver} → #{want_ver || "?"}"
+        Log.info "    URL: #{uri}"
+
+        if @opts.dry_run
+          Log.info "    (dry-run) would download and install into #{target_dir}"
+          return
+        end
+
+        tmp_zip = File.join(Dir.tempdir, "jb-#{Utils.safe(xml_id)}-#{Time.utc.to_unix}.zip")
+        HTTPClient.download(uri, tmp_zip)
+        Utils.extract_zip(tmp_zip, target_dir)
+
+        # Re-parse plugin.xml in the freshly extracted directory
+        if post = PluginMeta.parse_from_dir(target_dir)
+          compat = Utils.build_in_range?(@build.not_nil!, post.since, post.until_build)
+          suffix = compat ? "" : " (still incompatible)"
+          Log.success "  installed: #{post.id} #{post.version} [since=#{post.since || "-"} until=#{post.until_build || "-"}]#{suffix}"
+        else
+          Log.warn "  re-parse failed; installed plugin may be broken"
+        end
+      ensure
+        FileUtils.rm_rf(tmp_zip) if tmp_zip && File.exists?(tmp_zip)
+      end
     end
 
     # --- URL-resolution helpers ----------------------------------------------
@@ -160,7 +213,7 @@ module JBUpdater
     # Resolve URL for a specific pinned version
     private def resolve_download_url_for_version(xml_id : String, version : String) : URI
       base = "https://plugins.jetbrains.com/plugin/download?pluginId=#{Utils.escape(xml_id)}&version=#{Utils.escape(version)}"
-      res  = HTTPClient.head_or_get(base)
+      res = HTTPClient.head_or_get(base)
 
       case res.status_code
       when 301, 302
@@ -178,7 +231,7 @@ module JBUpdater
     # Resolve URL for the latest compatible version via pluginManager
     private def resolve_download_url_via_plugin_manager(xml_id : String, build : String) : URI
       base = "https://plugins.jetbrains.com/pluginManager?action=download&id=#{Utils.escape(xml_id)}&build=#{Utils.escape(build)}"
-      res  = HTTPClient.head_or_get(base)
+      res = HTTPClient.head_or_get(base)
 
       case res.status_code
       when 301, 302

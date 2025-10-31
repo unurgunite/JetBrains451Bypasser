@@ -7,7 +7,3 @@ module JbUpdater
 
   # TODO: Put your code here
 end
-
-opts = JBUpdater.parse_cli
-updater = JBUpdater::Updater.new(opts)
-updater.run

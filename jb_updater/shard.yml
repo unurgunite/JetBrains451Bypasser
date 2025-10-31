@@ -6,7 +6,7 @@ authors:
 
 targets:
   jb_updater:
-    main: src/jb_updater.cr
+    main: src/main.cr
 
 crystal: '>= 1.17.1'
 

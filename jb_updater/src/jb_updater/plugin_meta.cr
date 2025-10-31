@@ -15,7 +15,7 @@ module JBUpdater
       version : String,
       since : String? = nil,
       until_build : String? = nil,
-      path : String
+      path : String,
     )
       @id = id
       @version = version
