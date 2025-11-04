@@ -17,7 +17,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # --- macOS ---
           - os: macos-latest
             platform: macos
             arch: x86_64
@@ -30,8 +29,6 @@ jobs:
             target: aarch64-apple-darwin
             ext: ""
             package_format: tar.gz
-
-          # --- Linux ---
           - os: ubuntu-latest
             platform: linux
             arch: x86_64
@@ -44,14 +41,16 @@ jobs:
             target: aarch64-linux-gnu
             ext: ""
             package_format: tar.gz
-
-          # --- Windows ---
           - os: ubuntu-latest
             platform: windows
             arch: x64
             target: x86_64-w64-mingw32
             ext: ".exe"
             package_format: zip
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      TARGET: ${{ matrix.target }}
+      EXT: ${{ matrix.ext }}
 
     steps:
       - name: Checkout Repository
@@ -64,39 +63,39 @@ jobs:
           crystal: latest
 
       - name: Install MinGW for Windows Cross-Compile
-        if: matrix.platform == 'windows'
+        if: env.PLATFORM == 'windows'
         run: |
           sudo apt-get update
           sudo apt-get install -y mingw-w64
 
       - name: Install Crystal via script (for Windows cross-compilation)
-        if: matrix.platform == 'windows'
+        if: env.PLATFORM == 'windows'
         run: |
           curl -fsSL https://crystal-lang.org/install.sh | sudo bash
-          shards install --ignore-crystal-version
+          cd jb_updater && shards install --ignore-crystal-version
 
       - name: Install Shards (non-Windows)
-        if: matrix.platform != 'windows'
+        if: env.PLATFORM != 'windows'
         working-directory: ./jb_updater
         run: shards install --ignore-crystal-version
 
       - name: Build Binary
         working-directory: ./jb_updater
         run: |
-          OUTPUT_NAME="../jb_updater${{ matrix.ext }}"
-          if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          OUTPUT_NAME="../jb_updater$EXT"
+          if [[ "$PLATFORM" == "windows" ]]; then
             # Cross-compile for Windows
-            crystal build src/main.cr --cross-compile --target ${{ matrix.target }} --output jb_updater_temp
+            crystal build src/main.cr --cross-compile --target $TARGET --output jb_updater_temp
             # Link object file into executable
             x86_64-w64-mingw32-gcc jb_updater_temp.o -o jb_updater.exe \
               -lpcre -lm -lgc -lpthread -ladvapi32 -lws2_32 -liconv
             mv jb_updater.exe "$OUTPUT_NAME"
           else
             # Native build — static only on Linux
-            if [[ "${{ matrix.platform }}" == "linux" ]]; then
-              crystal build src/main.cr --release --static --target ${{ matrix.target }} -o jb_updater
+            if [[ "$PLATFORM" == "linux" ]]; then
+              crystal build src/main.cr --release --static --target $TARGET -o jb_updater
             else
-              crystal build src/main.cr --release --target ${{ matrix.target }} -o jb_updater
+              crystal build src/main.cr --release --target $TARGET -o jb_updater
             fi
             mv jb_updater "$OUTPUT_NAME"
           fi
@@ -105,11 +104,11 @@ jobs:
         id: package
         run: |
           mkdir -p dist
-          cp ../jb_updater${{ matrix.ext }} dist/
+          cp ../jb_updater$EXT dist/
 
           cd dist
-          FILENAME="jb_updater-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}"
-          mv jb_updater${{ matrix.ext }} "$FILENAME"
+          FILENAME="jb_updater-$PLATFORM-$arch$EXT"  # ← Note: $arch comes from matrix context
+          mv jb_updater$EXT "$FILENAME"
 
           if [[ "${{ matrix.package_format }}" == "zip" ]]; then
             zip -j "${FILENAME}.zip" "$FILENAME"
