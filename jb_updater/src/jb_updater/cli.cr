@@ -15,6 +15,10 @@ module JBUpdater
     property include_bundled : Bool
     property install_ids : Array(String)
     property product : String?
+    property brew_patch : Bool
+    property upgrade_ide : Bool
+    property ide_downloads_host : String
+    property arch : String?
 
     def initialize
       @only = [] of String
@@ -27,6 +31,10 @@ module JBUpdater
       @include_bundled = false
       @install_ids = [] of String
       @product = nil
+      @brew_patch = false
+      @upgrade_ide = false
+      @ide_downloads_host = "download-cdn.jetbrains.com"
+      @arch = nil
     end
   end
 
@@ -43,6 +51,11 @@ module JBUpdater
       parser.on("--product NAME", "IDE product name (e.g., RubyMine or RubyMine2025.2)") do |v|
         opts.product = v
       end
+      parser.on("--arch ARCH", "Architecture (arm or intel); default: autodetect") do |v|
+        opts.arch = v.downcase
+      end
+      parser.on("--upgrade-ide", "Upgrade whole IDE instead of plugins") { opts.upgrade_ide = true }
+      parser.on("--brew", "Patch Homebrew cask Ruby file instead of direct install") { opts.brew_patch = nil }
       parser.on("-h", "--help", "Show help") do
         puts parser
         exit 0
