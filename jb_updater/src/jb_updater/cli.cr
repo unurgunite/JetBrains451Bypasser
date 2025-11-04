@@ -15,7 +15,7 @@ module JBUpdater
     property include_bundled : Bool
     property install_ids : Array(String)
     property product : String?
-    property brew_patch : Bool
+    property brew_patch : Bool?
     property upgrade_ide : Bool
     property ide_downloads_host : String
     property arch : String?

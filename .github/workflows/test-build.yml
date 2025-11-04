@@ -1,0 +1,27 @@
+name: Test Build on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+
+jobs:
+  test-build:
+    name: Test build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+      - run: shards install
+        working-directory: ./jb_updater
+      - run: crystal build src/main.cr --release -o jb_updater
+        working-directory: ./jb_updater
+      - run: ./jb_updater --help
+        working-directory: ./jb_updater

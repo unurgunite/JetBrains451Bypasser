@@ -2,7 +2,7 @@ name: jb_updater
 version: 0.1.0
 
 authors:
-  - unurgunite <senpaiguru1488@gmail.com>
+  - unurgunite <senpaigunite@gmail.com>
 
 targets:
   jb_updater:
@@ -11,6 +11,3 @@ targets:
 crystal: '>= 1.17.1'
 
 license: MIT
-
-dependencies:
-  http-client: # built-in, no need to list; just using stdlib

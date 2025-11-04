@@ -3,3 +3,8 @@
 .vscode
 .shards/
 *.dwarf
+jb_updater/jb_updater
+jb_updater.exe
+*.o
+dist/
+artifacts/
