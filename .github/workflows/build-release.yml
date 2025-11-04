@@ -90,11 +90,15 @@ jobs:
             # Link object file into executable
             x86_64-w64-mingw32-gcc jb_updater_temp.o -o jb_updater.exe \
               -lpcre -lm -lgc -lpthread -ladvapi32 -lws2_32 -liconv
-            mv jb_updater.exe $OUTPUT_NAME
+            mv jb_updater.exe "$OUTPUT_NAME"
           else
-            # Native build (Linux/macOS)
-            crystal build src/main.cr --release --static --target ${{ matrix.target }} -o jb_updater
-            mv jb_updater $OUTPUT_NAME
+            # Native build — static only on Linux
+            if [[ "${{ matrix.platform }}" == "linux" ]]; then
+              crystal build src/main.cr --release --static --target ${{ matrix.target }} -o jb_updater
+            else
+              crystal build src/main.cr --release --target ${{ matrix.target }} -o jb_updater
+            fi
+            mv jb_updater "$OUTPUT_NAME"
           fi
 
       - name: Package Artifact
