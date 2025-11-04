@@ -35,7 +35,7 @@ jobs:
             target: x86_64-linux-gnu
             ext: ""
             package_format: tar.gz
-          - os: ubuntu-latest
+          - os: ubuntu-latest-arm64
             platform: linux
             arch: arm64
             target: aarch64-linux-gnu
@@ -47,28 +47,30 @@ jobs:
             target: x86_64-w64-mingw32
             ext: ".exe"
             package_format: zip
+
     env:
       PLATFORM: ${{ matrix.platform }}
       TARGET: ${{ matrix.target }}
       EXT: ${{ matrix.ext }}
+      ARCH: ${{ matrix.arch }}
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up Crystal (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: env.PLATFORM != 'windows'
         uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
 
-      - name: Install MinGW for Windows Cross-Compile
+      - name: Install MinGW + deps for Windows
         if: env.PLATFORM == 'windows'
         run: |
           sudo apt-get update
-          sudo apt-get install -y mingw-w64
+          sudo apt-get install -y mingw-w64 libpcre2-dev libgc-dev
 
-      - name: Install Crystal via script (for Windows cross-compilation)
+      - name: Install Crystal for Windows cross-compilation
         if: env.PLATFORM == 'windows'
         run: |
           curl -fsSL https://crystal-lang.org/install.sh | sudo bash
@@ -79,35 +81,53 @@ jobs:
         working-directory: ./jb_updater
         run: shards install --ignore-crystal-version
 
+      - name: Install Linux deps (for static linking)
+        if: env.PLATFORM == 'linux' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2-dev libssl-dev libpcre2-dev libgc-dev liblzma-dev
+
       - name: Build Binary
         working-directory: ./jb_updater
         run: |
-          OUTPUT_NAME="../jb_updater$EXT"
+          mkdir -p ../out
+          OUTPUT_NAME="../out/jb_updater$EXT"
+
           if [[ "$PLATFORM" == "windows" ]]; then
-            # Cross-compile for Windows
             crystal build src/main.cr --cross-compile --target $TARGET --output jb_updater_temp
-            # Link object file into executable
-            x86_64-w64-mingw32-gcc jb_updater_temp.o -o jb_updater.exe \
-              -lpcre -lm -lgc -lpthread -ladvapi32 -lws2_32 -liconv
-            mv jb_updater.exe "$OUTPUT_NAME"
-          else
-            # Native build — static only on Linux
-            if [[ "$PLATFORM" == "linux" ]]; then
-              crystal build src/main.cr --release --static --target $TARGET -o jb_updater
+            OBJ_FILE=$(find . -name "jb_updater_temp*.o" | head -n1)
+            if [ -z "$OBJ_FILE" ]; then
+              echo "Error: Object file not found after cross-compilation"
+              exit 1
+            fi
+            x86_64-w64-mingw32-gcc "$OBJ_FILE" -o jb_updater.exe \
+              -lpcre2-8 -lm -lgc -lpthread -ladvapi32 -lws2_32 -liconv -lbcrypt -lcrypt32
+            cp jb_updater.exe "$OUTPUT_NAME"
+
+          elif [[ "$PLATFORM" == "linux" ]]; then
+            crystal build src/main.cr --release --static --target $TARGET -o jb_updater
+            cp jb_updater "$OUTPUT_NAME"
+
+          else # macOS
+            if [[ "$ARCH" == "x86_64" ]]; then
+              # Force x86_64 compilation on ARM64 host
+              SDKROOT=$(xcrun --sdk macosx --show-sdk-path) \
+              CC="clang -arch x86_64" \
+              crystal build src/main.cr --release --target $TARGET -o jb_updater
             else
               crystal build src/main.cr --release --target $TARGET -o jb_updater
             fi
-            mv jb_updater "$OUTPUT_NAME"
+            cp jb_updater "$OUTPUT_NAME"
           fi
 
       - name: Package Artifact
         id: package
         run: |
           mkdir -p dist
-          cp ../jb_updater$EXT dist/
+          cp ../out/jb_updater$EXT dist/
 
           cd dist
-          FILENAME="jb_updater-$PLATFORM-$arch$EXT"  # ← Note: $arch comes from matrix context
+          FILENAME="jb_updater-$PLATFORM-$ARCH$EXT"
           mv jb_updater$EXT "$FILENAME"
 
           if [[ "${{ matrix.package_format }}" == "zip" ]]; then
@@ -121,7 +141,7 @@ jobs:
           echo "asset_path=dist/$ASSET" >> $GITHUB_OUTPUT
           echo "asset_name=$ASSET" >> $GITHUB_OUTPUT
 
-      - name: Upload Artifact (for debugging)
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: jb_updater-${{ matrix.platform }}-${{ matrix.arch }}
