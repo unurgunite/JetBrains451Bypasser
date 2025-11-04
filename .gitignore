@@ -1,2 +1,10 @@
-/.idea
-/.DS_Store
+.idea
+.DS_Store
+.vscode
+.shards/
+*.dwarf
+jb_updater/jb_updater
+jb_updater.exe
+*.o
+dist/
+artifacts/

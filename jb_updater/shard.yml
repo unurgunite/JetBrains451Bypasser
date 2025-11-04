@@ -1,0 +1,13 @@
+name: jb_updater
+version: 0.1.0
+
+authors:
+  - unurgunite <senpaigunite@gmail.com>
+
+targets:
+  jb_updater:
+    main: src/main.cr
+
+crystal: '>= 1.17.1'
+
+license: MIT

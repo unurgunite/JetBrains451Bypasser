@@ -27,11 +27,10 @@ TamperMonkey FAQ page.
 
 ### UNIX utility
 
-1. Install Ruby 3.0 or newer;
-2. Clone this repository;
-3. Run `./unix/jb_updater --help` to see available options;
-4. For additional information, navigate
-   to [README.md](https://github.com/unurgunite/JetBrains451Bypasser/blob/master/unix/README.md).
+1. Clone this repository;
+2. Run `./jb_updater/jb_updater --help` to see available options;
+3. For additional information, navigate
+   to [README.md](https://github.com/unurgunite/JetBrains451Bypasser/blob/master/jb_updater/README.md).
 
 ## TODO
 
