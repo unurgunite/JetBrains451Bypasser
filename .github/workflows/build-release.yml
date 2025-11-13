@@ -1,4 +1,4 @@
-name: Build jb_updater (manual release)
+name: Build jb_updater
 
 on:
   push:
