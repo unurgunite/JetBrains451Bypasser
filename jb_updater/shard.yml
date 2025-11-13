@@ -2,7 +2,7 @@ name: jb_updater
 version: 0.1.0
 
 authors:
-  - unurgunite <senpaigunite@gmail.com>
+  - unurgunite <email@email.com>
 
 targets:
   jb_updater:
