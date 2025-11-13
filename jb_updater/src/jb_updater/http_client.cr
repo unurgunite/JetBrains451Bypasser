@@ -30,7 +30,8 @@ module JBUpdater
     # ----------------------------------------------------------------------
     # Download a file with redirect support and a simple progress bar
     # ----------------------------------------------------------------------
-    def self.download(uri : URI, dest_path : String) : Nil
+    def self.download(uri : URI, dest_path : String, depth = 0) : Nil
+      raise "Too many redirects: #{depth}" if depth > 5
       headers = HTTP::Headers{"User-Agent" => USER_AGENT}
       client = HTTP::Client.new(uri)
       client.before_request { |req| req.headers.merge!(headers) }
@@ -77,7 +78,7 @@ module JBUpdater
                   path: loc
                 )
               end
-              return download(next_uri, dest_path)
+              return download(next_uri, dest_path, depth + 1)
             else
               raise "redirect without Location header for #{uri}"
             end

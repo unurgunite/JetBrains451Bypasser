@@ -15,6 +15,7 @@ module JBUpdater
     property include_bundled : Bool
     property install_ids : Array(String)
     property product : String?
+    property ide_path : String?
     property brew_patch : Bool?
     property upgrade_ide : Bool
     property ide_downloads_host : String
@@ -35,6 +36,7 @@ module JBUpdater
       @upgrade_ide = false
       @ide_downloads_host = "download-cdn.jetbrains.com"
       @arch = nil
+      @ide_path = nil
     end
   end
 
@@ -44,10 +46,10 @@ module JBUpdater
     OptionParser.parse do |parser|
       parser.banner = "Usage: jb_updater [options]"
       parser.on("--plugins-dir DIR", "Plugins directory") { |v| opts.plugins_dir = v }
-      parser.on("--build BUILD", "IDE build") { |v| opts.build = v }
-      parser.on("--dry-run", "Dry run") { opts.dry_run = true }
-      parser.on("--list", "List plugins") { opts.list = true }
-      parser.on("--install-plugin IDS", "Install plugins (comma-separated)") { |v| opts.install_ids = v.split(',') }
+      parser.on("-b", "--build BUILD", "IDE build") { |v| opts.build = v }
+      parser.on("-d", "--dry-run", "Dry run") { opts.dry_run = true }
+      parser.on("-l", "--list", "List plugins") { opts.list = true }
+      parser.on("-i", "--install-plugin IDS", "Install plugins (comma-separated)") { |v| opts.install_ids = v.split(',') }
       parser.on("--product NAME", "IDE product name (e.g., RubyMine or RubyMine2025.2)") do |v|
         opts.product = v
       end
@@ -55,6 +57,9 @@ module JBUpdater
         opts.arch = v.downcase
       end
       parser.on("--upgrade-ide", "Upgrade whole IDE instead of plugins") { opts.upgrade_ide = true }
+      parser.on("--ide-path PATH", "Specify custom IDE installation path") do |v|
+        opts.ide_path = v
+      end
       parser.on("--brew", "Patch Homebrew cask Ruby file instead of direct install") { opts.brew_patch = nil }
       parser.on("-h", "--help", "Show help") do
         puts parser

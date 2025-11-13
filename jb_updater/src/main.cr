@@ -38,5 +38,5 @@ if opts.plugins_dir
 end
 
 # If neither condition matched, print a brief help hint
-puts "Usage: jb_updater --plugins-dir <path> [options] or --product <IDE> [--brew]"
+puts "Usage: jb_updater --plugins-dir <path> [options] or --product <IDE>"
 exit 1
