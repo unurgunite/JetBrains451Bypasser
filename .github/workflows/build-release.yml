@@ -1,9 +1,27 @@
 name: Build and Release
 
+#on:
+#  push:
+#    branches:
+#      - main
+#      - develop
+#      - "feature/**"
+#    tags:
+#      - "v*.*.*"
+#  pull_request:
+#    branches:
+#      - main
+#      - develop
+#      - "feature/**"
+
 on: [push]
 
 permissions:
   contents: write
+
+# =========================================================
+# ===============   BUILD  JOBS   =========================
+# =========================================================
 
 jobs:
   linux:
@@ -34,8 +52,12 @@ jobs:
     name: macOS ${{ matrix.arch }}
     strategy:
       matrix:
-        arch: [x86_64, arm64]
-    runs-on: macos-latest
+        include:
+          - arch: arm64
+            runs_on: macos-latest       # Apple Silicon host
+          - arch: x86_64
+            runs_on: macos-13           # Intel host
+    runs-on: ${{ matrix.runs_on }}
     env:
       ARCH: ${{ matrix.arch }}
     steps:
@@ -53,23 +75,16 @@ jobs:
           cd jb_updater
           brew_prefix=$(brew --prefix openssl@3)
 
-          # Wipe any leftover OpenSSL@1.1 references
+          # Always use OpenSSL 3's pkg-config info
           unset PKG_CONFIG_PATH
           export PKG_CONFIG_PATH="${brew_prefix}/lib/pkgconfig"
-
           echo "Using OpenSSL from ${brew_prefix}"
 
-          if [[ "$ARCH" == "x86_64" ]]; then
-            SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-            CC="clang -arch x86_64" \
-            crystal build src/main.cr --release --no-debug \
-              --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
-              -o jb_updater
-          else
-            crystal build src/main.cr --release --no-debug \
-              --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
-              -o jb_updater
-          fi
+          # Native build for this host (ARM or Intel)
+          shards install
+          crystal build src/main.cr --release --no-debug \
+            --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
+            -o jb_updater
 
           cd ..
           tar -czf jb_updater-macos-${ARCH}.tar.gz -C jb_updater jb_updater
@@ -97,6 +112,10 @@ jobs:
         with:
           name: jb_updater-windows-x64
           path: jb_updater-windows-x64.zip
+
+  # =========================================================
+  # ===============   RELEASE  JOB   ========================
+  # =========================================================
 
   release:
     name: Create GitHub Release
