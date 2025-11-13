@@ -2,6 +2,11 @@ require "./jb_updater"
 
 opts = JBUpdater.parse_cli
 
+if opts.product && opts.ide_path
+  JBUpdater::Log.fail("Specify either --product or --ide-path, not both.")
+  exit 1
+end
+
 # ---------------------------------------------------------------------
 # Resolve plugins directory automatically if only --product is passed
 # ---------------------------------------------------------------------

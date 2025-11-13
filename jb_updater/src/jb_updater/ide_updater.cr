@@ -13,8 +13,15 @@ module JBUpdater
 
     def run : Nil
       if opts.product.nil?
-        Log.fail("Missing --product <Name> (e.g., RubyMine2025.2)")
-        exit 1
+        if p = opts.ide_path
+          # Try to infer product name from the last folder part
+          guessed = File.basename(p).sub(/\.app$/, "")
+          opts.product = guessed
+          Log.info("Guessed product name: #{guessed}")
+        else
+          Log.fail("Missing --product <Name> (e.g., RubyMine2025.2)")
+          exit 1
+        end
       end
 
       product = opts.product.not_nil!
@@ -27,8 +34,6 @@ module JBUpdater
         upgrade_direct(product, final_uri)
       end
     end
-
-    # ------------------------------------------------------------------------
 
     private def latest_ide_download_url(product : String) : URI
       # Example JetBrains API endpoint:

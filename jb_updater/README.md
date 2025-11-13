@@ -58,27 +58,25 @@ jb_updater \
 ```shell
 # auto‑detect architecture and download from CDN
 jb_updater --product RubyMine --upgrade-ide
+# or
+jb_updater --ide-path /Applications/WebStorm.app --upgrade-ide
 ```
 
 ### All options
 
-| Option                       | Description                                                                         |
-|------------------------------|-------------------------------------------------------------------------------------|
-| `--plugins-dir DIR`          | Path to `.../<ProductYYYY.X>/plugins` (required for plugin mode)                    |
-| `--product NAME`             | IDE name (e.g. `RubyMine` or `RubyMine2025.2`)                                      |
-| `--build BUILD`              | Override detected IDE build (`RM‑252.23892.415`)                                    |
-| `--only IDS`                 | Comma‑separated list of plugin xmlIds to update                                     |
-| `--only-incompatible`        | Update only plugins not matching current build                                      |
-| `--downloads-host HOST`      | Rewrite Marketplace `/files/` host (default: `downloads.marketplace.jetbrains.com`) |
-| `--pin xmlId=version`        | Force specific plugin version(s)                                                    |
-| `--direct xmlId=https://...` | Provide direct plugin URL(s)                                                        |
-| `--install-plugin IDS`       | Install one or more plugin IDs (comma or `@version`)                                |
-| `--upgrade-ide`              | Upgrade the entire IDE via JetBrains Releases API                                   |
-| `--brew`                     | Patch the local Homebrew Cask instead of direct download                            |
-| `--arch arm/intel`           | Force architecture; autodetects via `uname ‑m`                                      |
-| `--dry-run`                  | Show what would happen without changing files                                       |
-| `--list`                     | List installed plugins with compatibility status                                    |
-| `--help`                     | Show CLI help                                                                       |
+| Option                       | Description                                                 |
+|------------------------------|-------------------------------------------------------------|
+| `--plugins-dir DIR`          | Plugins directory                                           |
+| `-b`, `--build BUILD`        | IDE build                                                   |
+| `-d`, `--dry-run`            | Dry run                                                     |
+| `-l`, `--list`               | List plugins                                                |
+| `-i`, `--install-plugin IDS` | Install plugins (comma-separated)                           |
+| `--product NAME`             | IDE product name (e.g., RubyMine or RubyMine2025.2)         |
+| `--arch ARCH`                | Architecture (arm or intel); default: autodetect            |
+| `--upgrade-ide`              | Upgrade whole IDE instead of plugins                        |
+| `--ide-path PATH`            | Specify custom IDE installation path                        |
+| [WIP] `--brew`               | ~~Patch Homebrew cask Ruby file instead of direct install~~ |
+| `-h`, `--help`               | Show help                                                   |
 
 ---
 
