@@ -2,8 +2,8 @@ name: Build jb_updater
 
 on:
   push:
-    branches: ["**"]
-  workflow_dispatch: {}
+    branches: [ "**" ]
+  workflow_dispatch: { }
 
 permissions:
   contents: write
@@ -25,10 +25,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxml2-dev libssl-dev libpcre2-dev libgc-dev liblzma-dev
+      - name: Install shards
+        working-directory: jb_updater
+        run: shards install
+      - name: Run specs
+        working-directory: jb_updater
+        run: crystal spec -v
       - name: Build binary
         run: |
           cd jb_updater
-          shards install
           crystal build src/main.cr --release -o jb_updater
           cd ..
           tar -czf jb_updater-linux-x86_64.tar.gz -C jb_updater jb_updater
@@ -43,9 +48,9 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            runs_on: macos-latest       # Apple Silicon host
+            runs_on: macos-latest
           - arch: x86_64
-            runs_on: macos-13           # Intel host
+            runs_on: macos-13
     runs-on: ${{ matrix.runs_on }}
     env:
       ARCH: ${{ matrix.arch }}
@@ -56,6 +61,12 @@ jobs:
           crystal: latest
       - name: Install OpenSSL 3
         run: brew install openssl@3
+      - name: Install shards
+        working-directory: jb_updater
+        run: shards install
+      - name: Run specs
+        working-directory: jb_updater
+        run: crystal spec -v
       - name: Build binary
         run: |
           cd jb_updater
@@ -63,7 +74,6 @@ jobs:
           unset PKG_CONFIG_PATH
           export PKG_CONFIG_PATH="${brew_prefix}/lib/pkgconfig"
           echo "Using OpenSSL from ${brew_prefix}"
-          shards install
           crystal build src/main.cr --release --no-debug \
             --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
             -o jb_updater
@@ -82,10 +92,15 @@ jobs:
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
+      - name: Install shards
+        working-directory: jb_updater
+        run: shards install
+      - name: Run specs
+        working-directory: jb_updater
+        run: crystal spec -v
       - name: Build binary
         run: |
           cd jb_updater
-          shards install
           crystal build src/main.cr --release -o jb_updater.exe
           cd ..
           Compress-Archive -Path jb_updater\jb_updater.exe -DestinationPath jb_updater-windows-x64.zip
@@ -99,12 +114,12 @@ jobs:
   # =========================================================
 
   release:
-    name: Create GitHub Release (manual)
-    needs: [linux, macos, windows]
+    name: Create GitHub Release (manual, master only)
+    needs: [ linux, macos, windows ]
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
     steps:
-      - name: Download All Artifacts
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./all-artifacts
