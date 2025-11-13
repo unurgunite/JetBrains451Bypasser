@@ -1,20 +1,9 @@
-name: Build and Release
+name: Build jb_updater (manual release)
 
-#on:
-#  push:
-#    branches:
-#      - main
-#      - develop
-#      - "feature/**"
-#    tags:
-#      - "v*.*.*"
-#  pull_request:
-#    branches:
-#      - main
-#      - develop
-#      - "feature/**"
-
-on: [push]
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -65,27 +54,19 @@ jobs:
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
-
       - name: Install OpenSSL 3
-        run: |
-          brew install openssl@3
-
+        run: brew install openssl@3
       - name: Build binary
         run: |
           cd jb_updater
           brew_prefix=$(brew --prefix openssl@3)
-
-          # Always use OpenSSL 3's pkg-config info
           unset PKG_CONFIG_PATH
           export PKG_CONFIG_PATH="${brew_prefix}/lib/pkgconfig"
           echo "Using OpenSSL from ${brew_prefix}"
-
-          # Native build for this host (ARM or Intel)
           shards install
           crystal build src/main.cr --release --no-debug \
             --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
             -o jb_updater
-
           cd ..
           tar -czf jb_updater-macos-${ARCH}.tar.gz -C jb_updater jb_updater
       - uses: actions/upload-artifact@v4
@@ -114,25 +95,23 @@ jobs:
           path: jb_updater-windows-x64.zip
 
   # =========================================================
-  # ===============   RELEASE  JOB   ========================
+  # ===============   MANUAL  RELEASE  =======================
   # =========================================================
 
   release:
-    name: Create GitHub Release
+    name: Create GitHub Release (manual)
     needs: [linux, macos, windows]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./all-artifacts
-
       - name: Flatten artifacts
         run: |
           mkdir -p release-assets
           find ./all-artifacts -type f -exec mv {} ./release-assets/ \;
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
