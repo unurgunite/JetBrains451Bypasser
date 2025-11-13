@@ -10,14 +10,17 @@ describe Utils do
 
       {% if flag?(:darwin) %}
         base = File.join(tmp, "Library/Application Support/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:linux) %}
         base = File.join(tmp, ".local/share/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:win32) %}
         base = File.join(tmp, "AppData", "Roaming", "JetBrains")
+        FileUtils.mkdir_p(File.dirname(base)) # ensure C:\...AppData\Roaming exists
+        ENV["APPDATA"] = File.join(tmp, "AppData", "Roaming")
       {% end %}
 
       FileUtils.mkdir_p(File.join(base, "WebStorm2025.2"))
-      ENV["HOME"] = tmp
 
       begin
         result = Utils.resolve_product_folder("WebStorm2025.2")
@@ -30,17 +33,21 @@ describe Utils do
     it "returns latest matching folder for short product name" do
       tmp = File.join(Dir.tempdir, "jb-test-#{Random::Secure.hex(4)}")
       base = ""
+
       {% if flag?(:darwin) %}
         base = File.join(tmp, "Library/Application Support/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:linux) %}
         base = File.join(tmp, ".local/share/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:win32) %}
         base = File.join(tmp, "AppData", "Roaming", "JetBrains")
+        FileUtils.mkdir_p(File.dirname(base))
+        ENV["APPDATA"] = File.join(tmp, "AppData", "Roaming")
       {% end %}
 
       FileUtils.mkdir_p(File.join(base, "WebStorm2024.1"))
       FileUtils.mkdir_p(File.join(base, "WebStorm2025.2"))
-      ENV["HOME"] = tmp
 
       begin
         latest = Utils.resolve_product_folder("WebStorm")
@@ -53,20 +60,24 @@ describe Utils do
     it "raises if no matching folder found" do
       tmp = File.join(Dir.tempdir, "jb-test-#{Random::Secure.hex(4)}")
       base = ""
+
       {% if flag?(:darwin) %}
         base = File.join(tmp, "Library/Application Support/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:linux) %}
         base = File.join(tmp, ".local/share/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:win32) %}
         base = File.join(tmp, "AppData", "Roaming", "JetBrains")
+        FileUtils.mkdir_p(File.dirname(base))
+        ENV["APPDATA"] = File.join(tmp, "AppData", "Roaming")
       {% end %}
 
       FileUtils.mkdir_p(base)
-      ENV["HOME"] = tmp
 
       begin
         expect_raises(Exception, /No config folder/) do
-          Utils.resolve_product_folder("GhostIDE")
+          Utils.resolve_product_folder("FooIDE")
         end
       ensure
         FileUtils.rm_rf(tmp)
@@ -78,16 +89,20 @@ describe Utils do
     it "builds correct plugins path" do
       tmp = File.join(Dir.tempdir, "jb-home-#{Random::Secure.hex(4)}")
       base = ""
+
       {% if flag?(:darwin) %}
         base = File.join(tmp, "Library/Application Support/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:linux) %}
         base = File.join(tmp, ".local/share/JetBrains")
+        ENV["HOME"] = tmp
       {% elsif flag?(:win32) %}
         base = File.join(tmp, "AppData", "Roaming", "JetBrains")
+        FileUtils.mkdir_p(File.dirname(base))
+        ENV["APPDATA"] = File.join(tmp, "AppData", "Roaming")
       {% end %}
 
       FileUtils.mkdir_p(File.join(base, "RubyMine2025.2"))
-      ENV["HOME"] = tmp
 
       begin
         path = Utils.expand_jetbrains_plugins_dir("RubyMine2025.2")
