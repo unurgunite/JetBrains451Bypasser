@@ -27,13 +27,16 @@ jobs:
 
   macos:
     strategy:
-      matrix: { arch: [x86_64, arm64] }
+      matrix:
+        arch: [ x86_64, arm64 ]
     runs-on: macos-latest
-    env: { ARCH: ${{ matrix.arch }} }
+    env:
+      ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - uses: crystal-lang/install-crystal@v1
-        with: { crystal: latest }
+        with:
+          crystal: latest
       - name: Build binary
         run: |
           cd jb_updater
