@@ -46,10 +46,10 @@ module JBUpdater
     OptionParser.parse do |parser|
       parser.banner = "Usage: jb_updater [options]"
       parser.on("--plugins-dir DIR", "Plugins directory") { |v| opts.plugins_dir = v }
-      parser.on("--build BUILD", "IDE build") { |v| opts.build = v }
-      parser.on("--dry-run", "Dry run") { opts.dry_run = true }
-      parser.on("--list", "List plugins") { opts.list = true }
-      parser.on("--install-plugin IDS", "Install plugins (comma-separated)") { |v| opts.install_ids = v.split(',') }
+      parser.on("-b", "--build BUILD", "IDE build") { |v| opts.build = v }
+      parser.on("-d", "--dry-run", "Dry run") { opts.dry_run = true }
+      parser.on("-l", "--list", "List plugins") { opts.list = true }
+      parser.on("-i", "--install-plugin IDS", "Install plugins (comma-separated)") { |v| opts.install_ids = v.split(',') }
       parser.on("--product NAME", "IDE product name (e.g., RubyMine or RubyMine2025.2)") do |v|
         opts.product = v
       end
