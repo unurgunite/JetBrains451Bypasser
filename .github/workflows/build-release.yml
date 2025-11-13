@@ -1,4 +1,4 @@
-name: Build & Release Binaries
+name: Build and Release
 
 on:
   push:
@@ -10,162 +10,69 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build for ${{ matrix.platform }} (${{ matrix.arch }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            platform: macos
-            arch: x86_64
-            target: x86_64-apple-darwin
-            ext: ""
-            package_format: tar.gz
-          - os: macos-latest
-            platform: macos
-            arch: arm64
-            target: aarch64-apple-darwin
-            ext: ""
-            package_format: tar.gz
-          - os: ubuntu-latest
-            platform: linux
-            arch: x86_64
-            target: x86_64-linux-gnu
-            ext: ""
-            package_format: tar.gz
-          - os: ubuntu-latest-arm64
-            platform: linux
-            arch: arm64
-            target: aarch64-linux-gnu
-            ext: ""
-            package_format: tar.gz
-          - os: ubuntu-latest
-            platform: windows
-            arch: x64
-            target: x86_64-w64-mingw32
-            ext: ".exe"
-            package_format: zip
-
-    env:
-      PLATFORM: ${{ matrix.platform }}
-      TARGET: ${{ matrix.target }}
-      EXT: ${{ matrix.ext }}
-      ARCH: ${{ matrix.arch }}
-
+  linux:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+        with: { crystal: latest }
+      - run: sudo apt-get update && sudo apt-get install -y libxml2-dev libssl-dev libpcre2-dev libgc-dev liblzma-dev
+      - run: |
+          cd jb_updater
+          shards install
+          crystal build src/main.cr --release -o jb_updater
+      - run: tar -czf jb_updater-linux-x86_64.tar.gz -C jb_updater jb_updater
+      - uses: actions/upload-artifact@v4
+        with: { name: jb_updater-linux, path: jb_updater-linux-x86_64.tar.gz }
 
-      - name: Set up Crystal (Linux/macOS)
-        if: env.PLATFORM != 'windows'
-        uses: crystal-lang/install-crystal@v1
-        with:
-          crystal: latest
-
-      - name: Install MinGW + deps for Windows
-        if: env.PLATFORM == 'windows'
+  macos:
+    strategy:
+      matrix: { arch: [x86_64, arm64] }
+    runs-on: macos-latest
+    env: { ARCH: ${{ matrix.arch }} }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+        with: { crystal: latest }
+      - name: Build binary
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mingw-w64 libpcre2-dev libgc-dev
-
-      - name: Install Crystal for Windows cross-compilation
-        if: env.PLATFORM == 'windows'
-        run: |
-          curl -fsSL https://crystal-lang.org/install.sh | sudo bash
-          cd jb_updater && shards install --ignore-crystal-version
-
-      - name: Install Shards (non-Windows)
-        if: env.PLATFORM != 'windows'
-        working-directory: ./jb_updater
-        run: shards install --ignore-crystal-version
-
-      - name: Install Linux deps (for static linking)
-        if: env.PLATFORM == 'linux' && runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxml2-dev libssl-dev libpcre2-dev libgc-dev liblzma-dev
-
-      - name: Build Binary
-        working-directory: ./jb_updater
-        run: |
-          mkdir -p ../out
-          OUTPUT_NAME="../out/jb_updater$EXT"
-
-          if [[ "$PLATFORM" == "windows" ]]; then
-            crystal build src/main.cr --cross-compile --target $TARGET --output jb_updater_temp
-            OBJ_FILE=$(find . -name "jb_updater_temp*.o" | head -n1)
-            if [ -z "$OBJ_FILE" ]; then
-              echo "Error: Object file not found after cross-compilation"
-              exit 1
-            fi
-            x86_64-w64-mingw32-gcc "$OBJ_FILE" -o jb_updater.exe \
-              -lpcre2-8 -lm -lgc -lpthread -ladvapi32 -lws2_32 -liconv -lbcrypt -lcrypt32
-            cp jb_updater.exe "$OUTPUT_NAME"
-
-          elif [[ "$PLATFORM" == "linux" ]]; then
-            crystal build src/main.cr --release --static --target $TARGET -o jb_updater
-            cp jb_updater "$OUTPUT_NAME"
-
-          else # macOS
-            if [[ "$ARCH" == "x86_64" ]]; then
-              # Force x86_64 compilation on ARM64 host
-              SDKROOT=$(xcrun --sdk macosx --show-sdk-path) \
-              CC="clang -arch x86_64" \
-              crystal build src/main.cr --release --target $TARGET -o jb_updater
-            else
-              crystal build src/main.cr --release --target $TARGET -o jb_updater
-            fi
-            cp jb_updater "$OUTPUT_NAME"
-          fi
-
-      - name: Package Artifact
-        id: package
-        run: |
-          mkdir -p dist
-          cp ../out/jb_updater$EXT dist/
-
-          cd dist
-          FILENAME="jb_updater-$PLATFORM-$ARCH$EXT"
-          mv jb_updater$EXT "$FILENAME"
-
-          if [[ "${{ matrix.package_format }}" == "zip" ]]; then
-            zip -j "${FILENAME}.zip" "$FILENAME"
-            ASSET="${FILENAME}.zip"
+          cd jb_updater
+          if [[ "$ARCH" == "x86_64" ]]; then
+            SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+            CC="clang -arch x86_64" crystal build src/main.cr --release --no-debug -o jb_updater
           else
-            tar -czf "${FILENAME}.tar.gz" "$FILENAME"
-            ASSET="${FILENAME}.tar.gz"
+            crystal build src/main.cr --release --no-debug -o jb_updater
           fi
-
-          echo "asset_path=dist/$ASSET" >> $GITHUB_OUTPUT
-          echo "asset_name=$ASSET" >> $GITHUB_OUTPUT
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+          cd ..
+          tar -czf jb_updater-macos-${ARCH}.tar.gz -C jb_updater jb_updater
+      - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-${{ matrix.platform }}-${{ matrix.arch }}
-          path: ${{ steps.package.outputs.asset_path }}
+          name: jb_updater-macos-${{ matrix.arch }}
+          path: jb_updater-macos-${{ matrix.arch }}.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+      - run: |
+          cd jb_updater
+          shards install
+          crystal build src/main.cr --release -o jb_updater.exe
+          cd ..
+          Compress-Archive -Path jb_updater\jb_updater.exe -DestinationPath jb_updater-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jb_updater-windows
+          path: jb_updater-windows-x64.zip
 
   release:
-    name: Create GitHub Release
-    needs: build
+    needs: [linux, macos, windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./all-artifacts
-
-      - name: Flatten Artifacts
-        run: |
-          mkdir -p release-assets
-          find ./all-artifacts -name "*.zip" -exec mv {} ./release-assets/ \;
-          find ./all-artifacts -name "*.tar.gz" -exec mv {} ./release-assets/ \;
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release-assets/*
-          generate_release_notes: true
+      - uses: actions/download-artifact@v4
+        with: { path: ./artifacts }
+      - run: mv ./artifacts/*/* ./release-assets/
+      - uses: softprops/action-gh-release@v2
+        with: { files: release-assets/*, generate_release_notes: true }
