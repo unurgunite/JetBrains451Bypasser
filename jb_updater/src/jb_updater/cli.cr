@@ -15,6 +15,7 @@ module JBUpdater
     property include_bundled : Bool
     property install_ids : Array(String)
     property product : String?
+    property ide_path : String?
     property brew_patch : Bool?
     property upgrade_ide : Bool
     property ide_downloads_host : String
@@ -35,6 +36,7 @@ module JBUpdater
       @upgrade_ide = false
       @ide_downloads_host = "download-cdn.jetbrains.com"
       @arch = nil
+      @ide_path = nil
     end
   end
 
@@ -55,6 +57,9 @@ module JBUpdater
         opts.arch = v.downcase
       end
       parser.on("--upgrade-ide", "Upgrade whole IDE instead of plugins") { opts.upgrade_ide = true }
+      parser.on("--ide-path PATH", "Specify custom IDE installation path") do |v|
+        opts.ide_path = v
+      end
       parser.on("--brew", "Patch Homebrew cask Ruby file instead of direct install") { opts.brew_patch = nil }
       parser.on("-h", "--help", "Show help") do
         puts parser

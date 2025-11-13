@@ -68,33 +68,46 @@ module JBUpdater
     end
 
     private def detect_build_info_macos : String?
-      base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
-      app_path = "/Applications/#{base}.app"
-      info_json = File.join(app_path, "Contents", "Resources", "product-info.json")
-      build_txt = File.join(app_path, "Contents", "Resources", "build.txt")
+      if custom = @opts.ide_path
+        info_json = File.join(custom, "Contents", "Resources", "product-info.json")
+        build_txt = File.join(custom, "Contents", "Resources", "build.txt")
+      else
+        base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
+        app_path = "/Applications/#{base}.app"
+        info_json = File.join(app_path, "Contents", "Resources", "product-info.json")
+        build_txt = File.join(app_path, "Contents", "Resources", "build.txt")
+      end
 
       if File.file?(info_json)
-        data = JSON.parse(File.read(info_json))
-
-        code =
-          data["productCode"]?.try(&.as_s?) ||
-            data["product"]?.try(&.[]("code")).try(&.as_s?)
-
-        build =
-          data["buildNumber"]?.try(&.as_s?) ||
-            data["build"]?.try(&.as_s?) ||
-            data["version"]?.try(&.as_s?)
-
-        return "#{code}-#{build}" if code && build
+        begin
+          data = JSON.parse(File.read(info_json))
+          code =
+            data["productCode"]?.try(&.as_s?) ||
+              data["product"]?.try(&.[]("code")).try(&.as_s?)
+          build =
+            data["buildNumber"]?.try(&.as_s?) ||
+              data["build"]?.try(&.as_s?) ||
+              data["version"]?.try(&.as_s?)
+          return "#{code}-#{build}" if code && build
+        rescue ex
+          JBUpdater::Log.warn("Failed to parse product-info.json at #{info_json}: #{ex.message}")
+        end
       elsif File.file?(build_txt)
         build = File.read(build_txt).strip
         return "RM-#{build}" unless build.empty?
       end
 
+      JBUpdater::Log.warn("Could not detect build (no metadata found in #{custom || "/Applications"})")
       nil
     end
 
     private def detect_build_info_linux : String?
+      if custom = @opts.ide_path
+        info_json = File.join(custom, "bin", "product-info.json")
+        build_txt = File.join(custom, "build.txt")
+        return read_linux_build_info(info_json, build_txt, File.basename(custom))
+      end
+
       base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
       candidates = [
         "/opt/#{base}",
@@ -103,18 +116,42 @@ module JBUpdater
       ]
 
       candidates.each do |root|
-        info = File.join(root, "bin", "product-info.json")
-        if File.file?(info)
-          data = JSON.parse(File.read(info))
+        info_json = File.join(root, "bin", "product-info.json")
+        build_txt = File.join(root, "build.txt")
+        if result = read_linux_build_info(info_json, build_txt, base)
+          return result
+        end
+      end
+
+      JBUpdater::Log.warn("Could not detect build for #{base} on Linux")
+      nil
+    end
+
+    private def read_linux_build_info(info_json : String, build_txt : String, base : String) : String?
+      if File.file?(info_json)
+        begin
+          data = JSON.parse(File.read(info_json))
           code = data["productCode"]?.try(&.as_s?) || data["product"]?.try(&.[]("code")).try(&.as_s?)
           build = data["buildNumber"]?.try(&.as_s?) || data["build"]?.try(&.as_s?) || data["version"]?.try(&.as_s?)
           return "#{code}-#{build}" if code && build
+        rescue ex
+          JBUpdater::Log.warn("Parse error in #{info_json}: #{ex.message}")
         end
+      elsif File.file?(build_txt)
+        build = File.read(build_txt).strip
+        return "#{base}-#{build}" unless build.empty?
       end
+
       nil
     end
 
     private def detect_build_info_windows : String?
+      if custom = @opts.ide_path
+        info_json = File.join(custom, "bin", "product-info.json")
+        build_txt = File.join(custom, "build.txt")
+        return read_windows_build_info(info_json, build_txt, File.basename(custom))
+      end
+
       base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).sub(/\d.*$/, "")
       roots = [
         ENV["LOCALAPPDATA"]?,
@@ -126,16 +163,32 @@ module JBUpdater
         path = File.join(root, "JetBrains", base)
         info_json = File.join(path, "bin", "product-info.json")
         build_txt = File.join(path, "build.txt")
-        if File.file?(info_json)
-          j = JSON.parse(File.read(info_json))
-          code = j["productCode"]?.try(&.as_s?)
-          build = j["buildNumber"]?.try(&.as_s?)
-          return "#{code}-#{build}" if code && build
-        elsif File.file?(build_txt)
-          build = File.read(build_txt).strip
-          return "#{base}-#{build}" unless build.empty?
+        if result = read_windows_build_info(info_json, build_txt, base)
+          return result
         end
       end
+
+      JBUpdater::Log.warn("Could not detect build for #{base} on Windows")
+      nil
+    end
+
+    private def read_windows_build_info(info_json : String, build_txt : String, base : String) : String?
+      if File.file?(info_json)
+        begin
+          j = JSON.parse(File.read(info_json))
+          code = j["productCode"]?.try(&.as_s?)
+          build = j["buildNumber"]?.try(&.as_s?) ||
+                  j["build"]?.try(&.as_s?) ||
+                  j["version"]?.try(&.as_s?)
+          return "#{code}-#{build}" if code && build
+        rescue ex
+          JBUpdater::Log.warn("Parse error in #{info_json}: #{ex.message}")
+        end
+      elsif File.file?(build_txt)
+        build = File.read(build_txt).strip
+        return "#{base}-#{build}" unless build.empty?
+      end
+
       nil
     end
 
