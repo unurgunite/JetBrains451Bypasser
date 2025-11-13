@@ -50,34 +50,76 @@ module JBUpdater
       end
     end
 
-    private def validate!
-      raise "plugins_dir required" unless @opts.plugins_dir
-      raise "Plugins dir not found: #{@opts.plugins_dir}" unless Dir.exists?(@opts.plugins_dir.not_nil!)
-    end
-
     private def detect_build_info : String?
+      base_name = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
+      info_json = ""
+      build_txt = ""
+
+      # Prefer explicit --ide-path
+      if custom = @opts.ide_path
+        {% if flag?(:darwin) %}
+          info_json, build_txt = ide_metadata_paths(:mac, custom)
+        {% elsif flag?(:linux) %}
+          info_json, build_txt = ide_metadata_paths(:linux, custom)
+        {% elsif flag?(:win32) %}
+          info_json, build_txt = ide_metadata_paths(:windows, custom)
+        {% else %}
+          raise "Unsupported platform"
+        {% end %}
+        if result = read_build_info(info_json, build_txt, File.basename(custom))
+          return result
+        end
+      end
+
+      candidates = [] of String
       {% if flag?(:darwin) %}
-        detect_build_info_macos
+        candidates = ["/Applications/#{base_name}.app"]
       {% elsif flag?(:linux) %}
-        detect_build_info_linux
+        candidates = ["/opt/#{base_name}", "/usr/share/#{base_name}", "/snap/#{base_name}/current"]
       {% elsif flag?(:win32) %}
-        detect_build_info_windows
+        roots = [
+          ENV["LOCALAPPDATA"]?,
+          ENV["PROGRAMFILES"]?,
+          ENV["PROGRAMFILES(X86)"]?,
+        ].compact
+        candidates = roots.map { |r| File.join(r, "JetBrains", base_name) }
       {% else %}
         raise "Unsupported platform"
       {% end %}
-    end
 
-    private def detect_build_info_macos : String?
-      if custom = @opts.ide_path
-        info_json = File.join(custom, "Contents", "Resources", "product-info.json")
-        build_txt = File.join(custom, "Contents", "Resources", "build.txt")
-      else
-        base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
-        app_path = "/Applications/#{base}.app"
-        info_json = File.join(app_path, "Contents", "Resources", "product-info.json")
-        build_txt = File.join(app_path, "Contents", "Resources", "build.txt")
+      candidates.each do |root|
+        {% if flag?(:darwin) %}
+          info_json, build_txt = ide_metadata_paths(:mac, root)
+        {% elsif flag?(:linux) %}
+          info_json, build_txt = ide_metadata_paths(:linux, root)
+        {% elsif flag?(:win32) %}
+          info_json, build_txt = ide_metadata_paths(:windows, root)
+        {% end %}
+        if result = read_build_info(info_json, build_txt, base_name)
+          return result
+        end
       end
 
+      JBUpdater::Log.warn("Could not detect build for #{base_name}")
+      nil
+    end
+
+    private def ide_metadata_paths(platform, root : String) : {String, String}
+      case platform
+      when :mac
+        {
+          File.join(root, "Contents", "Resources", "product-info.json"),
+          File.join(root, "Contents", "Resources", "build.txt"),
+        }
+      else
+        {
+          File.join(root, "bin", "product-info.json"),
+          File.join(root, "build.txt"),
+        }
+      end
+    end
+
+    private def read_build_info(info_json : String, build_txt : String, base_name : String) : String?
       if File.file?(info_json)
         begin
           data = JSON.parse(File.read(info_json))
@@ -90,106 +132,18 @@ module JBUpdater
               data["version"]?.try(&.as_s?)
           return "#{code}-#{build}" if code && build
         rescue ex
-          JBUpdater::Log.warn("Failed to parse product-info.json at #{info_json}: #{ex.message}")
-        end
-      elsif File.file?(build_txt)
-        build = File.read(build_txt).strip
-        return "RM-#{build}" unless build.empty?
-      end
-
-      JBUpdater::Log.warn("Could not detect build (no metadata found in #{custom || "/Applications"})")
-      nil
-    end
-
-    private def detect_build_info_linux : String?
-      if custom = @opts.ide_path
-        info_json = File.join(custom, "bin", "product-info.json")
-        build_txt = File.join(custom, "build.txt")
-        return read_linux_build_info(info_json, build_txt, File.basename(custom))
-      end
-
-      base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
-      candidates = [
-        "/opt/#{base}",
-        "/usr/share/#{base}",
-        "/snap/#{base}/current",
-      ]
-
-      candidates.each do |root|
-        info_json = File.join(root, "bin", "product-info.json")
-        build_txt = File.join(root, "build.txt")
-        if result = read_linux_build_info(info_json, build_txt, base)
-          return result
-        end
-      end
-
-      JBUpdater::Log.warn("Could not detect build for #{base} on Linux")
-      nil
-    end
-
-    private def read_linux_build_info(info_json : String, build_txt : String, base : String) : String?
-      if File.file?(info_json)
-        begin
-          data = JSON.parse(File.read(info_json))
-          code = data["productCode"]?.try(&.as_s?) || data["product"]?.try(&.[]("code")).try(&.as_s?)
-          build = data["buildNumber"]?.try(&.as_s?) || data["build"]?.try(&.as_s?) || data["version"]?.try(&.as_s?)
-          return "#{code}-#{build}" if code && build
-        rescue ex
           JBUpdater::Log.warn("Parse error in #{info_json}: #{ex.message}")
         end
       elsif File.file?(build_txt)
         build = File.read(build_txt).strip
-        return "#{base}-#{build}" unless build.empty?
+        return "#{base_name}-#{build}" unless build.empty?
       end
-
       nil
     end
 
-    private def detect_build_info_windows : String?
-      if custom = @opts.ide_path
-        info_json = File.join(custom, "bin", "product-info.json")
-        build_txt = File.join(custom, "build.txt")
-        return read_windows_build_info(info_json, build_txt, File.basename(custom))
-      end
-
-      base = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).sub(/\d.*$/, "")
-      roots = [
-        ENV["LOCALAPPDATA"]?,
-        ENV["PROGRAMFILES"]?,
-        ENV["PROGRAMFILES(X86)"]?,
-      ].compact
-
-      roots.each do |root|
-        path = File.join(root, "JetBrains", base)
-        info_json = File.join(path, "bin", "product-info.json")
-        build_txt = File.join(path, "build.txt")
-        if result = read_windows_build_info(info_json, build_txt, base)
-          return result
-        end
-      end
-
-      JBUpdater::Log.warn("Could not detect build for #{base} on Windows")
-      nil
-    end
-
-    private def read_windows_build_info(info_json : String, build_txt : String, base : String) : String?
-      if File.file?(info_json)
-        begin
-          j = JSON.parse(File.read(info_json))
-          code = j["productCode"]?.try(&.as_s?)
-          build = j["buildNumber"]?.try(&.as_s?) ||
-                  j["build"]?.try(&.as_s?) ||
-                  j["version"]?.try(&.as_s?)
-          return "#{code}-#{build}" if code && build
-        rescue ex
-          JBUpdater::Log.warn("Parse error in #{info_json}: #{ex.message}")
-        end
-      elsif File.file?(build_txt)
-        build = File.read(build_txt).strip
-        return "#{base}-#{build}" unless build.empty?
-      end
-
-      nil
+    private def validate!
+      raise "plugins_dir required" unless @opts.plugins_dir
+      raise "Plugins dir not found: #{@opts.plugins_dir}" unless Dir.exists?(@opts.plugins_dir.not_nil!)
     end
 
     private def list_plugins : Nil
@@ -295,7 +249,6 @@ module JBUpdater
         HTTPClient.download(uri, tmp_zip)
         Utils.extract_zip(tmp_zip, target_dir)
 
-        # Re-parse plugin.xml in the freshly extracted directory
         if post = PluginMeta.parse_from_dir(target_dir)
           compat = Utils.build_in_range?(@build.not_nil!, post.since, post.until_build)
           suffix = compat ? "" : " (still incompatible)"
@@ -310,7 +263,6 @@ module JBUpdater
 
     # --- URL-resolution helpers ----------------------------------------------
 
-    # Determine the correct download URL for a given plugin id
     private def final_uri(xml_id : String) : URI
       if @opts.direct_urls.has_key?(xml_id)
         URI.parse(@opts.direct_urls[xml_id])
@@ -321,11 +273,9 @@ module JBUpdater
       end
     end
 
-    # Resolve URL for a specific pinned version
     private def resolve_download_url_for_version(xml_id : String, version : String) : URI
       base = "https://plugins.jetbrains.com/plugin/download?pluginId=#{Utils.escape(xml_id)}&version=#{Utils.escape(version)}"
       res = HTTPClient.head_or_get(base)
-
       case res.status_code
       when 301, 302
         loc = res.headers["Location"]?
@@ -339,11 +289,9 @@ module JBUpdater
       end
     end
 
-    # Resolve URL for the latest compatible version via pluginManager
     private def resolve_download_url_via_plugin_manager(xml_id : String, build : String) : URI
       base = "https://plugins.jetbrains.com/pluginManager?action=download&id=#{Utils.escape(xml_id)}&build=#{Utils.escape(build)}"
       res = HTTPClient.head_or_get(base)
-
       case res.status_code
       when 301, 302
         loc = res.headers["Location"]?
