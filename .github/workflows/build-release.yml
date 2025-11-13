@@ -114,11 +114,18 @@ jobs:
   # =========================================================
 
   release:
-    name: Create GitHub Release (manual, master only)
+    name: Create GitHub Release
     needs: [ linux, macos, windows ]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch'
     steps:
+      - name: Check branch (only master allowed)
+        run: |
+          echo "Triggered for ref: $GITHUB_REF"
+          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
+            echo "Releases are only allowed from master branch."
+            exit 0
+          fi
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
