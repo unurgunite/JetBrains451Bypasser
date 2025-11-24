@@ -41,7 +41,6 @@ module JBUpdater
           case response.status_code
           when 200
             File.open(dest_path, "wb") do |f|
-              # try to read expected length from header
               length_header = response.headers["Content-Length"]?
               total = length_header ? length_header.to_i64 : 0_i64
               downloaded = 0_i64
@@ -74,7 +73,7 @@ module JBUpdater
                 next_uri = URI.new(
                   scheme: uri.scheme,
                   host: uri.host,
-                  port: uri.port, # keep same port
+                  port: uri.port,
                   path: loc
                 )
               end
@@ -98,8 +97,26 @@ module JBUpdater
       return uri unless downloads_host && !downloads_host.empty?
       return uri unless uri.host =~ /^plugins\.jetbrains\.com$/i &&
                         uri.path.starts_with?("/files/")
-      URI.new(scheme: "https", host: downloads_host,
-        path: uri.path, query: uri.query)
+      URI.new(
+        scheme: "https",
+        host: downloads_host,
+        path: uri.path,
+        query: uri.query
+      )
+    end
+
+    # ----------------------------------------------------------------------
+    # Replace JetBrains IDE download host (for CDN/proxy)
+    # ----------------------------------------------------------------------
+    def self.override_ide_repo_host(uri : URI, downloads_host : String? = nil) : URI
+      host = downloads_host || "download-cdn.jetbrains.com"
+      return uri unless uri.host =~ /^download\.jetbrains\.com$/i
+      URI.new(
+        scheme: "https",
+        host: host,
+        path: uri.path,
+        query: uri.query
+      )
     end
   end
 end

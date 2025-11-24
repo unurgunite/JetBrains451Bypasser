@@ -14,7 +14,6 @@ module JBUpdater
     def run : Nil
       if opts.product.nil?
         if p = opts.ide_path
-          # Try to infer product name from the last folder part
           guessed = File.basename(p).sub(/\.app$/, "")
           opts.product = guessed
           Log.info("Guessed product name: #{guessed}")
@@ -26,7 +25,8 @@ module JBUpdater
 
       product = opts.product.not_nil!
       build_url = latest_ide_download_url(product)
-      final_uri = HTTPClient.override_plugin_repo_host(build_url, "download-cdn.jetbrains.com")
+      # use IDE host override, respecting opts.ide_downloads_host
+      final_uri = HTTPClient.override_ide_repo_host(build_url, opts.ide_downloads_host)
 
       if opts.brew_patch
         patch_homebrew_cask(product, final_uri)
@@ -98,8 +98,8 @@ module JBUpdater
     private def upgrade_direct(product : String, uri : URI) : Nil
       dmg_path = File.join(Dir.tempdir, "upgrade-#{product}-#{Time.utc.to_unix}.dmg")
 
-      # Replace JetBrains direct host with CDN mirror
-      cdn_uri = override_ide_repo_host(uri)
+      # uri is already passed through override_ide_repo_host in run
+      cdn_uri = uri
 
       Log.header("Downloading #{product} from #{cdn_uri.host}…")
       begin

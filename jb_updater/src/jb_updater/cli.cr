@@ -20,6 +20,7 @@ module JBUpdater
     property upgrade_ide : Bool
     property ide_downloads_host : String
     property arch : String?
+    property list_ide_releases : Bool
 
     def initialize
       @only = [] of String
@@ -37,6 +38,7 @@ module JBUpdater
       @ide_downloads_host = "download-cdn.jetbrains.com"
       @arch = nil
       @ide_path = nil
+      @list_ide_releases = false
     end
   end
 
@@ -59,6 +61,12 @@ module JBUpdater
       parser.on("--upgrade-ide", "Upgrade whole IDE instead of plugins") { opts.upgrade_ide = true }
       parser.on("--ide-path PATH", "Specify custom IDE installation path") do |v|
         opts.ide_path = v
+      end
+      parser.on("--list-ide-releases", "List IDE releases for given --product code") do
+        opts.list_ide_releases = true
+      end
+      parser.on("--ide-downloads-host HOST", "Override IDE downloads host (default: download-cdn.jetbrains.com)") do |v|
+        opts.ide_downloads_host = v
       end
       parser.on("--brew", "Patch Homebrew cask Ruby file instead of direct install") { opts.brew_patch = nil }
       parser.on("-h", "--help", "Show help") do

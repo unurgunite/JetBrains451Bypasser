@@ -101,7 +101,7 @@ private def run_cli(args : Array(String)) : Nil
   p = Process.new("jb_updater", args: args, output: w, error: w)
   w.close
 
-  # Log what we're running, for debugging / clarity
+  # Log what we're running
   CHANNEL.send(LineMsg.new("Running: jb_updater #{args.join(" ")}"))
 
   # Read on a real OS thread so the UI stays responsive
@@ -115,16 +115,41 @@ private def run_cli(args : Array(String)) : Nil
         chunk = String.new(buf[0, n])
         partial += chunk
 
+        # Percent detection (still works even without newlines)
         if m = percent_re.match(chunk)
           pct = m[1].to_f.round.to_i
           CHANNEL.send(PercentMsg.new(pct))
         end
 
-        while (i = (partial.index('\n') || partial.index('\r')))
-          line = partial[0, i]
-          partial = partial[i + 1, partial.bytesize - i - 1] || ""
+        # Properly split on either '\n' or '\r'
+        loop do
+          newline_index = partial.index('\n')
+          carriage_index = partial.index('\r')
+
+          # choose the earliest delimiter (if any)
+          delim_index =
+            if newline_index && carriage_index
+              {newline_index, carriage_index}.min
+            elsif newline_index
+              newline_index
+            else
+              carriage_index
+            end
+
+          break unless delim_index # no delimiter in partial
+
+          # extract up to (but not including) the delimiter
+          line = partial[0, delim_index]
+          # skip that delimiter character
+          partial = partial[delim_index + 1, partial.bytesize - delim_index - 1] || ""
+
           CHANNEL.send(LineMsg.new(line))
         end
+      end
+
+      # After EOF, flush any remaining non-empty partial as a line
+      unless partial.empty?
+        CHANNEL.send(LineMsg.new(partial))
       end
     ensure
       r.close
