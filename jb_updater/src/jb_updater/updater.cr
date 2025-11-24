@@ -142,8 +142,13 @@ module JBUpdater
     end
 
     private def validate!
-      raise "plugins_dir required" unless @opts.plugins_dir
-      raise "Plugins dir not found: #{@opts.plugins_dir}" unless Dir.exists?(@opts.plugins_dir.not_nil!)
+      if dir = @opts.plugins_dir
+        dir = Utils.expand_tilde(dir)
+        @opts.plugins_dir = dir
+        raise "Plugins dir not found: #{dir}" unless Dir.exists?(dir)
+      else
+        raise "plugins_dir required"
+      end
     end
 
     private def list_plugins : Nil

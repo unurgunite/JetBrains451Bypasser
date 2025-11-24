@@ -16,7 +16,7 @@ struct PercentMsg
 end
 
 alias Msg = LineMsg | PercentMsg
-CHANNEL = Channel(Msg).new
+CHANNEL = Channel(Msg).new(capacity: 1024)
 
 # Keep references to widgets without capturing closures in C callbacks
 module App
@@ -39,7 +39,6 @@ end
 
 # Timer callback (must be a top-level function; no captures)
 fun pump_cb(data : Void*) : LibC::Int
-  # Non-blocking drain of the channel; this runs on the UI thread
   loop do
     handled = false
 
@@ -97,36 +96,49 @@ private def build_args(
 end
 
 private def run_cli(args : Array(String)) : Nil
+  CHANNEL.send(LineMsg.new("DEBUG: run_cli starting"))
+
   r, w = IO.pipe
-  p = Process.new("jb_updater", args: args, output: w, error: w)
+  CHANNEL.send(LineMsg.new("DEBUG: pipe created"))
+
+  exe = "./jb_updater"
+  CHANNEL.send(LineMsg.new("DEBUG: about to spawn #{exe} #{args.join(" ")}"))
+
+  begin
+    p = Process.new(exe, args: args, output: w, error: w)
+  rescue ex
+    CHANNEL.send(LineMsg.new("ERROR: failed to spawn #{exe}: #{ex.message}"))
+    w.close
+    r.close
+    return
+  end
+
+  CHANNEL.send(LineMsg.new("DEBUG: process spawned, pid=#{p.pid}"))
+
   w.close
+  CHANNEL.send(LineMsg.new("DEBUG: write-end closed"))
 
-  # Log what we're running
-  CHANNEL.send(LineMsg.new("Running: jb_updater #{args.join(" ")}"))
-
-  # Read on a real OS thread so the UI stays responsive
   Thread.new do
+    CHANNEL.send(LineMsg.new("DEBUG: reader thread started"))
     begin
       buf = Bytes.new(4096)
       partial = ""
       percent_re = /(\d+(?:\.\d+)?)%/
 
       while (n = r.read(buf)) > 0
+        CHANNEL.send(LineMsg.new("DEBUG: read #{n} bytes from pipe"))
         chunk = String.new(buf[0, n])
         partial += chunk
 
-        # Percent detection (still works even without newlines)
         if m = percent_re.match(chunk)
           pct = m[1].to_f.round.to_i
           CHANNEL.send(PercentMsg.new(pct))
         end
 
-        # Properly split on either '\n' or '\r'
         loop do
           newline_index = partial.index('\n')
           carriage_index = partial.index('\r')
 
-          # choose the earliest delimiter (if any)
           delim_index =
             if newline_index && carriage_index
               {newline_index, carriage_index}.min
@@ -136,28 +148,26 @@ private def run_cli(args : Array(String)) : Nil
               carriage_index
             end
 
-          break unless delim_index # no delimiter in partial
+          break unless delim_index
 
-          # extract up to (but not including) the delimiter
           line = partial[0, delim_index]
-          # skip that delimiter character
           partial = partial[delim_index + 1, partial.bytesize - delim_index - 1] || ""
-
           CHANNEL.send(LineMsg.new(line))
         end
       end
 
-      # After EOF, flush any remaining non-empty partial as a line
       unless partial.empty?
         CHANNEL.send(LineMsg.new(partial))
       end
     ensure
       r.close
       status = p.wait
-      CHANNEL.send(LineMsg.new("Exit: #{status.exit_code}"))
+      CHANNEL.send(LineMsg.new("Process exited with #{status.exit_code} (success=#{status.success?})"))
       CHANNEL.send(PercentMsg.new(status.success? ? 100 : 0))
     end
   end
+
+  CHANNEL.send(LineMsg.new("DEBUG: run_cli returning to UI thread"))
 end
 
 # ---- UI --------------------------------------------------------------
@@ -179,7 +189,6 @@ UIng.init do
   progress = UIng::ProgressBar.new
   App.set_widgets(log, progress)
 
-  # Attach global progress + log once, at the bottom
   root.append(progress, false)
   root.append(log, true)
 
@@ -242,7 +251,15 @@ UIng.init do
 
   # ---- Wire buttons --------------------------------------------------
   btn_list.on_clicked do
-    run_cli(build_args(
+    CHANNEL.send(LineMsg.new("DEBUG: List clicked"))
+
+    text = e_plugins_dir.text
+    if text.nil? || text.empty?
+      CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for List."))
+      next
+    end
+
+    args = build_args(
       e_plugins_dir,
       e_build,
       e_product,
@@ -250,11 +267,21 @@ UIng.init do
       combo_arch,
       chk_dry,
       chk_list
-    ) + ["--list"])
+    ) + ["--list"]
+
+    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+
+    run_cli(args)
   end
 
   btn_install.on_clicked do
-    run_cli(build_args(
+    text = e_plugins_dir.text
+    if text.nil? || text.empty?
+      CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for Install."))
+      next
+    end
+
+    args = build_args(
       e_plugins_dir,
       e_build,
       e_product,
@@ -262,11 +289,20 @@ UIng.init do
       combo_arch,
       chk_dry,
       chk_list
-    ))
+    )
+    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+
+    run_cli(args)
   end
 
   btn_update.on_clicked do
-    run_cli(build_args(
+    text = e_plugins_dir.text
+    if text.nil? || text.empty?
+      CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for Update."))
+      next
+    end
+
+    args = build_args(
       e_plugins_dir,
       e_build,
       e_product,
@@ -274,7 +310,10 @@ UIng.init do
       combo_arch,
       chk_dry,
       chk_list
-    ))
+    )
+    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+
+    run_cli(args)
   end
 
   btn_upgrade.on_clicked do
@@ -286,6 +325,8 @@ UIng.init do
     args += ["--product", ide_product] if ide_product && !ide_product.empty?
     args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
     args << "--brew" if chk_brew.checked?
+
+    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE): #{args.join(" ")}"))
 
     run_cli(args)
   end

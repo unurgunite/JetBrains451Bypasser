@@ -52,7 +52,11 @@ if opts.plugins_dir.nil? && opts.product
 end
 
 # Case 2: normal plugin update / install / list
+# Case 2: normal plugin update / install / list
 if opts.plugins_dir
+  # Expand ~ in plugins_dir, if present
+  opts.plugins_dir = JBUpdater::Utils.expand_tilde(opts.plugins_dir.not_nil!)
+
   plugins_dir = opts.plugins_dir.not_nil!
   puts "Scanning #{plugins_dir}"
 

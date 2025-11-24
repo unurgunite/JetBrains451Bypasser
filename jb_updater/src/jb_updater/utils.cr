@@ -119,6 +119,22 @@ module JBUpdater
       path
     end
 
+    # Expand leading ~ or ~/ in paths
+    def self.expand_tilde(path : String) : String
+      return path unless path.starts_with?("~")
+
+      home = ENV["HOME"]? || File.expand_path("~")
+      return home if path == "~"
+
+      # "~/" or "~foo" – we only handle the simple current-user case (~ or ~/)
+      if path.starts_with?("~/")
+        File.join(home, path[2..])
+      else
+        # "~user" style not supported, just return as-is
+        path
+      end
+    end
+
     # Base JetBrains configuration directory for current OS.
     def self.jetbrains_config_base : String
       {% if flag?(:darwin) %}
