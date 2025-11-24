@@ -1,2 +1,6 @@
 version: 2.0
-shards: {}
+shards:
+  uing:
+    git: https://github.com/kojix2/uing.git
+    version: 0.0.3
+
