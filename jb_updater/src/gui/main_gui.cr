@@ -1,47 +1,6 @@
-# src/gui/main_gui.cr
-
 require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
-
-# ---- Messages passed from worker to UI ----
-struct LineMsg
-  getter text : String
-
-  def initialize(@text : String); end
-end
-
-# Overall progress (all plugins)
-struct OverallPercentMsg
-  getter percent : Int32
-
-  def initialize(@percent : Int32); end
-end
-
-# Per-plugin progress (current download)
-struct PluginPercentMsg
-  getter percent : Int32
-
-  def initialize(@percent : Int32); end
-end
-
-alias Msg = LineMsg | OverallPercentMsg | PluginPercentMsg
-
-# Include Nil to match Crystal 1.17.1 select/closed-channel behavior
-CHANNEL = Channel(Msg | Nil).new(capacity: 1024)
-
-# Small helpers
-def send_line(text : String)
-  CHANNEL.send(LineMsg.new(text))
-end
-
-def send_overall_percent(pct : Int32)
-  CHANNEL.send(OverallPercentMsg.new(pct))
-end
-
-def send_plugin_percent(pct : Int32)
-  CHANNEL.send(PluginPercentMsg.new(pct))
-end
 
 # ---- Global access to log/progress widgets ----
 module App
@@ -49,6 +8,7 @@ module App
   @@overall_progress : UIng::ProgressBar?
   @@plugin_progress : UIng::ProgressBar?
   @@buttons : Array(UIng::Button) = [] of UIng::Button
+  @@busy : Bool = false
 
   def self.set_widgets(
     log : UIng::MultilineEntry,
@@ -74,8 +34,13 @@ module App
     @@plugin_progress.not_nil!
   end
 
+  def self.busy? : Bool
+    @@busy
+  end
+
   # Enable/disable all tracked buttons (must be called on UI thread)
   def self.set_busy(busy : Bool)
+    @@busy = busy
     enabled = !busy
     @@buttons.each do |btn|
       if enabled
@@ -84,58 +49,15 @@ module App
         btn.disable
       end
     end
-  end
-end
-
-# ---- Timer callback: drain CHANNEL on UI thread via select ----
-fun pump_cb(_data : Void*) : LibC::Int
-  max_per_tick = 500
-  count = 0
-
-  begin
-    loop do
-      break if count >= max_per_tick
-
-      handled = false
-
-      select
-      when raw = CHANNEL.receive
-        handled = true
-
-        # Runtime may yield nil when channel is closed; just stop reading
-        next unless raw
-
-        msg = raw.not_nil!
-        case msg
-        when LineMsg
-          text = msg.text
-
-          # Re-enable buttons on plugin update completion or explicit run-done marker
-          if text.includes?("✔ Done. Start the IDE to load updated plugins.") ||
-             text == "[GUI] RUN DONE"
-            App.set_busy(false)
-          end
-
-          App.log.append(text + "\n")
-        when OverallPercentMsg
-          App.overall_progress.value = msg.percent
-        when PluginPercentMsg
-          App.plugin_progress.value = msg.percent
-        end
-
-        count += 1
-      else
-        # no message ready right now; leave loop
-        break
-      end
+    # Reset bars when entering / leaving busy
+    if busy
+      App.overall_progress.value = 0
+      App.plugin_progress.value = 0
+    else
+      App.overall_progress.value = 100
+      App.plugin_progress.value = 0
     end
-  rescue ex : TypeCastError
-    # Defensive: if select/receive hit the Nil-cast bug, log and re-enable buttons
-    send_line("[GUI] pump_cb ERROR: #{ex.message}")
-    App.set_busy(false)
   end
-
-  1
 end
 
 # ---- Helpers ---------------------------------------------------------
@@ -146,11 +68,13 @@ private def expand_tilde(text : String?) : String?
 end
 
 def new_run_header(action : String, args : Array(String))
-  send_line("")
-  send_line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-  send_line("#{action} at #{Time.local}")
-  send_line("Command: ./jb_updater #{args.join(" ")}")
-  send_line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  UIng.queue_main do
+    App.log.append("\n")
+    App.log.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+    App.log.append("#{action} at #{Time.local}\n")
+    App.log.append("Command: ./jb_updater #{args.join(" ")}\n")
+    App.log.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+  end
 end
 
 private def build_args(
@@ -195,35 +119,44 @@ private def jb_exe_path : String
   ENV["JB_UPDATER"]? || "jb_updater"
 end
 
-# ---- CLI execution: worker thread reads pipe, sends to CHANNEL ----
+# ---- CLI execution: spawn jb_updater, stream output, update UI via queue_main ----
 private def run_cli(args : Array(String)) : Nil
-  r, w = IO.pipe
-
-  # Disable buttons for the duration of this run (UI thread)
-  App.set_busy(true)
-
   exe = jb_exe_path
-  send_line("[GUI] spawn: #{exe} #{args.join(" ")}")
+
+  # mark GUI as busy on UI thread
+  UIng.queue_main { App.set_busy(true) }
+
+  # log spawn line
+  UIng.queue_main do
+    App.log.append("[GUI] spawn: #{exe} #{args.join(" ")}\n")
+  end
+
+  # Create a pipe to read process output (stdout+stderr)
+  r, w = IO.pipe
 
   begin
     p = Process.new(exe, args: args, output: w, error: w)
   rescue ex
-    send_line("[GUI] ERROR: failed to spawn: #{ex.message}")
+    UIng.queue_main do
+      App.log.append("[GUI] ERROR: failed to spawn: #{ex.message}\n")
+      App.set_busy(false)
+    end
     w.close
     r.close
-    App.set_busy(false)
     return
   end
   w.close
-  send_line("[GUI] pid=#{p.pid}")
 
-  # pattern for "[n/total]" progress lines from CLI
-  step_re = /\[(\d+)\/(\d+)\]/
-  # ASCII progress bar line: "[#####     ] 37.5%"
-  bar_re = /^\[[# ]+\]\s+(\d+(?:\.\d+)?)%$/
-  # fallback: any "NN%" in a line
-  percent_re = /(\d+(?:\.\d+)?)%/
+  UIng.queue_main do
+    App.log.append("[GUI] pid=#{p.pid}\n")
+  end
 
+  # Regexes for progress parsing
+  step_re = /\[(\d+)\/(\d+)\]/              # [n/total]
+  bar_re = /^\[[# ]+\]\s+(\d+(?:\.\d+)?)%$/ # [###   ] 37.5%
+  percent_re = /(\d+(?:\.\d+)?)%/           # fallback "NN%"
+
+  # Worker thread: read process output, send UI updates via queue_main
   Thread.new do
     begin
       buf = Bytes.new(4096)
@@ -244,7 +177,7 @@ private def run_cli(args : Array(String)) : Nil
             # 1) ASCII per-plugin progress: "[#######    ] 88.4%"
             if m = bar_re.match(line)
               pct = m[1].to_f.round.to_i
-              send_plugin_percent(pct.clamp(0, 100))
+              UIng.queue_main { App.plugin_progress.value = pct.clamp(0, 100) }
               next
             end
 
@@ -254,33 +187,39 @@ private def run_cli(args : Array(String)) : Nil
               total = m[2].to_i
               if total > 0
                 pct = (cur.to_f / total * 100).round.to_i
-                send_overall_percent(pct.clamp(0, 100))
+                UIng.queue_main { App.overall_progress.value = pct.clamp(0, 100) }
               end
             end
 
             # 3) Fallback: any "NN%" in the line; treat as per-plugin progress
             if m = percent_re.match(line)
               pct = m[1].to_f.round.to_i
-              send_plugin_percent(pct.clamp(0, 100))
+              UIng.queue_main { App.plugin_progress.value = pct.clamp(0, 100) }
             end
 
-            send_line(line)
+            # Append line to log
+            UIng.queue_main { App.log.append(line + "\n") }
           end
         end
       end
 
-      send_line(partial) unless partial.empty?
+      unless partial.empty?
+        UIng.queue_main { App.log.append(partial + "\n") }
+      end
     rescue ex
-      send_line("[GUI] worker ERROR: #{ex.class}: #{ex.message}")
-      ex.backtrace.each { |f| send_line("  #{f}") }
+      UIng.queue_main do
+        App.log.append("[GUI] worker ERROR: #{ex.class}: #{ex.message}\n")
+        ex.backtrace.each { |f| App.log.append("  #{f}\n") }
+      end
     ensure
       r.close
       status = p.wait
-      send_line("[GUI] exited #{status.exit_code} (success=#{status.success?})")
-      send_overall_percent(status.success? ? 100 : 0)
-      send_plugin_percent(0)
-      # For non-plugin cases (IDE list/upgrade), this marker will cause buttons to re-enable
-      send_line("[GUI] RUN DONE")
+      UIng.queue_main do
+        App.log.append("[GUI] exited #{status.exit_code} (success=#{status.success?})\n")
+        App.overall_progress.value = status.success? ? 100 : 0
+        App.plugin_progress.value = 0
+        App.set_busy(false)
+      end
     end
   end
 end
@@ -340,8 +279,9 @@ UIng.init do
   combo_arch.selected = 0
 
   chk_dry = UIng::Checkbox.new("Dry run")
-  dummy_chk = UIng::Checkbox.new("")
+  dummy_chk = UIng::Checkbox.new("") # never shown; only passed to build_args
 
+  # Detected products combobox
   combo_products = UIng::Combobox.new
   detected = JBUpdater::DetectProducts.all
 
@@ -359,7 +299,7 @@ UIng.init do
   form.append("Arch (plugins)", combo_arch, false)
 
   if detected.empty?
-    send_line("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually.")
+    log.append("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually.\n")
   end
 
   # --- IDE tab widgets ---
@@ -388,12 +328,12 @@ UIng.init do
   combo_products.on_selected do
     idx = combo_products.selected
     if idx <= 0
-      send_line("[GUI] Product selection: manual/custom")
+      log.append("[GUI] Product selection: manual/custom\n")
       next
     end
 
     prod = detected[idx - 1]
-    send_line("[GUI] Selected product: #{prod.name} (#{prod.code})")
+    log.append("[GUI] Selected product: #{prod.name} (#{prod.code})\n")
 
     if prod.plugins_dir
       e_plugins_dir.text = prod.plugins_dir.not_nil!
@@ -429,16 +369,13 @@ UIng.init do
   all_buttons.concat([btn_list_releases, btn_upgrade])
   App.set_widgets(log, overall_bar, plugin_bar, all_buttons)
 
-  # Start timer to drain CHANNEL via pump_cb
-  UIng::LibUI.timer(50, ->pump_cb, Pointer(Void).null)
-
-  send_line("JB Updater GUI ready. Select a detected IDE or enter paths manually.")
+  log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 
   # ---- Wire buttons: Plugins tab ------------------------------------
   btn_detect.on_clicked do
     product = e_product.text
     if product.nil? || product.empty?
-      send_line("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect.")
+      log.append("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect.\n")
       next
     end
 
@@ -446,16 +383,16 @@ UIng.init do
       resolved = JBUpdater::Utils.resolve_product_folder(product)
       path = JBUpdater::Utils.expand_jetbrains_plugins_dir(resolved)
       e_plugins_dir.text = path
-      send_line("Detected plugins dir: #{path}")
+      log.append("Detected plugins dir: #{path}\n")
     rescue ex
-      send_line("ERROR: #{ex.message}")
+      log.append("ERROR: #{ex.message}\n")
     end
   end
 
   btn_list.on_clicked do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
-      send_line("ERROR: Plugins dir is required for List.")
+      log.append("ERROR: Plugins dir is required for List.\n")
       next
     end
 
@@ -472,8 +409,6 @@ UIng.init do
       dummy_chk
     ) + ["--list"]
 
-    App.overall_progress.value = 0
-    App.plugin_progress.value = 0
     new_run_header("List installed plugins", args)
     run_cli(args)
   end
@@ -481,7 +416,7 @@ UIng.init do
   btn_install.on_clicked do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
-      send_line("ERROR: Plugins dir is required for Install.")
+      log.append("ERROR: Plugins dir is required for Install.\n")
       next
     end
 
@@ -497,9 +432,7 @@ UIng.init do
       chk_dry,
       dummy_chk
     )
-    send_line("DEBUG: args for jb_updater: #{args.join(" ")}")
-    App.overall_progress.value = 0
-    App.plugin_progress.value = 0
+    log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Install plugins", args)
     run_cli(args)
   end
@@ -507,7 +440,7 @@ UIng.init do
   btn_update.on_clicked do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
-      send_line("ERROR: Plugins dir is required for Update.")
+      log.append("ERROR: Plugins dir is required for Update.\n")
       next
     end
 
@@ -523,9 +456,7 @@ UIng.init do
       chk_dry,
       dummy_chk
     )
-    send_line("DEBUG: args for jb_updater: #{args.join(" ")}")
-    App.overall_progress.value = 0
-    App.plugin_progress.value = 0
+    log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Update plugins", args)
     run_cli(args)
   end
@@ -534,14 +465,12 @@ UIng.init do
   btn_list_releases.on_clicked do
     product = e_ide_product.text
     if product.nil? || product.empty?
-      send_line("ERROR: IDE code is required for List releases (e.g., WS, RM).")
+      log.append("ERROR: IDE code is required for List releases (e.g., WS, RM).\n")
       next
     end
 
     args = ["--list-ide-releases", "--product", product]
-    send_line("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}")
-    App.overall_progress.value = 0
-    App.plugin_progress.value = 0
+    log.append("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}\n")
     new_run_header("List IDE releases", args)
     run_cli(args)
   end
@@ -556,9 +485,7 @@ UIng.init do
     args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
     args << "--brew" if chk_brew.checked?
 
-    send_line("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}")
-    App.overall_progress.value = 0
-    App.plugin_progress.value = 0
+    log.append("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}\n")
     new_run_header("Upgrade IDE", args)
     run_cli(args)
   end
