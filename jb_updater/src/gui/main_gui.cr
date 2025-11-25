@@ -2,7 +2,7 @@ require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
 
-# ---- Small message pump to safely touch widgets on the UI thread ----
+# ---- Messages passed from worker to UI ----
 struct LineMsg
   getter text : String
 
@@ -18,7 +18,7 @@ end
 alias Msg = LineMsg | PercentMsg
 CHANNEL = Channel(Msg).new(capacity: 1024)
 
-# Keep references to widgets without capturing closures in C callbacks
+# ---- Global access to log/progress widgets ----
 module App
   @@log : UIng::MultilineEntry?
   @@progress : UIng::ProgressBar?
@@ -37,8 +37,11 @@ module App
   end
 end
 
-# Timer callback (must be a top-level function; no captures)
-fun pump_cb(data : Void*) : LibC::Int
+# ---- Timer callback: drain CHANNEL on UI thread via select ----
+fun pump_cb(_data : Void*) : LibC::Int
+  # process up to N messages per tick to avoid starving UI
+  processed = 0
+
   loop do
     handled = false
 
@@ -51,12 +54,15 @@ fun pump_cb(data : Void*) : LibC::Int
       when PercentMsg
         App.progress.value = msg.percent
       end
+      processed += 1
+      break if processed >= 500
     else
-      # nothing to read right now
+      # no message ready right now; leave loop
     end
 
     break unless handled
   end
+
   1
 end
 
@@ -108,28 +114,34 @@ private def build_args(
   args
 end
 
-private def run_cli(args : Array(String)) : Nil
-  CHANNEL.send(LineMsg.new("[GUI] run_cli starting"))
+private def jb_exe_path : String
+  here = File.dirname(Process.executable_path.not_nil!)
+  cand = File.expand_path(File.join(here, "jb_updater"))
+  return cand if File.executable?(cand)
+  cand2 = "./jb_updater"
+  return cand2 if File.executable?(cand2)
+  ENV["JB_UPDATER"]? || "jb_updater"
+end
 
+# ---- CLI execution: worker thread reads pipe, sends to CHANNEL ----
+private def run_cli(args : Array(String)) : Nil
   r, w = IO.pipe
 
-  exe = "./jb_updater"
-  CHANNEL.send(LineMsg.new("[GUI] about to spawn #{exe} #{args.join(" ")}"))
+  exe = jb_exe_path
+  CHANNEL.send(LineMsg.new("[GUI] spawn: #{exe} #{args.join(" ")}"))
 
   begin
     p = Process.new(exe, args: args, output: w, error: w)
   rescue ex
-    CHANNEL.send(LineMsg.new("[GUI] ERROR: failed to spawn #{exe}: #{ex.message}"))
+    CHANNEL.send(LineMsg.new("[GUI] ERROR: failed to spawn: #{ex.message}"))
     w.close
     r.close
     return
   end
-
-  CHANNEL.send(LineMsg.new("[GUI] process spawned, pid=#{p.pid}"))
   w.close
+  CHANNEL.send(LineMsg.new("[GUI] pid=#{p.pid}"))
 
   Thread.new do
-    CHANNEL.send(LineMsg.new("[GUI] reader thread started"))
     begin
       buf = Bytes.new(4096)
       partial = ""
@@ -140,48 +152,32 @@ private def run_cli(args : Array(String)) : Nil
         partial += chunk
 
         if m = percent_re.match(chunk)
-          pct = m[1].to_f.round.to_i
-          CHANNEL.send(PercentMsg.new(pct))
+          CHANNEL.send(PercentMsg.new(m[1].to_f.round.to_i))
         end
 
         loop do
-          newline_index = partial.index('\n')
-          carriage_index = partial.index('\r')
+          i_n = partial.index('\n')
+          i_r = partial.index('\r')
+          i = i_n && i_r ? {i_n, i_r}.min : (i_n || i_r)
+          break unless i
 
-          delim_index =
-            if newline_index && carriage_index
-              {newline_index, carriage_index}.min
-            elsif newline_index
-              newline_index
-            else
-              carriage_index
-            end
+          line = partial[0, i]
+          partial = partial[i + 1, partial.bytesize - i - 1] || ""
 
-          break unless delim_index
-
-          line = partial[0, delim_index]
-          partial = partial[delim_index + 1, partial.bytesize - delim_index - 1] || ""
-
-          if line =~ /^\[[# ]+\]\s+\d+(\.\d+)?%$/
-            # skip logging ASCII bar lines
-          else
-            CHANNEL.send(LineMsg.new(line))
-          end
+          # ignore ascii progress bar lines
+          next if line =~ /^\[[# ]+\]\s+\d+(\.\d+)?%$/
+          CHANNEL.send(LineMsg.new(line))
         end
       end
 
-      unless partial.empty?
-        CHANNEL.send(LineMsg.new(partial))
-      end
+      CHANNEL.send(LineMsg.new(partial)) unless partial.empty?
     ensure
       r.close
       status = p.wait
-      CHANNEL.send(LineMsg.new("[GUI] Process exited with #{status.exit_code} (success=#{status.success?})"))
+      CHANNEL.send(LineMsg.new("[GUI] exited #{status.exit_code} (success=#{status.success?})"))
       CHANNEL.send(PercentMsg.new(status.success? ? 100 : 0))
     end
   end
-
-  CHANNEL.send(LineMsg.new("[GUI] run_cli returning to UI thread"))
 end
 
 # ---- UI --------------------------------------------------------------
@@ -205,9 +201,10 @@ UIng.init do
   root.append(progress, false)
   root.append(log, true)
 
-  CHANNEL.send(LineMsg.new("JB Updater GUI ready. Select a detected IDE or enter paths manually."))
-
+  # Start timer to drain CHANNEL via pump_cb
   UIng::LibUI.timer(50, ->pump_cb, Pointer(Void).null)
+
+  CHANNEL.send(LineMsg.new("JB Updater GUI ready. Select a detected IDE or enter paths manually."))
 
   # --- Plugins tab ----------------------------------------------------
   plugins = UIng::Box.new(:vertical)
@@ -248,7 +245,7 @@ UIng.init do
     CHANNEL.send(LineMsg.new("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually."))
   end
 
-  # --- IDE tab widgets (must be defined before combo_products handler uses them) ---
+  # --- IDE tab widgets ---
   ide = UIng::Box.new(:vertical)
   ide.padded = true
   ide_form = UIng::Form.new
@@ -286,7 +283,6 @@ UIng.init do
     end
     e_product.text = prod.name
     e_ide_product.text = prod.code
-
     if path = prod.ide_path
       e_ide_path.text = path
     end
@@ -392,7 +388,7 @@ UIng.init do
       e_product,
       e_install_ids,
       combo_arch,
-      chk_dry,
+      chk_dry, # user controls dry-run
       dummy_chk
     )
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
