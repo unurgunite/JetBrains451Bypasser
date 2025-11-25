@@ -1,5 +1,3 @@
-# src/gui/main_gui.cr
-
 require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
@@ -27,7 +25,7 @@ end
 
 alias Msg = LineMsg | OverallPercentMsg | PluginPercentMsg
 
-# Allow Nil to cope with closed-channel semantics
+# Allow Nil explicitly to cope with closed-channel semantics on Crystal 1.17.1
 CHANNEL = Channel(Msg | Nil).new(capacity: 1024)
 
 # Small helpers so we never intentionally send Nil except sentinel
@@ -48,15 +46,18 @@ module App
   @@log : UIng::MultilineEntry?
   @@overall_progress : UIng::ProgressBar?
   @@plugin_progress : UIng::ProgressBar?
+  @@buttons : Array(UIng::Button) = [] of UIng::Button
 
   def self.set_widgets(
     log : UIng::MultilineEntry,
     overall : UIng::ProgressBar,
     plugin : UIng::ProgressBar,
+    buttons : Array(UIng::Button),
   )
     @@log = log
     @@overall_progress = overall
     @@plugin_progress = plugin
+    @@buttons = buttons
   end
 
   def self.log : UIng::MultilineEntry
@@ -69,6 +70,18 @@ module App
 
   def self.plugin_progress : UIng::ProgressBar
     @@plugin_progress.not_nil!
+  end
+
+  # Enable/disable all tracked buttons
+  def self.set_busy(busy : Bool)
+    enabled = !busy
+    @@buttons.each do |btn|
+      if enabled
+        btn.enable
+      else
+        btn.disable
+      end
+    end
   end
 end
 
@@ -171,6 +184,9 @@ end
 private def run_cli(args : Array(String)) : Nil
   r, w = IO.pipe
 
+  # Disable buttons for the duration of this run
+  App.set_busy(true)
+
   exe = jb_exe_path
   send_line("[GUI] spawn: #{exe} #{args.join(" ")}")
 
@@ -180,6 +196,7 @@ private def run_cli(args : Array(String)) : Nil
     send_line("[GUI] ERROR: failed to spawn: #{ex.message}")
     w.close
     r.close
+    App.set_busy(false)
     return
   end
   w.close
@@ -227,8 +244,7 @@ private def run_cli(args : Array(String)) : Nil
               # log these lines as normal too
             end
 
-            # 3) Fallback: any "NN%" in the line;
-            # here we treat it as per-plugin progress
+            # 3) Fallback: any "NN%" in the line; treat as per-plugin progress
             if m = percent_re.match(line)
               pct = m[1].to_f.round.to_i
               send_plugin_percent(pct.clamp(0, 100))
@@ -251,6 +267,7 @@ private def run_cli(args : Array(String)) : Nil
       send_plugin_percent(0)
       # sentinel Nil to tell pump_cb to stop if desired
       CHANNEL.send(nil)
+      App.set_busy(false)
     end
   end
 end
@@ -277,10 +294,9 @@ UIng.init do
   plugin_label = UIng::Label.new("Current plugin:")
   plugin_bar = UIng::ProgressBar.new
 
-  App.set_widgets(log, overall_bar, plugin_bar)
-
   pb_box = UIng::Box.new(:vertical)
   pb_box.padded = true
+
   row1 = UIng::Box.new(:horizontal)
   row1.append(overall_label, false)
   row1.append(overall_bar, true)
@@ -294,11 +310,6 @@ UIng.init do
 
   root.append(pb_box, false)
   root.append(log, true)
-
-  # Start timer to drain CHANNEL via pump_cb
-  UIng::LibUI.timer(50, ->pump_cb, Pointer(Void).null)
-
-  send_line("JB Updater GUI ready. Select a detected IDE or enter paths manually.")
 
   # --- Plugins tab ----------------------------------------------------
   plugins = UIng::Box.new(:vertical)
@@ -399,6 +410,18 @@ UIng.init do
   plugins.append(chk_dry, false)
   plugins.append(row, false)
   tabs.append("Plugins", plugins)
+
+  # Register widgets + buttons with App
+  all_buttons = [] of UIng::Button
+  all_buttons.concat([btn_list, btn_install, btn_update])
+  all_buttons.concat([btn_list_releases, btn_upgrade])
+  # btn_detect remains usable even while running; add it if you want it disabled too.
+  App.set_widgets(log, overall_bar, plugin_bar, all_buttons)
+
+  # Start timer to drain CHANNEL via pump_cb
+  UIng::LibUI.timer(50, ->pump_cb, Pointer(Void).null)
+
+  send_line("JB Updater GUI ready. Select a detected IDE or enter paths manually.")
 
   # ---- Wire buttons: Plugins tab ------------------------------------
   btn_detect.on_clicked do
