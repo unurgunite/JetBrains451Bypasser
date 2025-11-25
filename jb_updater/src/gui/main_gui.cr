@@ -67,6 +67,14 @@ private def expand_tilde(text : String?) : String?
   JBUpdater::Utils.expand_tilde(text)
 end
 
+def new_run_header(action : String, args : Array(String))
+  CHANNEL.send(LineMsg.new(""))
+  CHANNEL.send(LineMsg.new("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
+  CHANNEL.send(LineMsg.new("#{action} at #{Time.local}"))
+  CHANNEL.send(LineMsg.new("Command: ./jb_updater #{args.join(" ")}"))
+  CHANNEL.send(LineMsg.new("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
+end
+
 private def build_args(
   e_plugins_dir : UIng::Entry,
   e_build : UIng::Entry,
@@ -104,7 +112,6 @@ private def run_cli(args : Array(String)) : Nil
   CHANNEL.send(LineMsg.new("[GUI] run_cli starting"))
 
   r, w = IO.pipe
-  CHANNEL.send(LineMsg.new("[GUI] pipe created"))
 
   exe = "./jb_updater"
   CHANNEL.send(LineMsg.new("[GUI] about to spawn #{exe} #{args.join(" ")}"))
@@ -119,9 +126,7 @@ private def run_cli(args : Array(String)) : Nil
   end
 
   CHANNEL.send(LineMsg.new("[GUI] process spawned, pid=#{p.pid}"))
-
   w.close
-  CHANNEL.send(LineMsg.new("[GUI] write-end closed"))
 
   Thread.new do
     CHANNEL.send(LineMsg.new("[GUI] reader thread started"))
@@ -131,7 +136,6 @@ private def run_cli(args : Array(String)) : Nil
       percent_re = /(\d+(?:\.\d+)?)%/
 
       while (n = r.read(buf)) > 0
-        CHANNEL.send(LineMsg.new("[GUI] read #{n} bytes from pipe"))
         chunk = String.new(buf[0, n])
         partial += chunk
 
@@ -157,7 +161,12 @@ private def run_cli(args : Array(String)) : Nil
 
           line = partial[0, delim_index]
           partial = partial[delim_index + 1, partial.bytesize - delim_index - 1] || ""
-          CHANNEL.send(LineMsg.new(line))
+
+          if line =~ /^\[[# ]+\]\s+\d+(\.\d+)?%$/
+            # skip logging ASCII bar lines
+          else
+            CHANNEL.send(LineMsg.new(line))
+          end
         end
       end
 
@@ -239,7 +248,7 @@ UIng.init do
     CHANNEL.send(LineMsg.new("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually."))
   end
 
-  # IDE tab widgets must be defined before we use them in the combo_products handler
+  # --- IDE tab widgets (must be defined before combo_products handler uses them) ---
   ide = UIng::Box.new(:vertical)
   ide.padded = true
   ide_form = UIng::Form.new
@@ -261,7 +270,7 @@ UIng.init do
   ide.append(btn_upgrade, false)
   tabs.append("IDE Upgrade", ide)
 
-  # Now wire the detected products combobox, which can touch e_ide_product/e_ide_path
+  # Wire detected products combobox
   combo_products.on_selected do
     idx = combo_products.selected
     if idx <= 0
@@ -339,7 +348,7 @@ UIng.init do
       dummy_chk
     ) + ["--list"]
 
-    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+    new_run_header("List installed plugins", args)
     run_cli(args)
   end
 
@@ -363,6 +372,7 @@ UIng.init do
       dummy_chk
     )
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+    new_run_header("Install plugins", args)
     run_cli(args)
   end
 
@@ -386,6 +396,7 @@ UIng.init do
       dummy_chk
     )
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+    new_run_header("Update plugins", args)
     run_cli(args)
   end
 
@@ -399,6 +410,7 @@ UIng.init do
 
     args = ["--list-ide-releases", "--product", product]
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}"))
+    new_run_header("List IDE releases", args)
     run_cli(args)
   end
 
@@ -413,6 +425,7 @@ UIng.init do
     args << "--brew" if chk_brew.checked?
 
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}"))
+    new_run_header("Upgrade IDE", args)
     run_cli(args)
   end
 
