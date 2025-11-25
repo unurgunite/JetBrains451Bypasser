@@ -12,7 +12,6 @@ end
 # ---------------------------------------------------------------------
 
 # Case 0: just list IDE releases (Toolbox-like discovery)
-# Case 0: just list IDE releases (Toolbox-like discovery)
 if opts.list_ide_releases
   if opts.product.nil?
     JBUpdater::Log.fail("Missing --product when using --list-ide-releases (e.g., WS, RM)")
@@ -51,7 +50,6 @@ if opts.plugins_dir.nil? && opts.product
   puts "Detected latest config folder: #{resolved}"
 end
 
-# Case 2: normal plugin update / install / list
 # Case 2: normal plugin update / install / list
 if opts.plugins_dir
   # Expand ~ in plugins_dir, if present
