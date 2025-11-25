@@ -16,7 +16,18 @@ struct PercentMsg
 end
 
 alias Msg = LineMsg | PercentMsg
-CHANNEL = Channel(Msg).new(capacity: 1024)
+
+# Allow Nil explicitly to cope with closed-channel semantics on Crystal 1.17.1
+CHANNEL = Channel(Msg | Nil).new(capacity: 1024)
+
+# Small helpers so we never intentionally send Nil
+def send_line(text : String)
+  CHANNEL.send(LineMsg.new(text))
+end
+
+def send_percent(pct : Int32)
+  CHANNEL.send(PercentMsg.new(pct))
+end
 
 # ---- Global access to log/progress widgets ----
 module App
@@ -39,21 +50,28 @@ end
 
 # ---- Timer callback: drain CHANNEL on UI thread via select ----
 fun pump_cb(_data : Void*) : LibC::Int
-  # process up to N messages per tick to avoid starving UI
   processed = 0
 
   loop do
     handled = false
 
     select
-    when msg = CHANNEL.receive
+    when raw = CHANNEL.receive
       handled = true
+
+      # If the channel has been closed, receive may yield Nil; stop processing
+      unless raw
+        return 1
+      end
+
+      msg = raw.not_nil!
       case msg
       when LineMsg
         App.log.append(msg.text + "\n")
       when PercentMsg
         App.progress.value = msg.percent
       end
+
       processed += 1
       break if processed >= 500
     else
@@ -74,11 +92,11 @@ private def expand_tilde(text : String?) : String?
 end
 
 def new_run_header(action : String, args : Array(String))
-  CHANNEL.send(LineMsg.new(""))
-  CHANNEL.send(LineMsg.new("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
-  CHANNEL.send(LineMsg.new("#{action} at #{Time.local}"))
-  CHANNEL.send(LineMsg.new("Command: ./jb_updater #{args.join(" ")}"))
-  CHANNEL.send(LineMsg.new("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
+  send_line("")
+  send_line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  send_line("#{action} at #{Time.local}")
+  send_line("Command: ./jb_updater #{args.join(" ")}")
+  send_line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 end
 
 private def build_args(
@@ -128,54 +146,83 @@ private def run_cli(args : Array(String)) : Nil
   r, w = IO.pipe
 
   exe = jb_exe_path
-  CHANNEL.send(LineMsg.new("[GUI] spawn: #{exe} #{args.join(" ")}"))
+  send_line("[GUI] spawn: #{exe} #{args.join(" ")}")
 
   begin
     p = Process.new(exe, args: args, output: w, error: w)
   rescue ex
-    CHANNEL.send(LineMsg.new("[GUI] ERROR: failed to spawn: #{ex.message}"))
+    send_line("[GUI] ERROR: failed to spawn: #{ex.message}")
     w.close
     r.close
     return
   end
   w.close
-  CHANNEL.send(LineMsg.new("[GUI] pid=#{p.pid}"))
+  send_line("[GUI] pid=#{p.pid}")
+
+  # pattern for "[n/total]" progress lines from CLI
+  step_re = /\[(\d+)\/(\d+)\]/
+  # ASCII progress bar line: "[#####     ] 37.5%"
+  bar_re = /^\[[# ]+\]\s+(\d+(?:\.\d+)?)%$/
+  # fallback: any "NN%" in a line
+  percent_re = /(\d+(?:\.\d+)?)%/
 
   Thread.new do
     begin
       buf = Bytes.new(4096)
       partial = ""
-      percent_re = /(\d+(?:\.\d+)?)%/
 
       while (n = r.read(buf)) > 0
         chunk = String.new(buf[0, n])
         partial += chunk
 
-        if m = percent_re.match(chunk)
-          CHANNEL.send(PercentMsg.new(m[1].to_f.round.to_i))
-        end
+        last_nl = partial.rindex('\n') || partial.rindex('\r')
+        if last_nl
+          lines_part = partial[0..last_nl]
+          partial = partial[(last_nl + 1)..] || ""
 
-        loop do
-          i_n = partial.index('\n')
-          i_r = partial.index('\r')
-          i = i_n && i_r ? {i_n, i_r}.min : (i_n || i_r)
-          break unless i
+          lines_part.each_line do |orig_line|
+            line = orig_line.chomp
 
-          line = partial[0, i]
-          partial = partial[i + 1, partial.bytesize - i - 1] || ""
+            # 1) ASCII progress bar lines: "[#######    ] 88.4%"
+            if m = bar_re.match(line)
+              pct = m[1].to_f.round.to_i
+              send_percent(pct.clamp(0, 100))
+              next
+            end
 
-          # ignore ascii progress bar lines
-          next if line =~ /^\[[# ]+\]\s+\d+(\.\d+)?%$/
-          CHANNEL.send(LineMsg.new(line))
+            # 2) [n/total] progress lines
+            if m = step_re.match(line)
+              cur = m[1].to_i
+              total = m[2].to_i
+              if total > 0
+                pct = (cur.to_f / total * 100).round.to_i
+                send_percent(pct.clamp(0, 100))
+              end
+            end
+
+            # 3) Fallback: any "NN%" in the line
+            if m = percent_re.match(line)
+              pct = m[1].to_f.round.to_i
+              send_percent(pct.clamp(0, 100))
+            end
+
+            send_line(line)
+          end
         end
       end
 
-      CHANNEL.send(LineMsg.new(partial)) unless partial.empty?
+      send_line(partial) unless partial.empty?
+    rescue ex
+      send_line("[GUI] worker ERROR: #{ex.class}: #{ex.message}")
+      ex.backtrace.each { |f| send_line("  #{f}") }
     ensure
       r.close
       status = p.wait
-      CHANNEL.send(LineMsg.new("[GUI] exited #{status.exit_code} (success=#{status.success?})"))
-      CHANNEL.send(PercentMsg.new(status.success? ? 100 : 0))
+      send_line("[GUI] exited #{status.exit_code} (success=#{status.success?})")
+      send_percent(status.success? ? 100 : 0)
+
+      # Optionally, signal end-of-stream by sending nil once
+      CHANNEL.send(nil)
     end
   end
 end
@@ -204,7 +251,7 @@ UIng.init do
   # Start timer to drain CHANNEL via pump_cb
   UIng::LibUI.timer(50, ->pump_cb, Pointer(Void).null)
 
-  CHANNEL.send(LineMsg.new("JB Updater GUI ready. Select a detected IDE or enter paths manually."))
+  send_line("JB Updater GUI ready. Select a detected IDE or enter paths manually.")
 
   # --- Plugins tab ----------------------------------------------------
   plugins = UIng::Box.new(:vertical)
@@ -242,7 +289,7 @@ UIng.init do
   form.append("Arch (plugins)", combo_arch, false)
 
   if detected.empty?
-    CHANNEL.send(LineMsg.new("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually."))
+    send_line("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually.")
   end
 
   # --- IDE tab widgets ---
@@ -271,12 +318,12 @@ UIng.init do
   combo_products.on_selected do
     idx = combo_products.selected
     if idx <= 0
-      CHANNEL.send(LineMsg.new("[GUI] Product selection: manual/custom"))
+      send_line("[GUI] Product selection: manual/custom")
       next
     end
 
     prod = detected[idx - 1]
-    CHANNEL.send(LineMsg.new("[GUI] Selected product: #{prod.name} (#{prod.code})"))
+    send_line("[GUI] Selected product: #{prod.name} (#{prod.code})")
 
     if prod.plugins_dir
       e_plugins_dir.text = prod.plugins_dir.not_nil!
@@ -310,7 +357,7 @@ UIng.init do
   btn_detect.on_clicked do
     product = e_product.text
     if product.nil? || product.empty?
-      CHANNEL.send(LineMsg.new("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect."))
+      send_line("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect.")
       next
     end
 
@@ -318,16 +365,16 @@ UIng.init do
       resolved = JBUpdater::Utils.resolve_product_folder(product)
       path = JBUpdater::Utils.expand_jetbrains_plugins_dir(resolved)
       e_plugins_dir.text = path
-      CHANNEL.send(LineMsg.new("Detected plugins dir: #{path}"))
+      send_line("Detected plugins dir: #{path}")
     rescue ex
-      CHANNEL.send(LineMsg.new("ERROR: #{ex.message}"))
+      send_line("ERROR: #{ex.message}")
     end
   end
 
   btn_list.on_clicked do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
-      CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for List."))
+      send_line("ERROR: Plugins dir is required for List.")
       next
     end
 
@@ -344,6 +391,7 @@ UIng.init do
       dummy_chk
     ) + ["--list"]
 
+    App.progress.value = 0
     new_run_header("List installed plugins", args)
     run_cli(args)
   end
@@ -351,7 +399,7 @@ UIng.init do
   btn_install.on_clicked do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
-      CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for Install."))
+      send_line("ERROR: Plugins dir is required for Install.")
       next
     end
 
@@ -367,7 +415,8 @@ UIng.init do
       chk_dry,
       dummy_chk
     )
-    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+    send_line("DEBUG: args for jb_updater: #{args.join(" ")}")
+    App.progress.value = 0
     new_run_header("Install plugins", args)
     run_cli(args)
   end
@@ -375,7 +424,7 @@ UIng.init do
   btn_update.on_clicked do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
-      CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for Update."))
+      send_line("ERROR: Plugins dir is required for Update.")
       next
     end
 
@@ -391,7 +440,8 @@ UIng.init do
       chk_dry, # user controls dry-run
       dummy_chk
     )
-    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+    send_line("DEBUG: args for jb_updater: #{args.join(" ")}")
+    App.progress.value = 0
     new_run_header("Update plugins", args)
     run_cli(args)
   end
@@ -400,12 +450,13 @@ UIng.init do
   btn_list_releases.on_clicked do
     product = e_ide_product.text
     if product.nil? || product.empty?
-      CHANNEL.send(LineMsg.new("ERROR: IDE code is required for List releases (e.g., WS, RM)."))
+      send_line("ERROR: IDE code is required for List releases (e.g., WS, RM).")
       next
     end
 
     args = ["--list-ide-releases", "--product", product]
-    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}"))
+    send_line("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}")
+    App.progress.value = 0
     new_run_header("List IDE releases", args)
     run_cli(args)
   end
@@ -420,7 +471,8 @@ UIng.init do
     args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
     args << "--brew" if chk_brew.checked?
 
-    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}"))
+    send_line("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}")
+    App.progress.value = 0
     new_run_header("Upgrade IDE", args)
     run_cli(args)
   end
