@@ -1,3 +1,5 @@
+# src/gui/main_gui.cr
+
 require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
@@ -25,10 +27,10 @@ end
 
 alias Msg = LineMsg | OverallPercentMsg | PluginPercentMsg
 
-# Allow Nil explicitly to cope with closed-channel semantics on Crystal 1.17.1
+# Include Nil to match Crystal 1.17.1 select/closed-channel behavior
 CHANNEL = Channel(Msg | Nil).new(capacity: 1024)
 
-# Small helpers so we never intentionally send Nil except sentinel
+# Small helpers
 def send_line(text : String)
   CHANNEL.send(LineMsg.new(text))
 end
@@ -72,7 +74,7 @@ module App
     @@plugin_progress.not_nil!
   end
 
-  # Enable/disable all tracked buttons
+  # Enable/disable all tracked buttons (must be called on UI thread)
   def self.set_busy(busy : Bool)
     enabled = !busy
     @@buttons.each do |btn|
@@ -87,37 +89,50 @@ end
 
 # ---- Timer callback: drain CHANNEL on UI thread via select ----
 fun pump_cb(_data : Void*) : LibC::Int
-  processed = 0
+  max_per_tick = 500
+  count = 0
 
-  loop do
-    handled = false
+  begin
+    loop do
+      break if count >= max_per_tick
 
-    select
-    when raw = CHANNEL.receive
-      handled = true
+      handled = false
 
-      # Stop pumping if sentinel Nil is received
-      unless raw
-        return 1
+      select
+      when raw = CHANNEL.receive
+        handled = true
+
+        # Runtime may yield nil when channel is closed; just stop reading
+        next unless raw
+
+        msg = raw.not_nil!
+        case msg
+        when LineMsg
+          text = msg.text
+
+          # Re-enable buttons on plugin update completion or explicit run-done marker
+          if text.includes?("✔ Done. Start the IDE to load updated plugins.") ||
+             text == "[GUI] RUN DONE"
+            App.set_busy(false)
+          end
+
+          App.log.append(text + "\n")
+        when OverallPercentMsg
+          App.overall_progress.value = msg.percent
+        when PluginPercentMsg
+          App.plugin_progress.value = msg.percent
+        end
+
+        count += 1
+      else
+        # no message ready right now; leave loop
+        break
       end
-
-      msg = raw.not_nil!
-      case msg
-      when LineMsg
-        App.log.append(msg.text + "\n")
-      when OverallPercentMsg
-        App.overall_progress.value = msg.percent
-      when PluginPercentMsg
-        App.plugin_progress.value = msg.percent
-      end
-
-      processed += 1
-      break if processed >= 500
-    else
-      # no message ready right now; leave loop
     end
-
-    break unless handled
+  rescue ex : TypeCastError
+    # Defensive: if select/receive hit the Nil-cast bug, log and re-enable buttons
+    send_line("[GUI] pump_cb ERROR: #{ex.message}")
+    App.set_busy(false)
   end
 
   1
@@ -184,7 +199,7 @@ end
 private def run_cli(args : Array(String)) : Nil
   r, w = IO.pipe
 
-  # Disable buttons for the duration of this run
+  # Disable buttons for the duration of this run (UI thread)
   App.set_busy(true)
 
   exe = jb_exe_path
@@ -241,7 +256,6 @@ private def run_cli(args : Array(String)) : Nil
                 pct = (cur.to_f / total * 100).round.to_i
                 send_overall_percent(pct.clamp(0, 100))
               end
-              # log these lines as normal too
             end
 
             # 3) Fallback: any "NN%" in the line; treat as per-plugin progress
@@ -265,9 +279,8 @@ private def run_cli(args : Array(String)) : Nil
       send_line("[GUI] exited #{status.exit_code} (success=#{status.success?})")
       send_overall_percent(status.success? ? 100 : 0)
       send_plugin_percent(0)
-      # sentinel Nil to tell pump_cb to stop if desired
-      CHANNEL.send(nil)
-      App.set_busy(false)
+      # For non-plugin cases (IDE list/upgrade), this marker will cause buttons to re-enable
+      send_line("[GUI] RUN DONE")
     end
   end
 end
@@ -327,9 +340,8 @@ UIng.init do
   combo_arch.selected = 0
 
   chk_dry = UIng::Checkbox.new("Dry run")
-  dummy_chk = UIng::Checkbox.new("") # never shown; only passed to build_args
+  dummy_chk = UIng::Checkbox.new("")
 
-  # Detected products combobox
   combo_products = UIng::Combobox.new
   detected = JBUpdater::DetectProducts.all
 
@@ -415,7 +427,6 @@ UIng.init do
   all_buttons = [] of UIng::Button
   all_buttons.concat([btn_list, btn_install, btn_update])
   all_buttons.concat([btn_list_releases, btn_upgrade])
-  # btn_detect remains usable even while running; add it if you want it disabled too.
   App.set_widgets(log, overall_bar, plugin_bar, all_buttons)
 
   # Start timer to drain CHANNEL via pump_cb
@@ -509,7 +520,7 @@ UIng.init do
       e_product,
       e_install_ids,
       combo_arch,
-      chk_dry, # user controls dry-run
+      chk_dry,
       dummy_chk
     )
     send_line("DEBUG: args for jb_updater: #{args.join(" ")}")
