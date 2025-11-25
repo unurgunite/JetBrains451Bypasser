@@ -1,18 +1,18 @@
 require "uing"
+require "../jb_updater"
+require "../jb_updater/detect_products"
 
 # ---- Small message pump to safely touch widgets on the UI thread ----
 struct LineMsg
   getter text : String
 
-  def initialize(@text : String)
-  end
+  def initialize(@text : String); end
 end
 
 struct PercentMsg
   getter percent : Int32
 
-  def initialize(@percent : Int32)
-  end
+  def initialize(@percent : Int32); end
 end
 
 alias Msg = LineMsg | PercentMsg
@@ -57,11 +57,16 @@ fun pump_cb(data : Void*) : LibC::Int
 
     break unless handled
   end
-
-  1 # non-zero to keep the timer running
+  1
 end
 
-# ---- Top-level helper methods (not inside UIng.init) ----------------
+# ---- Helpers ---------------------------------------------------------
+private def expand_tilde(text : String?) : String?
+  return nil unless text
+  return nil if text.empty?
+  JBUpdater::Utils.expand_tilde(text)
+end
+
 private def build_args(
   e_plugins_dir : UIng::Entry,
   e_build : UIng::Entry,
@@ -73,7 +78,7 @@ private def build_args(
 ) : Array(String)
   args = [] of String
 
-  plugins_dir = e_plugins_dir.text
+  plugins_dir = expand_tilde(e_plugins_dir.text)
   build = e_build.text
   product = e_product.text
   install_ids = e_install_ids.text
@@ -96,37 +101,37 @@ private def build_args(
 end
 
 private def run_cli(args : Array(String)) : Nil
-  CHANNEL.send(LineMsg.new("DEBUG: run_cli starting"))
+  CHANNEL.send(LineMsg.new("[GUI] run_cli starting"))
 
   r, w = IO.pipe
-  CHANNEL.send(LineMsg.new("DEBUG: pipe created"))
+  CHANNEL.send(LineMsg.new("[GUI] pipe created"))
 
   exe = "./jb_updater"
-  CHANNEL.send(LineMsg.new("DEBUG: about to spawn #{exe} #{args.join(" ")}"))
+  CHANNEL.send(LineMsg.new("[GUI] about to spawn #{exe} #{args.join(" ")}"))
 
   begin
     p = Process.new(exe, args: args, output: w, error: w)
   rescue ex
-    CHANNEL.send(LineMsg.new("ERROR: failed to spawn #{exe}: #{ex.message}"))
+    CHANNEL.send(LineMsg.new("[GUI] ERROR: failed to spawn #{exe}: #{ex.message}"))
     w.close
     r.close
     return
   end
 
-  CHANNEL.send(LineMsg.new("DEBUG: process spawned, pid=#{p.pid}"))
+  CHANNEL.send(LineMsg.new("[GUI] process spawned, pid=#{p.pid}"))
 
   w.close
-  CHANNEL.send(LineMsg.new("DEBUG: write-end closed"))
+  CHANNEL.send(LineMsg.new("[GUI] write-end closed"))
 
   Thread.new do
-    CHANNEL.send(LineMsg.new("DEBUG: reader thread started"))
+    CHANNEL.send(LineMsg.new("[GUI] reader thread started"))
     begin
       buf = Bytes.new(4096)
       partial = ""
       percent_re = /(\d+(?:\.\d+)?)%/
 
       while (n = r.read(buf)) > 0
-        CHANNEL.send(LineMsg.new("DEBUG: read #{n} bytes from pipe"))
+        CHANNEL.send(LineMsg.new("[GUI] read #{n} bytes from pipe"))
         chunk = String.new(buf[0, n])
         partial += chunk
 
@@ -162,12 +167,12 @@ private def run_cli(args : Array(String)) : Nil
     ensure
       r.close
       status = p.wait
-      CHANNEL.send(LineMsg.new("Process exited with #{status.exit_code} (success=#{status.success?})"))
+      CHANNEL.send(LineMsg.new("[GUI] Process exited with #{status.exit_code} (success=#{status.success?})"))
       CHANNEL.send(PercentMsg.new(status.success? ? 100 : 0))
     end
   end
 
-  CHANNEL.send(LineMsg.new("DEBUG: run_cli returning to UI thread"))
+  CHANNEL.send(LineMsg.new("[GUI] run_cli returning to UI thread"))
 end
 
 # ---- UI --------------------------------------------------------------
@@ -175,7 +180,6 @@ UIng.init do
   window = UIng::Window.new("JB Updater", 880, 560)
   window.on_closing { UIng.quit; true }
 
-  # Root layout: vertical box with tabs at top, global progress + log at bottom
   root = UIng::Box.new(:vertical)
   root.padded = true
   window.set_child(root)
@@ -183,7 +187,7 @@ UIng.init do
   tabs = UIng::Tab.new
   root.append(tabs, true)
 
-  # Global shared widgets
+  # Shared log/progress
   log = UIng::MultilineEntry.new
   log.read_only = true
   progress = UIng::ProgressBar.new
@@ -192,7 +196,8 @@ UIng.init do
   root.append(progress, false)
   root.append(log, true)
 
-  # Start a 50ms UI-thread pump to consume messages and update widgets
+  CHANNEL.send(LineMsg.new("JB Updater GUI ready. Select a detected IDE or enter paths manually."))
+
   UIng::LibUI.timer(50, ->pump_cb, Pointer(Void).null)
 
   # --- Plugins tab ----------------------------------------------------
@@ -211,27 +216,30 @@ UIng.init do
   combo_arch.selected = 0
 
   chk_dry = UIng::Checkbox.new("Dry run")
-  chk_list = UIng::Checkbox.new("List plugins")
+  dummy_chk = UIng::Checkbox.new("") # never shown; only passed to build_args
 
+  # Detected products combobox
+  combo_products = UIng::Combobox.new
+  detected = JBUpdater::DetectProducts.all
+
+  combo_products.append("Manual / Custom")
+  detected.each do |prod|
+    combo_products.append("#{prod.name} (#{prod.code})")
+  end
+  combo_products.selected = 0
+
+  form.append("Detected product", combo_products, false)
   form.append("Plugins dir", e_plugins_dir, false)
   form.append("Build", e_build, false)
-  form.append("Product", e_product, false)
+  form.append("Product (config folder, e.g. RubyMine2025.2)", e_product, false)
   form.append("Install IDs (comma-separated)", e_install_ids, false)
-  form.append("Arch", combo_arch, false)
+  form.append("Arch (plugins)", combo_arch, false)
 
-  row = UIng::Box.new(:horizontal)
-  btn_list = UIng::Button.new("List")
-  btn_install = UIng::Button.new("Install")
-  btn_update = UIng::Button.new("Update")
-  [btn_list, btn_install, btn_update].each { |b| row.append(b, false) }
+  if detected.empty?
+    CHANNEL.send(LineMsg.new("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually."))
+  end
 
-  plugins.append(form, false)
-  plugins.append(chk_dry, false)
-  plugins.append(chk_list, false)
-  plugins.append(row, false)
-  tabs.append("Plugins", plugins)
-
-  # --- IDE tab --------------------------------------------------------
+  # IDE tab widgets must be defined before we use them in the combo_products handler
   ide = UIng::Box.new(:vertical)
   ide.padded = true
   ide_form = UIng::Form.new
@@ -240,25 +248,87 @@ UIng.init do
   e_ide_product = UIng::Entry.new
   e_ide_path = UIng::Entry.new
   chk_brew = UIng::Checkbox.new("Patch Homebrew cask (macOS)")
+
+  ide_form.append("IDE code or name (e.g., WS, RM, WebStorm2025.2)", e_ide_product, false)
+  ide_form.append("IDE Path (.app or install dir)", e_ide_path, false)
+
+  btn_list_releases = UIng::Button.new("List releases")
   btn_upgrade = UIng::Button.new("Upgrade IDE")
 
-  ide_form.append("Product (e.g., RubyMine or RubyMine2025.2)", e_ide_product, false)
-  ide_form.append("IDE Path (.app or install dir)", e_ide_path, false)
   ide.append(ide_form, false)
   ide.append(chk_brew, false)
+  ide.append(btn_list_releases, false)
   ide.append(btn_upgrade, false)
   tabs.append("IDE Upgrade", ide)
 
-  # ---- Wire buttons --------------------------------------------------
-  btn_list.on_clicked do
-    CHANNEL.send(LineMsg.new("DEBUG: List clicked"))
+  # Now wire the detected products combobox, which can touch e_ide_product/e_ide_path
+  combo_products.on_selected do
+    idx = combo_products.selected
+    if idx <= 0
+      CHANNEL.send(LineMsg.new("[GUI] Product selection: manual/custom"))
+      next
+    end
 
-    text = e_plugins_dir.text
-    if text.nil? || text.empty?
+    prod = detected[idx - 1]
+    CHANNEL.send(LineMsg.new("[GUI] Selected product: #{prod.name} (#{prod.code})"))
+
+    if prod.plugins_dir
+      e_plugins_dir.text = prod.plugins_dir.not_nil!
+    end
+    e_product.text = prod.name
+    e_ide_product.text = prod.code
+
+    if path = prod.ide_path
+      e_ide_path.text = path
+    end
+  end
+
+  # Detect-from-Product button
+  detect_row = UIng::Box.new(:horizontal)
+  btn_detect = UIng::Button.new("Detect from Product")
+  detect_row.append(btn_detect, false)
+
+  # Action buttons
+  row = UIng::Box.new(:horizontal)
+  btn_list = UIng::Button.new("List installed")
+  btn_install = UIng::Button.new("Install by IDs")
+  btn_update = UIng::Button.new("Update all")
+  [btn_list, btn_install, btn_update].each { |b| row.append(b, false) }
+
+  plugins.append(form, false)
+  plugins.append(detect_row, false)
+  plugins.append(chk_dry, false)
+  plugins.append(row, false)
+  tabs.append("Plugins", plugins)
+
+  # ---- Wire buttons: Plugins tab ------------------------------------
+  btn_detect.on_clicked do
+    product = e_product.text
+    if product.nil? || product.empty?
+      CHANNEL.send(LineMsg.new("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect."))
+      next
+    end
+
+    begin
+      resolved = JBUpdater::Utils.resolve_product_folder(product)
+      path = JBUpdater::Utils.expand_jetbrains_plugins_dir(resolved)
+      e_plugins_dir.text = path
+      CHANNEL.send(LineMsg.new("Detected plugins dir: #{path}"))
+    rescue ex
+      CHANNEL.send(LineMsg.new("ERROR: #{ex.message}"))
+    end
+  end
+
+  btn_list.on_clicked do
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
       CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for List."))
       next
     end
 
+    plugins_dir = expand_tilde(raw)
+    e_plugins_dir.text = plugins_dir if plugins_dir
+
     args = build_args(
       e_plugins_dir,
       e_build,
@@ -266,21 +336,23 @@ UIng.init do
       e_install_ids,
       combo_arch,
       chk_dry,
-      chk_list
+      dummy_chk
     ) + ["--list"]
 
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
-
     run_cli(args)
   end
 
   btn_install.on_clicked do
-    text = e_plugins_dir.text
-    if text.nil? || text.empty?
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
       CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for Install."))
       next
     end
 
+    plugins_dir = expand_tilde(raw)
+    e_plugins_dir.text = plugins_dir if plugins_dir
+
     args = build_args(
       e_plugins_dir,
       e_build,
@@ -288,19 +360,21 @@ UIng.init do
       e_install_ids,
       combo_arch,
       chk_dry,
-      chk_list
+      dummy_chk
     )
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
-
     run_cli(args)
   end
 
   btn_update.on_clicked do
-    text = e_plugins_dir.text
-    if text.nil? || text.empty?
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
       CHANNEL.send(LineMsg.new("ERROR: Plugins dir is required for Update."))
       next
     end
+
+    plugins_dir = expand_tilde(raw)
+    e_plugins_dir.text = plugins_dir if plugins_dir
 
     args = build_args(
       e_plugins_dir,
@@ -309,10 +383,22 @@ UIng.init do
       e_install_ids,
       combo_arch,
       chk_dry,
-      chk_list
+      dummy_chk
     )
     CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater: #{args.join(" ")}"))
+    run_cli(args)
+  end
 
+  # ---- Wire buttons: IDE tab ----------------------------------------
+  btn_list_releases.on_clicked do
+    product = e_ide_product.text
+    if product.nil? || product.empty?
+      CHANNEL.send(LineMsg.new("ERROR: IDE code is required for List releases (e.g., WS, RM)."))
+      next
+    end
+
+    args = ["--list-ide-releases", "--product", product]
+    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}"))
     run_cli(args)
   end
 
@@ -326,8 +412,7 @@ UIng.init do
     args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
     args << "--brew" if chk_brew.checked?
 
-    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE): #{args.join(" ")}"))
-
+    CHANNEL.send(LineMsg.new("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}"))
     run_cli(args)
   end
 
