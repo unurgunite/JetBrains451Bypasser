@@ -1,3 +1,5 @@
+# src/gui/main_gui.cr
+
 require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
@@ -9,6 +11,7 @@ module App
   @@plugin_progress : UIng::ProgressBar?
   @@buttons : Array(UIng::Button) = [] of UIng::Button
   @@busy : Bool = false
+  @@shutting_down : Bool = false
 
   def self.set_widgets(
     log : UIng::MultilineEntry,
@@ -38,9 +41,40 @@ module App
     @@busy
   end
 
+  def self.shutting_down? : Bool
+    @@shutting_down
+  end
+
+  def self.mark_shutting_down
+    @@shutting_down = true
+  end
+
+  # Called from UI thread
+  def self.debug_reenable
+    return if @@shutting_down
+
+    if @@log
+      App.log.append("[GUI] debug_reenable(): forcing not busy and enabling buttons\n") rescue nil
+    end
+
+    @@busy = false
+    @@buttons.each &.enable
+  end
+
   # Enable/disable all tracked buttons (must be called on UI thread)
   def self.set_busy(busy : Bool)
+    return if @@shutting_down
+
     @@busy = busy
+
+    count = @@buttons.size
+    if @@log
+      begin
+        App.log.append("[GUI] set_busy(#{busy}) for #{count} buttons\n")
+      rescue
+      end
+    end
+
     enabled = !busy
     @@buttons.each do |btn|
       if enabled
@@ -49,7 +83,7 @@ module App
         btn.disable
       end
     end
-    # Reset bars when entering / leaving busy
+
     if busy
       App.overall_progress.value = 0
       App.plugin_progress.value = 0
@@ -121,25 +155,35 @@ end
 
 # ---- CLI execution: spawn jb_updater, stream output, update UI via queue_main ----
 private def run_cli(args : Array(String)) : Nil
+  if App.busy?
+    UIng.queue_main do
+      next if App.shutting_down?
+      App.log.append("[GUI] Ignoring request: updater already running\n")
+    end
+    return
+  end
+
   exe = jb_exe_path
 
-  # mark GUI as busy on UI thread
-  UIng.queue_main { App.set_busy(true) }
-
-  # log spawn line
   UIng.queue_main do
+    next if App.shutting_down?
+    App.set_busy(true)
+  end
+
+  UIng.queue_main do
+    next if App.shutting_down?
     App.log.append("[GUI] spawn: #{exe} #{args.join(" ")}\n")
   end
 
-  # Create a pipe to read process output (stdout+stderr)
   r, w = IO.pipe
 
   begin
     p = Process.new(exe, args: args, output: w, error: w)
   rescue ex
     UIng.queue_main do
+      next if App.shutting_down?
       App.log.append("[GUI] ERROR: failed to spawn: #{ex.message}\n")
-      App.set_busy(false)
+      App.debug_reenable
     end
     w.close
     r.close
@@ -148,15 +192,14 @@ private def run_cli(args : Array(String)) : Nil
   w.close
 
   UIng.queue_main do
+    next if App.shutting_down?
     App.log.append("[GUI] pid=#{p.pid}\n")
   end
 
-  # Regexes for progress parsing
-  step_re = /\[(\d+)\/(\d+)\]/              # [n/total]
-  bar_re = /^\[[# ]+\]\s+(\d+(?:\.\d+)?)%$/ # [###   ] 37.5%
-  percent_re = /(\d+(?:\.\d+)?)%/           # fallback "NN%"
+  step_re = /\[(\d+)\/(\d+)\]/
+  bar_re = /^\[[# ]+\]\s+(\d+(?:\.\d+)?)%$/
+  percent_re = /(\d+(?:\.\d+)?)%/
 
-  # Worker thread: read process output, send UI updates via queue_main
   Thread.new do
     begin
       buf = Bytes.new(4096)
@@ -166,59 +209,66 @@ private def run_cli(args : Array(String)) : Nil
         chunk = String.new(buf[0, n])
         partial += chunk
 
-        last_nl = partial.rindex('\n') || partial.rindex('\r')
-        if last_nl
+        if last_nl = (partial.rindex('\n') || partial.rindex('\r'))
           lines_part = partial[0..last_nl]
           partial = partial[(last_nl + 1)..] || ""
 
           lines_part.each_line do |orig_line|
             line = orig_line.chomp
 
-            # 1) ASCII per-plugin progress: "[#######    ] 88.4%"
-            if m = bar_re.match(line)
-              pct = m[1].to_f.round.to_i
-              UIng.queue_main { App.plugin_progress.value = pct.clamp(0, 100) }
-              next
-            end
+            UIng.queue_main do
+              next if App.shutting_down?
 
-            # 2) Overall "[n/total]" plugin progress
-            if m = step_re.match(line)
-              cur = m[1].to_i
-              total = m[2].to_i
-              if total > 0
-                pct = (cur.to_f / total * 100).round.to_i
-                UIng.queue_main { App.overall_progress.value = pct.clamp(0, 100) }
+              if m = bar_re.match(line)
+                pct = m[1].to_f.round.to_i
+                App.plugin_progress.value = pct.clamp(0, 100)
+              elsif m = step_re.match(line)
+                cur = m[1].to_i
+                total = m[2].to_i
+                if total > 0
+                  pct = (cur.to_f / total * 100).round.to_i
+                  App.overall_progress.value = pct.clamp(0, 100)
+                end
+              elsif m = percent_re.match(line)
+                pct = m[1].to_f.round.to_i
+                App.plugin_progress.value = pct.clamp(0, 100)
               end
-            end
 
-            # 3) Fallback: any "NN%" in the line; treat as per-plugin progress
-            if m = percent_re.match(line)
-              pct = m[1].to_f.round.to_i
-              UIng.queue_main { App.plugin_progress.value = pct.clamp(0, 100) }
+              App.log.append(line + "\n")
             end
-
-            # Append line to log
-            UIng.queue_main { App.log.append(line + "\n") }
           end
         end
       end
 
       unless partial.empty?
-        UIng.queue_main { App.log.append(partial + "\n") }
+        UIng.queue_main do
+          next if App.shutting_down?
+          App.log.append(partial + "\n")
+        end
       end
     rescue ex
       UIng.queue_main do
+        next if App.shutting_down?
         App.log.append("[GUI] worker ERROR: #{ex.class}: #{ex.message}\n")
         ex.backtrace.each { |f| App.log.append("  #{f}\n") }
       end
     ensure
+      # Close read end of the pipe
       r.close
-      status = p.wait
+
+      # We don't wait on the process here; we just assume that if
+      # the pipe closed, the CLI is done emitting useful output.
       UIng.queue_main do
-        App.log.append("[GUI] exited #{status.exit_code} (success=#{status.success?})\n")
-        App.overall_progress.value = status.success? ? 100 : 0
-        App.plugin_progress.value = 0
-        App.set_busy(false)
+        begin
+          next if App.shutting_down?
+
+          # We don't know the exact exit code anymore, skip that.
+          App.log.append("[GUI] run_cli: output stream finished; re-enabling UI\n") rescue nil
+
+          # Just mark not busy and enable buttons.
+          App.debug_reenable
+        rescue
+        end
       end
     end
   end
@@ -227,7 +277,11 @@ end
 # ---- UI --------------------------------------------------------------
 UIng.init do
   window = UIng::Window.new("JB Updater", 880, 600)
-  window.on_closing { UIng.quit; true }
+  window.on_closing do
+    App.mark_shutting_down
+    UIng.quit
+    true
+  end
 
   root = UIng::Box.new(:vertical)
   root.padded = true
@@ -236,7 +290,6 @@ UIng.init do
   tabs = UIng::Tab.new
   root.append(tabs, true)
 
-  # Shared log and two progress bars
   log = UIng::MultilineEntry.new
   log.read_only = true
 
@@ -263,6 +316,16 @@ UIng.init do
   root.append(pb_box, false)
   root.append(log, true)
 
+  # DEBUG: manual re-enable button (never in @@buttons)
+  debug_row = UIng::Box.new(:horizontal)
+  debug_btn = UIng::Button.new("DEBUG: Re-enable UI")
+  debug_row.append(debug_btn, false)
+  root.append(debug_row, false)
+
+  debug_btn.on_clicked do
+    UIng.queue_main { App.debug_reenable }
+  end
+
   # --- Plugins tab ----------------------------------------------------
   plugins = UIng::Box.new(:vertical)
   plugins.padded = true
@@ -279,9 +342,8 @@ UIng.init do
   combo_arch.selected = 0
 
   chk_dry = UIng::Checkbox.new("Dry run")
-  dummy_chk = UIng::Checkbox.new("") # never shown; only passed to build_args
+  dummy_chk = UIng::Checkbox.new("")
 
-  # Detected products combobox
   combo_products = UIng::Combobox.new
   detected = JBUpdater::DetectProducts.all
 
@@ -324,7 +386,6 @@ UIng.init do
   ide.append(btn_upgrade, false)
   tabs.append("IDE Upgrade", ide)
 
-  # Wire detected products combobox
   combo_products.on_selected do
     idx = combo_products.selected
     if idx <= 0
@@ -345,12 +406,10 @@ UIng.init do
     end
   end
 
-  # Detect-from-Product button
   detect_row = UIng::Box.new(:horizontal)
   btn_detect = UIng::Button.new("Detect from Product")
   detect_row.append(btn_detect, false)
 
-  # Action buttons
   row = UIng::Box.new(:horizontal)
   btn_list = UIng::Button.new("List installed")
   btn_install = UIng::Button.new("Install by IDs")
@@ -363,7 +422,6 @@ UIng.init do
   plugins.append(row, false)
   tabs.append("Plugins", plugins)
 
-  # Register widgets + buttons with App
   all_buttons = [] of UIng::Button
   all_buttons.concat([btn_list, btn_install, btn_update])
   all_buttons.concat([btn_list_releases, btn_upgrade])
@@ -371,7 +429,6 @@ UIng.init do
 
   log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 
-  # ---- Wire buttons: Plugins tab ------------------------------------
   btn_detect.on_clicked do
     product = e_product.text
     if product.nil? || product.empty?
@@ -399,16 +456,7 @@ UIng.init do
     plugins_dir = expand_tilde(raw)
     e_plugins_dir.text = plugins_dir if plugins_dir
 
-    args = build_args(
-      e_plugins_dir,
-      e_build,
-      e_product,
-      e_install_ids,
-      combo_arch,
-      chk_dry,
-      dummy_chk
-    ) + ["--list"]
-
+    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk) + ["--list"]
     new_run_header("List installed plugins", args)
     run_cli(args)
   end
@@ -423,15 +471,7 @@ UIng.init do
     plugins_dir = expand_tilde(raw)
     e_plugins_dir.text = plugins_dir if plugins_dir
 
-    args = build_args(
-      e_plugins_dir,
-      e_build,
-      e_product,
-      e_install_ids,
-      combo_arch,
-      chk_dry,
-      dummy_chk
-    )
+    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk)
     log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Install plugins", args)
     run_cli(args)
@@ -447,21 +487,12 @@ UIng.init do
     plugins_dir = expand_tilde(raw)
     e_plugins_dir.text = plugins_dir if plugins_dir
 
-    args = build_args(
-      e_plugins_dir,
-      e_build,
-      e_product,
-      e_install_ids,
-      combo_arch,
-      chk_dry,
-      dummy_chk
-    )
+    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk)
     log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Update plugins", args)
     run_cli(args)
   end
 
-  # ---- Wire buttons: IDE tab ----------------------------------------
   btn_list_releases.on_clicked do
     product = e_ide_product.text
     if product.nil? || product.empty?
