@@ -1,3 +1,5 @@
+# src/gui/main_gui.cr
+
 require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
@@ -9,42 +11,64 @@ struct LineMsg
   def initialize(@text : String); end
 end
 
-struct PercentMsg
+# Overall progress (all plugins)
+struct OverallPercentMsg
   getter percent : Int32
 
   def initialize(@percent : Int32); end
 end
 
-alias Msg = LineMsg | PercentMsg
+# Per-plugin progress (current download)
+struct PluginPercentMsg
+  getter percent : Int32
 
-# Allow Nil explicitly to cope with closed-channel semantics on Crystal 1.17.1
+  def initialize(@percent : Int32); end
+end
+
+alias Msg = LineMsg | OverallPercentMsg | PluginPercentMsg
+
+# Allow Nil to cope with closed-channel semantics
 CHANNEL = Channel(Msg | Nil).new(capacity: 1024)
 
-# Small helpers so we never intentionally send Nil
+# Small helpers so we never intentionally send Nil except sentinel
 def send_line(text : String)
   CHANNEL.send(LineMsg.new(text))
 end
 
-def send_percent(pct : Int32)
-  CHANNEL.send(PercentMsg.new(pct))
+def send_overall_percent(pct : Int32)
+  CHANNEL.send(OverallPercentMsg.new(pct))
+end
+
+def send_plugin_percent(pct : Int32)
+  CHANNEL.send(PluginPercentMsg.new(pct))
 end
 
 # ---- Global access to log/progress widgets ----
 module App
   @@log : UIng::MultilineEntry?
-  @@progress : UIng::ProgressBar?
+  @@overall_progress : UIng::ProgressBar?
+  @@plugin_progress : UIng::ProgressBar?
 
-  def self.set_widgets(log : UIng::MultilineEntry, progress : UIng::ProgressBar)
+  def self.set_widgets(
+    log : UIng::MultilineEntry,
+    overall : UIng::ProgressBar,
+    plugin : UIng::ProgressBar,
+  )
     @@log = log
-    @@progress = progress
+    @@overall_progress = overall
+    @@plugin_progress = plugin
   end
 
   def self.log : UIng::MultilineEntry
     @@log.not_nil!
   end
 
-  def self.progress : UIng::ProgressBar
-    @@progress.not_nil!
+  def self.overall_progress : UIng::ProgressBar
+    @@overall_progress.not_nil!
+  end
+
+  def self.plugin_progress : UIng::ProgressBar
+    @@plugin_progress.not_nil!
   end
 end
 
@@ -59,7 +83,7 @@ fun pump_cb(_data : Void*) : LibC::Int
     when raw = CHANNEL.receive
       handled = true
 
-      # If the channel has been closed, receive may yield Nil; stop processing
+      # Stop pumping if sentinel Nil is received
       unless raw
         return 1
       end
@@ -68,8 +92,10 @@ fun pump_cb(_data : Void*) : LibC::Int
       case msg
       when LineMsg
         App.log.append(msg.text + "\n")
-      when PercentMsg
-        App.progress.value = msg.percent
+      when OverallPercentMsg
+        App.overall_progress.value = msg.percent
+      when PluginPercentMsg
+        App.plugin_progress.value = msg.percent
       end
 
       processed += 1
@@ -183,27 +209,29 @@ private def run_cli(args : Array(String)) : Nil
           lines_part.each_line do |orig_line|
             line = orig_line.chomp
 
-            # 1) ASCII progress bar lines: "[#######    ] 88.4%"
+            # 1) ASCII per-plugin progress: "[#######    ] 88.4%"
             if m = bar_re.match(line)
               pct = m[1].to_f.round.to_i
-              send_percent(pct.clamp(0, 100))
+              send_plugin_percent(pct.clamp(0, 100))
               next
             end
 
-            # 2) [n/total] progress lines
+            # 2) Overall "[n/total]" plugin progress
             if m = step_re.match(line)
               cur = m[1].to_i
               total = m[2].to_i
               if total > 0
                 pct = (cur.to_f / total * 100).round.to_i
-                send_percent(pct.clamp(0, 100))
+                send_overall_percent(pct.clamp(0, 100))
               end
+              # log these lines as normal too
             end
 
-            # 3) Fallback: any "NN%" in the line
+            # 3) Fallback: any "NN%" in the line;
+            # here we treat it as per-plugin progress
             if m = percent_re.match(line)
               pct = m[1].to_f.round.to_i
-              send_percent(pct.clamp(0, 100))
+              send_plugin_percent(pct.clamp(0, 100))
             end
 
             send_line(line)
@@ -219,9 +247,9 @@ private def run_cli(args : Array(String)) : Nil
       r.close
       status = p.wait
       send_line("[GUI] exited #{status.exit_code} (success=#{status.success?})")
-      send_percent(status.success? ? 100 : 0)
-
-      # Optionally, signal end-of-stream by sending nil once
+      send_overall_percent(status.success? ? 100 : 0)
+      send_plugin_percent(0)
+      # sentinel Nil to tell pump_cb to stop if desired
       CHANNEL.send(nil)
     end
   end
@@ -229,7 +257,7 @@ end
 
 # ---- UI --------------------------------------------------------------
 UIng.init do
-  window = UIng::Window.new("JB Updater", 880, 560)
+  window = UIng::Window.new("JB Updater", 880, 600)
   window.on_closing { UIng.quit; true }
 
   root = UIng::Box.new(:vertical)
@@ -239,13 +267,32 @@ UIng.init do
   tabs = UIng::Tab.new
   root.append(tabs, true)
 
-  # Shared log/progress
+  # Shared log and two progress bars
   log = UIng::MultilineEntry.new
   log.read_only = true
-  progress = UIng::ProgressBar.new
-  App.set_widgets(log, progress)
 
-  root.append(progress, false)
+  overall_label = UIng::Label.new("Overall:")
+  overall_bar = UIng::ProgressBar.new
+
+  plugin_label = UIng::Label.new("Current plugin:")
+  plugin_bar = UIng::ProgressBar.new
+
+  App.set_widgets(log, overall_bar, plugin_bar)
+
+  pb_box = UIng::Box.new(:vertical)
+  pb_box.padded = true
+  row1 = UIng::Box.new(:horizontal)
+  row1.append(overall_label, false)
+  row1.append(overall_bar, true)
+
+  row2 = UIng::Box.new(:horizontal)
+  row2.append(plugin_label, false)
+  row2.append(plugin_bar, true)
+
+  pb_box.append(row1, false)
+  pb_box.append(row2, false)
+
+  root.append(pb_box, false)
   root.append(log, true)
 
   # Start timer to drain CHANNEL via pump_cb
@@ -391,7 +438,8 @@ UIng.init do
       dummy_chk
     ) + ["--list"]
 
-    App.progress.value = 0
+    App.overall_progress.value = 0
+    App.plugin_progress.value = 0
     new_run_header("List installed plugins", args)
     run_cli(args)
   end
@@ -416,7 +464,8 @@ UIng.init do
       dummy_chk
     )
     send_line("DEBUG: args for jb_updater: #{args.join(" ")}")
-    App.progress.value = 0
+    App.overall_progress.value = 0
+    App.plugin_progress.value = 0
     new_run_header("Install plugins", args)
     run_cli(args)
   end
@@ -441,7 +490,8 @@ UIng.init do
       dummy_chk
     )
     send_line("DEBUG: args for jb_updater: #{args.join(" ")}")
-    App.progress.value = 0
+    App.overall_progress.value = 0
+    App.plugin_progress.value = 0
     new_run_header("Update plugins", args)
     run_cli(args)
   end
@@ -456,7 +506,8 @@ UIng.init do
 
     args = ["--list-ide-releases", "--product", product]
     send_line("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}")
-    App.progress.value = 0
+    App.overall_progress.value = 0
+    App.plugin_progress.value = 0
     new_run_header("List IDE releases", args)
     run_cli(args)
   end
@@ -472,7 +523,8 @@ UIng.init do
     args << "--brew" if chk_brew.checked?
 
     send_line("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}")
-    App.progress.value = 0
+    App.overall_progress.value = 0
+    App.plugin_progress.value = 0
     new_run_header("Upgrade IDE", args)
     run_cli(args)
   end
