@@ -1,5 +1,3 @@
-# src/gui/main_gui.cr
-
 require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
@@ -49,7 +47,7 @@ module App
     @@shutting_down = true
   end
 
-  # Called from UI thread
+  # Called from UI thread: clear busy and enable all tracked buttons
   def self.debug_reenable
     return if @@shutting_down
 
@@ -67,10 +65,9 @@ module App
 
     @@busy = busy
 
-    count = @@buttons.size
     if @@log
       begin
-        App.log.append("[GUI] set_busy(#{busy}) for #{count} buttons\n")
+        App.log.append("[GUI] set_busy(#{busy}) for #{@@buttons.size} buttons\n")
       rescue
       end
     end
@@ -133,10 +130,8 @@ private def build_args(
   args += ["--install-plugin", install_ids] if install_ids && !install_ids.empty?
 
   case combo_arch.selected
-  when 1
-    args += ["--arch", "arm"]
-  when 2
-    args += ["--arch", "intel"]
+  when 1 then args += ["--arch", "arm"]
+  when 2 then args += ["--arch", "intel"]
   end
 
   args << "--dry-run" if chk_dry.checked?
@@ -147,14 +142,16 @@ end
 private def jb_exe_path : String
   here = File.dirname(Process.executable_path.not_nil!)
   cand = File.expand_path(File.join(here, "jb_updater"))
-  return cand if File.executable?(cand)
   cand2 = "./jb_updater"
+
+  return cand if File.executable?(cand)
   return cand2 if File.executable?(cand2)
   ENV["JB_UPDATER"]? || "jb_updater"
 end
 
 # ---- CLI execution: spawn jb_updater, stream output, update UI via queue_main ----
 private def run_cli(args : Array(String)) : Nil
+  # Don’t start another job while one is in progress
   if App.busy?
     UIng.queue_main do
       next if App.shutting_down?
@@ -165,16 +162,19 @@ private def run_cli(args : Array(String)) : Nil
 
   exe = jb_exe_path
 
+  # mark GUI as busy on UI thread
   UIng.queue_main do
     next if App.shutting_down?
     App.set_busy(true)
   end
 
+  # log spawn line
   UIng.queue_main do
     next if App.shutting_down?
     App.log.append("[GUI] spawn: #{exe} #{args.join(" ")}\n")
   end
 
+  # Create a pipe to read process output (stdout+stderr)
   r, w = IO.pipe
 
   begin
@@ -197,8 +197,14 @@ private def run_cli(args : Array(String)) : Nil
   end
 
   step_re = /\[(\d+)\/(\d+)\]/
-  bar_re = /^\[[# ]+\]\s+(\d+(?:\.\d+)?)%$/
   percent_re = /(\d+(?:\.\d+)?)%/
+
+  # Numeric bar parser: "[####    ] 93.3%" (optional spaces after bar)
+  bar_re = /^\[[# ]+\]\s*(\d+(?:\.\d+)?)%\s*$/
+
+  # Loose detector for "bar-like" lines: starts with "[" and ends with "%"
+  # used only to decide whether to log or not
+  bar_line_re = /^\[[# ]+\].*%\s*$/
 
   Thread.new do
     begin
@@ -214,11 +220,16 @@ private def run_cli(args : Array(String)) : Nil
           partial = partial[(last_nl + 1)..] || ""
 
           lines_part.each_line do |orig_line|
-            line = orig_line.chomp
+            # strip both \n and \r
+            line = orig_line.chomp("\n").chomp("\r")
 
             UIng.queue_main do
               next if App.shutting_down?
 
+              # Any line that looks like "[#####] ...%" should not be logged
+              is_bar_line = !!bar_line_re.match(line)
+
+              # Update progress from numeric bar if possible
               if m = bar_re.match(line)
                 pct = m[1].to_f.round.to_i
                 App.plugin_progress.value = pct.clamp(0, 100)
@@ -234,7 +245,8 @@ private def run_cli(args : Array(String)) : Nil
                 App.plugin_progress.value = pct.clamp(0, 100)
               end
 
-              App.log.append(line + "\n")
+              # Log only non-bar-like lines
+              App.log.append(line + "\n") if !is_bar_line && !line.empty?
             end
           end
         end
@@ -243,7 +255,20 @@ private def run_cli(args : Array(String)) : Nil
       unless partial.empty?
         UIng.queue_main do
           next if App.shutting_down?
-          App.log.append(partial + "\n")
+
+          partial.each_line do |orig_line|
+            line = orig_line.chomp("\n").chomp("\r")
+            next if line.empty?
+
+            is_bar_line = !!bar_line_re.match(line)
+
+            if m = bar_re.match(line)
+              pct = m[1].to_f.round.to_i
+              App.plugin_progress.value = pct.clamp(0, 100)
+            end
+
+            App.log.append(line + "\n") unless is_bar_line
+          end
         end
       end
     rescue ex
@@ -256,16 +281,11 @@ private def run_cli(args : Array(String)) : Nil
       # Close read end of the pipe
       r.close
 
-      # We don't wait on the process here; we just assume that if
-      # the pipe closed, the CLI is done emitting useful output.
+      # From the GUI's point of view, output is done → job finished.
       UIng.queue_main do
         begin
           next if App.shutting_down?
-
-          # We don't know the exact exit code anymore, skip that.
           App.log.append("[GUI] run_cli: output stream finished; re-enabling UI\n") rescue nil
-
-          # Just mark not busy and enable buttons.
           App.debug_reenable
         rescue
         end
@@ -316,7 +336,7 @@ UIng.init do
   root.append(pb_box, false)
   root.append(log, true)
 
-  # DEBUG: manual re-enable button (never in @@buttons)
+  # Optional debug button
   debug_row = UIng::Box.new(:horizontal)
   debug_btn = UIng::Button.new("DEBUG: Re-enable UI")
   debug_row.append(debug_btn, false)
@@ -429,6 +449,7 @@ UIng.init do
 
   log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 
+  # ---- Wire buttons: Plugins tab ------------------------------------
   btn_detect.on_clicked do
     product = e_product.text
     if product.nil? || product.empty?
@@ -457,6 +478,8 @@ UIng.init do
     e_plugins_dir.text = plugins_dir if plugins_dir
 
     args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk) + ["--list"]
+    # args << "--no-tty-progress-bar"
+
     new_run_header("List installed plugins", args)
     run_cli(args)
   end
@@ -472,6 +495,8 @@ UIng.init do
     e_plugins_dir.text = plugins_dir if plugins_dir
 
     args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk)
+    # args << "--no-tty-progress-bar"
+
     log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Install plugins", args)
     run_cli(args)
@@ -488,11 +513,14 @@ UIng.init do
     e_plugins_dir.text = plugins_dir if plugins_dir
 
     args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk)
+    # args << "--no-tty-progress-bar"
+
     log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Update plugins", args)
     run_cli(args)
   end
 
+  # ---- Wire buttons: IDE tab ----------------------------------------
   btn_list_releases.on_clicked do
     product = e_ide_product.text
     if product.nil? || product.empty?
@@ -501,6 +529,8 @@ UIng.init do
     end
 
     args = ["--list-ide-releases", "--product", product]
+    # args << "--no-tty-progress-bar"
+
     log.append("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}\n")
     new_run_header("List IDE releases", args)
     run_cli(args)
@@ -515,6 +545,7 @@ UIng.init do
     args += ["--product", ide_product] if ide_product && !ide_product.empty?
     args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
     args << "--brew" if chk_brew.checked?
+    # args << "--no-tty-progress-bar"
 
     log.append("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}\n")
     new_run_header("Upgrade IDE", args)

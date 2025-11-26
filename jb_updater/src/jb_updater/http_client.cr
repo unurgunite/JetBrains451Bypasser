@@ -5,6 +5,16 @@ module JBUpdater
   class HTTPClient
     USER_AGENT = "jb-updater/crystal/1.0 (+https://github.com/unurgunite)"
 
+    @@no_tty_progress_bar : Bool = false
+
+    def self.no_tty_progress_bar=(on : Bool)
+      @@no_tty_progress_bar = on
+    end
+
+    def self.no_tty_progress_bar? : Bool
+      @@no_tty_progress_bar
+    end
+
     # ----------------------------------------------------------------------
     # Perform a HEAD or GET and return the Response
     # ----------------------------------------------------------------------
@@ -54,7 +64,7 @@ module JBUpdater
                   f.write(buf[0, read_bytes])
                   downloaded += read_bytes
 
-                  if total > 0
+                  if total > 0 && !HTTPClient.no_tty_progress_bar?
                     progress = (downloaded.to_f / total * bar_width)
                       .clamp(0, bar_width).to_i
                     percent = (downloaded.to_f / total * 100).round(1)
@@ -65,7 +75,11 @@ module JBUpdater
                 end
               end
             end
-            puts "\rDownload complete#{" " * 40}"
+            if HTTPClient.no_tty_progress_bar?
+              puts "Download complete"
+            else
+              puts "\rDownload complete#{" " * 40}"
+            end
           when 301, 302
             if loc = response.headers["Location"]?
               next_uri = URI.parse(loc)

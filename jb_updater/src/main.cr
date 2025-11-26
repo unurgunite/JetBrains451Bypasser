@@ -2,6 +2,8 @@ require "./jb_updater"
 
 opts = JBUpdater.parse_cli
 
+JBUpdater::HTTPClient.no_tty_progress_bar = opts.no_tty_progress_bar
+
 if opts.product && opts.ide_path
   JBUpdater::Log.fail("Specify either --product or --ide-path, not both.")
   exit 1

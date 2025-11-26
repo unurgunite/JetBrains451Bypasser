@@ -21,6 +21,7 @@ module JBUpdater
     property ide_downloads_host : String
     property arch : String?
     property list_ide_releases : Bool
+    property no_tty_progress_bar : Bool
 
     def initialize
       @only = [] of String
@@ -39,6 +40,7 @@ module JBUpdater
       @arch = nil
       @ide_path = nil
       @list_ide_releases = false
+      @no_tty_progress_bar = false
     end
   end
 
@@ -67,6 +69,9 @@ module JBUpdater
       end
       parser.on("--ide-downloads-host HOST", "Override IDE downloads host (default: download-cdn.jetbrains.com)") do |v|
         opts.ide_downloads_host = v
+      end
+      parser.on("--no-tty-progress-bar", "Disable ASCII progress bars on stdout for downloads") do
+        opts.no_tty_progress_bar = true
       end
       parser.on("--brew", "Patch Homebrew cask Ruby file instead of direct install") { opts.brew_patch = nil }
       parser.on("-h", "--help", "Show help") do
