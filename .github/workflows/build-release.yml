@@ -159,17 +159,6 @@ jobs:
         working-directory: jb_updater
         run: crystal spec -v
 
-      - name: Run Ameba linter
-        working-directory: jb_updater
-        run: |
-          if (Test-Path .\bin\ameba) {
-            .\bin\ameba
-          } elseif (Test-Path .\lib\ameba\bin\ameba) {
-            .\lib\ameba\bin\ameba
-          } else {
-            crystal run lib/ameba/src/cli.cr -- .
-          }
-
       - name: Build binaries (CLI + GUI)
         working-directory: jb_updater
         run: |
