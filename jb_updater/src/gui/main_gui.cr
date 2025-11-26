@@ -1,6 +1,7 @@
 require "uing"
 require "../jb_updater"
 require "../jb_updater/detect_products"
+require "file_utils"
 
 # ---- Global access to log/progress widgets ----
 module App
@@ -144,8 +145,8 @@ private def jb_exe_path : String
   cand = File.expand_path(File.join(here, "jb_updater"))
   cand2 = "./jb_updater"
 
-  return cand if File.executable?(cand)
-  return cand2 if File.executable?(cand2)
+  return cand if File::Info.executable?(cand)
+  return cand2 if File::Info.executable?(cand2)
   ENV["JB_UPDATER"]? || "jb_updater"
 end
 
@@ -199,11 +200,9 @@ private def run_cli(args : Array(String)) : Nil
   step_re = /\[(\d+)\/(\d+)\]/
   percent_re = /(\d+(?:\.\d+)?)%/
 
-  # Numeric bar parser: "[####    ] 93.3%" (optional spaces after bar)
+  # Numeric bar parser: "[####    ] 93.3%" (optional spaces)
   bar_re = /^\[[# ]+\]\s*(\d+(?:\.\d+)?)%\s*$/
-
-  # Loose detector for "bar-like" lines: starts with "[" and ends with "%"
-  # used only to decide whether to log or not
+  # Loose detector for "bar-like" lines
   bar_line_re = /^\[[# ]+\].*%\s*$/
 
   Thread.new do
@@ -220,16 +219,13 @@ private def run_cli(args : Array(String)) : Nil
           partial = partial[(last_nl + 1)..] || ""
 
           lines_part.each_line do |orig_line|
-            # strip both \n and \r
             line = orig_line.chomp("\n").chomp("\r")
 
             UIng.queue_main do
               next if App.shutting_down?
 
-              # Any line that looks like "[#####] ...%" should not be logged
               is_bar_line = !!bar_line_re.match(line)
 
-              # Update progress from numeric bar if possible
               if m = bar_re.match(line)
                 pct = m[1].to_f.round.to_i
                 App.plugin_progress.value = pct.clamp(0, 100)
@@ -245,7 +241,6 @@ private def run_cli(args : Array(String)) : Nil
                 App.plugin_progress.value = pct.clamp(0, 100)
               end
 
-              # Log only non-bar-like lines
               App.log.append(line + "\n") if !is_bar_line && !line.empty?
             end
           end
@@ -336,12 +331,26 @@ UIng.init do
   root.append(pb_box, false)
   root.append(log, true)
 
-  # Optional debug button
-  debug_row = UIng::Box.new(:horizontal)
+  # Global actions row: Clear console, Remove cache, Debug
+  actions_row = UIng::Box.new(:horizontal)
+  btn_clear_log = UIng::Button.new("Clear console")
+  btn_remove_cache = UIng::Button.new("Remove *.bak* plugin backups")
   debug_btn = UIng::Button.new("DEBUG: Re-enable UI")
-  debug_row.append(debug_btn, false)
-  root.append(debug_row, false)
 
+  actions_row.append(btn_clear_log, false)
+  actions_row.append(btn_remove_cache, false)
+  actions_row.append(debug_btn, false)
+  root.append(actions_row, false)
+
+  # Clear console
+  btn_clear_log.on_clicked do
+    UIng.queue_main do
+      log.text = ""
+      log.append("Console cleared at #{Time.local}\n")
+    end
+  end
+
+  # DEBUG re-enable
   debug_btn.on_clicked do
     UIng.queue_main { App.debug_reenable }
   end
@@ -384,7 +393,7 @@ UIng.init do
     log.append("No JetBrains IDEs detected automatically. Please enter plugins dir or IDE path manually.\n")
   end
 
-  # --- IDE tab widgets ---
+  # --- IDE tab widgets ------------------------------------------------
   ide = UIng::Box.new(:vertical)
   ide.padded = true
   ide_form = UIng::Form.new
@@ -449,7 +458,43 @@ UIng.init do
 
   log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 
-  # ---- Wire buttons: Plugins tab ------------------------------------
+  # ---- Wire buttons: Remove cache ------------------------------------
+  btn_remove_cache.on_clicked do
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
+      log.append("ERROR: Plugins dir is required for Remove cache.\n")
+      next
+    end
+
+    plugins_dir = expand_tilde(raw) || raw
+    unless Dir.exists?(plugins_dir)
+      log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
+      next
+    end
+
+    begin
+      removed = 0
+      Dir.each_child(plugins_dir) do |entry|
+        # treat anything containing ".bak" as a backup; or tighten this if you want
+        if entry.includes?(".bak")
+          path = File.join(plugins_dir, entry)
+          FileUtils.rm_rf(path)
+          removed += 1
+          log.append("Removed backup: #{path}\n")
+        end
+      end
+
+      if removed == 0
+        log.append("No *.bak* backup entries found under #{plugins_dir}\n")
+      else
+        log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
+      end
+    rescue ex
+      log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
+    end
+  end
+
+  # ---- Wire buttons: Plugins tab actions -----------------------------
   btn_detect.on_clicked do
     product = e_product.text
     if product.nil? || product.empty?
@@ -478,8 +523,6 @@ UIng.init do
     e_plugins_dir.text = plugins_dir if plugins_dir
 
     args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk) + ["--list"]
-    # args << "--no-tty-progress-bar"
-
     new_run_header("List installed plugins", args)
     run_cli(args)
   end
@@ -495,8 +538,6 @@ UIng.init do
     e_plugins_dir.text = plugins_dir if plugins_dir
 
     args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk)
-    # args << "--no-tty-progress-bar"
-
     log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Install plugins", args)
     run_cli(args)
@@ -513,8 +554,6 @@ UIng.init do
     e_plugins_dir.text = plugins_dir if plugins_dir
 
     args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, dummy_chk)
-    # args << "--no-tty-progress-bar"
-
     log.append("DEBUG: args for jb_updater: #{args.join(" ")}\n")
     new_run_header("Update plugins", args)
     run_cli(args)
@@ -529,8 +568,6 @@ UIng.init do
     end
 
     args = ["--list-ide-releases", "--product", product]
-    # args << "--no-tty-progress-bar"
-
     log.append("DEBUG: args for jb_updater (IDE releases): #{args.join(" ")}\n")
     new_run_header("List IDE releases", args)
     run_cli(args)
@@ -545,7 +582,6 @@ UIng.init do
     args += ["--product", ide_product] if ide_product && !ide_product.empty?
     args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
     args << "--brew" if chk_brew.checked?
-    # args << "--no-tty-progress-bar"
 
     log.append("DEBUG: args for jb_updater (IDE upgrade): #{args.join(" ")}\n")
     new_run_header("Upgrade IDE", args)

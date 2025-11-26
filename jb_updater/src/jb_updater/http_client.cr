@@ -5,6 +5,7 @@ module JBUpdater
   class HTTPClient
     USER_AGENT = "jb-updater/crystal/1.0 (+https://github.com/unurgunite)"
 
+    # Default: show TTY progress bars (CLI friendly)
     @@no_tty_progress_bar : Bool = false
 
     def self.no_tty_progress_bar=(on : Bool)
