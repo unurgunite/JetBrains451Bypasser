@@ -48,6 +48,11 @@ jobs:
           tar -czf jb_updater-linux-x86_64.tar.gz -C jb_updater jb_updater
           # Package GUI
           tar -czf jb_updater-gui-linux-x86_64.tar.gz -C jb_updater jb_updater_gui
+          # Package bundle: CLI + GUI together
+          mkdir -p jb_updater-bundle-linux
+          cp jb_updater/jb_updater     jb_updater-bundle-linux/
+          cp jb_updater/jb_updater_gui jb_updater-bundle-linux/
+          tar -czf jb_updater-bundle-linux-x86_64.tar.gz -C jb_updater-bundle-linux .
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-linux-x86_64
@@ -56,6 +61,10 @@ jobs:
         with:
           name: jb_updater-gui-linux-x86_64
           path: jb_updater-gui-linux-x86_64.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jb_updater-bundle-linux-x86_64
+          path: jb_updater-bundle-linux-x86_64.tar.gz
   macos:
     name: macOS ${{ matrix.arch }}
     strategy:
@@ -182,6 +191,11 @@ jobs:
         run: |
           Compress-Archive -Path jb_updater\jb_updater.exe -DestinationPath jb_updater-windows-x64.zip
           Compress-Archive -Path jb_updater\jb_updater_gui.exe -DestinationPath jb_updater-gui-windows-x64.zip
+          # Bundle: CLI + GUI together
+          New-Item -ItemType Directory -Force -Path jb_updater-bundle | Out-Null
+          Copy-Item jb_updater\jb_updater.exe     jb_updater-bundle\
+          Copy-Item jb_updater\jb_updater_gui.exe jb_updater-bundle\
+          Compress-Archive -Path jb_updater-bundle\* -DestinationPath jb_updater-bundle-windows-x64.zip
 
       - uses: actions/upload-artifact@v4
         with:
@@ -192,6 +206,11 @@ jobs:
         with:
           name: jb_updater-gui-windows-x64
           path: jb_updater-gui-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jb_updater-bundle-windows-x64
+          path: jb_updater-bundle-windows-x64.zip
 
   # =========================================================
   # ===============   RELEASE JOB   =========================
