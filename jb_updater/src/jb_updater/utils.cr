@@ -63,7 +63,7 @@ module JBUpdater
     def self.parse_build_string(str : String) : Array(Float64)
       return [0.0, 0.0, 0.0] if str.empty?
       core = str.gsub(/^[A-Z]+-/, "")
-      parts = core.split('.', 3).map { |p| p == "*" ? INF : p.to_f }
+      parts = core.split('.', 3).map { |part| part == "*" ? INF : part.to_f }
       parts.fill(0.0, parts.size...3)
     end
 
@@ -117,6 +117,22 @@ module JBUpdater
       path = File.join(jetbrains_config_base, base, "plugins")
       FileUtils.mkdir_p(path) unless Dir.exists?(path)
       path
+    end
+
+    # Expand leading ~ or ~/ in paths
+    def self.expand_tilde(path : String) : String
+      return path unless path.starts_with?("~")
+
+      home = ENV["HOME"]? || File.expand_path("~")
+      return home if path == "~"
+
+      # "~/" or "~foo" – we only handle the simple current-user case (~ or ~/)
+      if path.starts_with?("~/")
+        File.join(home, path[2..])
+      else
+        # "~user" style not supported, just return as-is
+        path
+      end
     end
 
     # Base JetBrains configuration directory for current OS.

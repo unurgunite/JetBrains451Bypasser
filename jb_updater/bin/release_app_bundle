@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Build CLI + GUI
+crystal build src/main.cr --release -o jb_updater
+crystal build src/gui/main_gui.cr --release -o jb_updater_gui
+
+APP_NAME="JBUpdater"
+APP_ROOT="${APP_NAME}.app/Contents"
+mkdir -p "$APP_ROOT/MacOS" "$APP_ROOT/Resources"
+
+# Copy both binaries into the app
+cp jb_updater_gui "$APP_ROOT/MacOS/jb_updater_gui"
+cp jb_updater     "$APP_ROOT/MacOS/jb_updater"
+
+cat > "$APP_ROOT/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>CFBundleName</key>
+    <string>JB Updater</string>
+    <key>CFBundleDisplayName</key>
+    <string>JB Updater</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.example.jb-updater</string>
+
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+
+    <key>CFBundleExecutable</key>
+    <string>jb_updater_gui</string>
+
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+  </dict>
+</plist>
+PLIST

@@ -3,11 +3,19 @@ version: 0.1.0
 
 authors:
   - unurgunite <email@email.com>
+crystal: '>= 1.17.1'
+license: MIT
+
+dependencies:
+  uing:
+    github: kojix2/uing
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
 
 targets:
   jb_updater:
     main: src/main.cr
-
-crystal: '>= 1.17.1'
-
-license: MIT
+  jb_updater_gui:
+    main: src/gui/main_gui.cr

@@ -56,20 +56,18 @@ module JBUpdater
     end
 
     def self.parse_xml(xml : String, path : String) : PluginMeta?
-      begin
-        doc = XML.parse(xml)
-        id_node = doc.xpath_node("//id") || doc.xpath_node("//name")
-        version_node = doc.xpath_node("//version")
-        idea_version = doc.xpath_node("//idea-version")
-        since = idea_version.try &.["since-build"]? || idea_version.try &.["sinceBuild"]?
-        until_build = idea_version.try &.["until-build"]? || idea_version.try &.["untilBuild"]?
-        id = id_node.try &.content
-        version = version_node.try &.content
-        return nil unless id && version
-        new(id: id.strip, version: version.strip, since: since.try &.strip, until_build: until_build.try &.strip, path: path)
-      rescue ex : XML::Error
-        nil
-      end
+      doc = XML.parse(xml)
+      id_node = doc.xpath_node("//id") || doc.xpath_node("//name")
+      version_node = doc.xpath_node("//version")
+      idea_version = doc.xpath_node("//idea-version")
+      since = idea_version.try &.["since-build"]? || idea_version.try &.["sinceBuild"]?
+      until_build = idea_version.try &.["until-build"]? || idea_version.try &.["untilBuild"]?
+      id = id_node.try &.content
+      version = version_node.try &.content
+      return nil unless id && version
+      new(id: id.strip, version: version.strip, since: since.try &.strip, until_build: until_build.try &.strip, path: path)
+    rescue ex : XML::Error
+      nil
     end
 
     # Uses unzip -p to read a text file inside JAR

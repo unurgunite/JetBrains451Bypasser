@@ -1,2 +1,10 @@
 version: 2.0
-shards: {}
+shards:
+  ameba:
+    git: https://github.com/crystal-ameba/ameba.git
+    version: 1.6.4
+
+  uing:
+    git: https://github.com/kojix2/uing.git
+    version: 0.0.3
+

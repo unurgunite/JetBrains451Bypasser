@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+if [ -x "./bin/ameba" ]; then
+  ./bin/ameba "$@"
+elif [ -x "./lib/ameba/bin/ameba" ]; then
+  ./lib/ameba/bin/ameba "$@"
+else
+  crystal run lib/ameba/src/cli.cr -- "$@"
+fi
