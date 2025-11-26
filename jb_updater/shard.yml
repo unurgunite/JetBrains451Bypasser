@@ -10,6 +10,10 @@ dependencies:
   uing:
     github: kojix2/uing
 
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+
 targets:
   jb_updater:
     main: src/main.cr

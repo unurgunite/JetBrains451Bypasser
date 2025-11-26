@@ -32,6 +32,10 @@ jobs:
         working-directory: ./jb_updater
         run: shards install
 
+      - name: Run Ameba linter
+        working-directory: ./jb_updater
+        run: ./bin/ameba || ./lib/ameba/bin/ameba || crystal run lib/ameba/src/cli.cr -- .
+
       - name: Build CLI
         working-directory: ./jb_updater
         run: crystal build src/main.cr --release -o jb_updater
