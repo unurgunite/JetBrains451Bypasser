@@ -13,19 +13,33 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ ubuntu-latest, macos-latest ]
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
-      - run: shards install
+
+      - name: Install GTK3 (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev
+
+      - name: Install shards
         working-directory: ./jb_updater
+        run: shards install
+
       - name: Build CLI
+        working-directory: ./jb_updater
         run: crystal build src/main.cr --release -o jb_updater
-        working-directory: ./jb_updater
+
       - name: Build GUI
+        working-directory: ./jb_updater
         run: crystal build src/gui/main_gui.cr --release -o jb_updater_gui
+
+      - name: Run CLI --help
         working-directory: ./jb_updater
-      - run: ./jb_updater --help
-        working-directory: ./jb_updater
+        run: ./jb_updater --help

@@ -26,7 +26,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxml2-dev libssl-dev libpcre2-dev libgc-dev liblzma-dev
+          sudo apt-get install -y libxml2-dev libssl-dev libpcre2-dev libgc-dev liblzma-dev libgtk-3-dev
       - name: Install shards
         working-directory: jb_updater
         run: shards install
@@ -107,57 +107,68 @@ jobs:
           cp jb_updater/jb_updater_gui "$APP_ROOT/MacOS/jb_updater_gui"
 
           cat > "$APP_ROOT/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleName</key><string>JB Updater</string>
-<key>CFBundleIdentifier</key><string>com.example.jb-updater</string>
-<key>CFBundleVersion</key><string>1.0</string>
-<key>CFBundleExecutable</key><string>jb_updater_gui</string>
-<key>LSMinimumSystemVersion</key><string>11.0</string>
-<key>NSHighResolutionCapable</key><true/>
-</dict></plist>
-  PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>CFBundleName</key><string>JB Updater</string>
+          <key>CFBundleIdentifier</key><string>com.example.jb-updater</string>
+          <key>CFBundleVersion</key><string>1.0</string>
+          <key>CFBundleExecutable</key><string>jb_updater_gui</string>
+          <key>LSMinimumSystemVersion</key><string>11.0</string>
+          <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
   
-  # Package GUI
-  zip -ry jb_updater-gui-macos-${ARCH}.zip JBUpdater.app
-  - uses: actions/upload-artifact@v4
-    with:
-      name: jb_updater-macos-${{ matrix.arch }}
-      path: jb_updater-macos-${{ matrix.arch }}.tar.gz
-  - uses: actions/upload-artifact@v4
-    with:
-      name: jb_updater-gui-macos-${{ matrix.arch }}
-      path: jb_updater-gui-macos-${{ matrix.arch }}.zip
-
+          # Package GUI
+          zip -ry jb_updater-gui-macos-${ARCH}.zip JBUpdater.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jb_updater-macos-${{ matrix.arch }}
+          path: jb_updater-macos-${{ matrix.arch }}.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jb_updater-gui-macos-${{ matrix.arch }}
+          path: jb_updater-gui-macos-${{ matrix.arch }}.zip
   windows:
     name: Windows x64
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
+
+      # Ensure MSVC build environment is set up (cl, link, mt, etc.)
+      - name: Set up MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install shards
         working-directory: jb_updater
         run: shards install
+
       - name: Run specs
         working-directory: jb_updater
         run: crystal spec -v
+
       - name: Build binaries (CLI + GUI)
+        working-directory: jb_updater
         run: |
-          cd jb_updater
           # CLI
           crystal build src/main.cr --release -o jb_updater.exe
           # GUI (windowed subsystem to hide console)
           crystal build src/gui/main_gui.cr --release --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
-          cd ..
+
+      - name: Package artifacts
+        run: |
           Compress-Archive -Path jb_updater\jb_updater.exe -DestinationPath jb_updater-windows-x64.zip
           Compress-Archive -Path jb_updater\jb_updater_gui.exe -DestinationPath jb_updater-gui-windows-x64.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-windows-x64
           path: jb_updater-windows-x64.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-gui-windows-x64
