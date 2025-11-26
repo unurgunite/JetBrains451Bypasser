@@ -24,7 +24,7 @@ module JBUpdater
       headers = HTTP::Headers{"User-Agent" => USER_AGENT}
 
       client = HTTP::Client.new(uri)
-      client.before_request { |req| req.headers.merge!(headers) }
+      client.before_request(&.headers.merge!(headers))
 
       begin
         case method
@@ -45,7 +45,7 @@ module JBUpdater
       raise "Too many redirects: #{depth}" if depth > 5
       headers = HTTP::Headers{"User-Agent" => USER_AGENT}
       client = HTTP::Client.new(uri)
-      client.before_request { |req| req.headers.merge!(headers) }
+      client.before_request(&.headers.merge!(headers))
 
       begin
         client.get(uri.request_target, headers: headers) do |response|
