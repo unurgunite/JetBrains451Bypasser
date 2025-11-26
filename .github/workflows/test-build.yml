@@ -3,7 +3,7 @@ name: Test Build on PR
 on:
   pull_request:
     branches:
-      - main
+      - master
       - develop
       - 'feature/**'
 
@@ -21,7 +21,11 @@ jobs:
           crystal: latest
       - run: shards install
         working-directory: ./jb_updater
-      - run: crystal build src/main.cr --release -o jb_updater
+      - name: Build CLI
+        run: crystal build src/main.cr --release -o jb_updater
+        working-directory: ./jb_updater
+      - name: Build GUI
+        run: crystal build src/gui/main_gui.cr --release -o jb_updater_gui
         working-directory: ./jb_updater
       - run: ./jb_updater --help
         working-directory: ./jb_updater
