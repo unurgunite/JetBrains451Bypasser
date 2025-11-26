@@ -152,7 +152,6 @@ end
 
 # ---- CLI execution: spawn jb_updater, stream output, update UI via queue_main ----
 private def run_cli(args : Array(String)) : Nil
-  # Don’t start another job while one is in progress
   if App.busy?
     UIng.queue_main do
       next if App.shutting_down?
@@ -202,7 +201,7 @@ private def run_cli(args : Array(String)) : Nil
 
   # Numeric bar parser: "[####    ] 93.3%" (optional spaces)
   bar_re = /^\[[# ]+\]\s*(\d+(?:\.\d+)?)%\s*$/
-  # Loose detector for "bar-like" lines
+  # Loose detector for "bar-like" lines: starts with "[" and ends with "%"
   bar_line_re = /^\[[# ]+\].*%\s*$/
 
   Thread.new do
@@ -292,6 +291,7 @@ end
 # ---- UI --------------------------------------------------------------
 UIng.init do
   window = UIng::Window.new("JB Updater", 880, 600)
+
   window.on_closing do
     App.mark_shutting_down
     UIng.quit
@@ -451,6 +451,7 @@ UIng.init do
   plugins.append(row, false)
   tabs.append("Plugins", plugins)
 
+  # Register buttons for busy state (do not include Clear/Remove/Debug)
   all_buttons = [] of UIng::Button
   all_buttons.concat([btn_list, btn_install, btn_update])
   all_buttons.concat([btn_list_releases, btn_upgrade])
@@ -458,7 +459,7 @@ UIng.init do
 
   log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 
-  # ---- Wire buttons: Remove cache ------------------------------------
+  # ---- Wire Remove cache ---------------------------------------------
   btn_remove_cache.on_clicked do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
@@ -475,7 +476,6 @@ UIng.init do
     begin
       removed = 0
       Dir.each_child(plugins_dir) do |entry|
-        # treat anything containing ".bak" as a backup; or tighten this if you want
         if entry.includes?(".bak")
           path = File.join(plugins_dir, entry)
           FileUtils.rm_rf(path)

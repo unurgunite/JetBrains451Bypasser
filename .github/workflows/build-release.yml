@@ -105,6 +105,7 @@ jobs:
           APP_ROOT="JBUpdater.app/Contents"
           mkdir -p "$APP_ROOT/MacOS" "$APP_ROOT/Resources"
           cp jb_updater/jb_updater_gui "$APP_ROOT/MacOS/jb_updater_gui"
+          cp jb_updater/jb_updater     "$APP_ROOT/MacOS/jb_updater"
 
           cat > "$APP_ROOT/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -118,7 +119,7 @@ jobs:
           <key>NSHighResolutionCapable</key><true/>
           </dict></plist>
           PLIST
-  
+
           # Package GUI
           zip -ry jb_updater-gui-macos-${ARCH}.zip JBUpdater.app
       - uses: actions/upload-artifact@v4
