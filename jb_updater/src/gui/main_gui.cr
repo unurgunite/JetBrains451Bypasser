@@ -61,7 +61,7 @@ module App
   end
 
   # Enable/disable all tracked buttons (must be called on UI thread)
-  def self.set_busy(busy : Bool)
+  def self.busy=(busy : Bool)
     return if @@shutting_down
 
     @@busy = busy
@@ -165,7 +165,7 @@ private def run_cli(args : Array(String)) : Nil
   # mark GUI as busy on UI thread
   UIng.queue_main do
     next if App.shutting_down?
-    App.set_busy(true)
+    App.busy = true
   end
 
   # log spawn line
@@ -269,7 +269,7 @@ private def run_cli(args : Array(String)) : Nil
       UIng.queue_main do
         next if App.shutting_down?
         App.log.append("[GUI] worker ERROR: #{ex.class}: #{ex.message}\n")
-        ex.backtrace.each { |f| App.log.append("  #{f}\n") }
+        ex.backtrace.each { |frame| App.log.append("  #{frame}\n") }
       end
     ensure
       # Close read end of the pipe
@@ -367,7 +367,7 @@ UIng.init do
   e_install_ids = UIng::Entry.new
 
   combo_arch = UIng::Combobox.new
-  ["Auto", "arm", "intel"].each { |s| combo_arch.append s }
+  ["Auto", "arm", "intel"].each { |arch_label| combo_arch.append arch_label }
   combo_arch.selected = 0
 
   chk_dry = UIng::Checkbox.new("Dry run")
@@ -443,7 +443,7 @@ UIng.init do
   btn_list = UIng::Button.new("List installed")
   btn_install = UIng::Button.new("Install by IDs")
   btn_update = UIng::Button.new("Update all")
-  [btn_list, btn_install, btn_update].each { |b| row.append(b, false) }
+  [btn_list, btn_install, btn_update].each { |button| row.append(button, false) }
 
   plugins.append(form, false)
   plugins.append(detect_row, false)

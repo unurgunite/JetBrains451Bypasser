@@ -20,7 +20,8 @@ if opts.list_ide_releases
     exit 1
   end
 
-  product_code = opts.product.not_nil!
+  product_code = opts.product || raise "missing --product"
+
   releases = JBUpdater::IDEReleases.fetch(
     product_code,
     channel: "release",

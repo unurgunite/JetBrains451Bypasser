@@ -63,7 +63,7 @@ module JBUpdater
     def self.parse_build_string(str : String) : Array(Float64)
       return [0.0, 0.0, 0.0] if str.empty?
       core = str.gsub(/^[A-Z]+-/, "")
-      parts = core.split('.', 3).map { |p| p == "*" ? INF : p.to_f }
+      parts = core.split('.', 3).map { |part| part == "*" ? INF : part.to_f }
       parts.fill(0.0, parts.size...3)
     end
 

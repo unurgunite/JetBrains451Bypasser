@@ -51,7 +51,7 @@ module JBUpdater
         client.get(uri.request_target, headers: headers) do |response|
           case response.status_code
           when 200
-            File.open(dest_path, "wb") do |f|
+            File.open(dest_path, "wb") do |file|
               length_header = response.headers["Content-Length"]?
               total = length_header ? length_header.to_i64 : 0_i64
               downloaded = 0_i64
@@ -62,7 +62,7 @@ module JBUpdater
                 loop do
                   read_bytes = stream.read(buf)
                   break if read_bytes == 0
-                  f.write(buf[0, read_bytes])
+                  file.write(buf[0, read_bytes])
                   downloaded += read_bytes
 
                   if total > 0 && !HTTPClient.no_tty_progress_bar?
@@ -109,7 +109,7 @@ module JBUpdater
     # Replace JetBrains plugin download host (for CDN workaround)
     # ----------------------------------------------------------------------
     def self.override_plugin_repo_host(uri : URI, downloads_host : String?) : URI
-      return uri unless downloads_host && !downloads_host.empty?
+      return uri if downloads_host.nil? || downloads_host.empty?
       return uri unless uri.host =~ /^plugins\.jetbrains\.com$/i &&
                         uri.path.starts_with?("/files/")
       URI.new(
