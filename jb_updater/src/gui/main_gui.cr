@@ -6,7 +6,7 @@ require "file_utils"
 require "json"
 require "uing"
 
-# ---- Global access to log/progress widgets ----
+# Global access to log/progress widgets and browser state.
 module App
   @@log : UIng::MultilineEntry?
   @@overall_progress : UIng::ProgressBar?
@@ -33,6 +33,7 @@ module App
   @@download_total : Int64 = 0_i64
   @@download_progress_mutex : Mutex = Mutex.new
 
+  # Drains accumulated log messages for display on the UI thread.
   def self.drain_log_buffer : Array(String)
     @@log_buffer_mutex.synchronize {
       buf = @@log_buffer.dup
@@ -41,12 +42,14 @@ module App
     }
   end
 
+  # Appends a message to the thread-safe log buffer.
   def self.push_log(msg : String)
     @@log_buffer_mutex.synchronize {
       @@log_buffer << msg
     }
   end
 
+  # Records download progress from a background thread.
   def self.update_progress(downloaded : Int64, total : Int64)
     @@download_progress_mutex.synchronize {
       @@download_progress = total > 0 ? ((downloaded.to_f / total) * 100).to_i : 0
@@ -54,6 +57,7 @@ module App
     }
   end
 
+  # Reads the current download progress percentage.
   def self.read_progress : Int32
     @@download_progress_mutex.synchronize { @@download_progress }
   end
@@ -110,6 +114,7 @@ module App
     @@selected_xml_id = id
   end
 
+  # Registers the log, progress bars, and tracked buttons for global access.
   def self.set_widgets(
     log : UIng::MultilineEntry,
     overall : UIng::ProgressBar,
@@ -146,7 +151,8 @@ module App
     @@shutting_down = true
   end
 
-  # Called from UI thread: clear busy and enable all tracked buttons
+  # Forces the UI out of busy state and enables all tracked buttons.
+  # Must be called from the UI thread.
   def self.debug_reenable
     return if @@shutting_down
 
@@ -158,7 +164,8 @@ module App
     @@buttons.each &.enable
   end
 
-  # Enable/disable all tracked buttons (must be called on UI thread)
+  # Enables or disables all tracked buttons and resets progress bars.
+  # Must be called from the UI thread.
   def self.busy=(busy : Bool)
     return if @@shutting_down
 
@@ -190,12 +197,17 @@ module App
   end
 end
 
-# ---- Settings persistence --------------------------------------------
+# Settings persistence helpers.
+#
+# Stores GUI field values as JSON under `~/.jb_updater_gui/config.json`.
 module Settings
   CONFIG_DIR  = File.expand_path(File.join(ENV["HOME"], ".jb_updater_gui"))
   CONFIG_FILE = File.join(CONFIG_DIR, "config.json")
 end
 
+# Reads the saved config JSON, returning an empty hash on error.
+#
+# @return [Hash(String, String)] Saved config key-value pairs
 private def load_config : Hash(String, String)
   return {} of String => String unless File.exists?(Settings::CONFIG_FILE)
   begin
@@ -207,17 +219,25 @@ private def load_config : Hash(String, String)
   end
 end
 
+# Writes config hash to JSON file.
+#
+# @param hash [Hash(String, String)] Config key-value pairs
 private def save_config(hash : Hash(String, String))
   Dir.mkdir_p(Settings::CONFIG_DIR) unless Dir.exists?(Settings::CONFIG_DIR)
   File.write(Settings::CONFIG_FILE, hash.to_json)
 end
 
+# Expands `~` in a path string.
+#
+# @param text [String?] Path string (may contain `~`)
+# @return [String?] Expanded path or nil
 private def expand_tilde(text : String?) : String?
   return nil unless text
   return nil if text.empty?
   JBUpdater::Utils.expand_tilde(text)
 end
 
+# Appends a formatted section header to the log console.
 def new_run_header(action : String, args : Array(String))
   UIng.queue_main do
     App.log.append("\n")
@@ -228,6 +248,9 @@ def new_run_header(action : String, args : Array(String))
   end
 end
 
+# Builds a CLI argument array from the current GUI field values.
+#
+# @return [Array(String)] CLI arguments for `jb_updater`
 private def build_args(
   e_plugins_dir : UIng::Entry,
   e_build : UIng::Entry,
@@ -259,6 +282,11 @@ private def build_args(
   args
 end
 
+# Locates the `jb_updater` executable (for subprocess invocation).
+#
+# Checks `Process.executable_path`, then CWD, then `JB_UPDATER` env var.
+#
+# @return [String] Path to the executable
 private def jb_exe_path : String
   exe_path = Process.executable_path
   if exe_path.nil?
@@ -275,7 +303,9 @@ private def jb_exe_path : String
   ENV["JB_UPDATER"]? || "jb_updater"
 end
 
-# ---- Run CLI as subprocess (used by Plugins tab: list/install/update) ----
+# Runs `jb_updater` as a subprocess, streaming output to the log.
+#
+# @param args [Array(String)] CLI arguments
 private def run_cli(args : Array(String)) : Nil
   return if App.busy?
 
@@ -316,7 +346,14 @@ private def run_cli(args : Array(String)) : Nil
   end
 end
 
-# ---- Queue-based installer (multiple plugins, sequential) -------------
+# Enqueues a plugin for queue-based sequential installation from the Browse tab.
+#
+# Spawns a background thread that processes the queue one-by-one,
+# updating the overall progress bar after each plugin.
+#
+# @param xml_id [String] Plugin XML identifier
+# @param plugins_dir [String] Target plugins directory
+# @param build [String] IDE build string
 private def queue_install(xml_id : String, plugins_dir : String, build : String)
   JBUpdater::GUI::Actions.enqueue(xml_id, plugins_dir, build)
 
@@ -361,7 +398,6 @@ private def queue_install(xml_id : String, plugins_dir : String, build : String)
 
       App.push_log("[Browser] #{status_msg}")
 
-      # Update overall progress on UI thread
       completed = JBUpdater::GUI::Actions.total - JBUpdater::GUI::Actions.queue_size
       overall_pct = JBUpdater::GUI::Actions.total > 0 ? ((completed.to_f / JBUpdater::GUI::Actions.total) * 100).to_i : 100
       UIng.queue_main do
@@ -379,14 +415,14 @@ private def queue_install(xml_id : String, plugins_dir : String, build : String)
   end
 end
 
-# ---- Helper: auto-scroll log to bottom -------------------------------
+# Forces the log scrollbar to the bottom by re-assigning the text.
 private def scroll_log(log : UIng::MultilineEntry)
   full_text = log.text || ""
   log.text = full_text
 rescue
 end
 
-# ---- Helper: save settings -------------------------------------------
+# Saves Plugins tab UI field values to config.
 private def save_plugins_settings(
   e_plugins_dir : UIng::Entry,
   e_build : UIng::Entry,
@@ -407,6 +443,7 @@ private def save_plugins_settings(
   save_config(data)
 end
 
+# Saves IDE tab UI field values to config.
 private def save_ide_settings(
   e_ide_product : UIng::Entry,
   e_ide_path : UIng::Entry,
@@ -419,6 +456,7 @@ private def save_ide_settings(
   save_config(data)
 end
 
+# Restores Plugins tab field values from saved config.
 private def apply_plugins_settings(
   e_plugins_dir : UIng::Entry,
   e_build : UIng::Entry,
@@ -448,6 +486,7 @@ private def apply_plugins_settings(
   end
 end
 
+# Restores IDE tab field values from saved config.
 private def apply_ide_settings(
   e_ide_product : UIng::Entry,
   e_ide_path : UIng::Entry,
@@ -455,8 +494,6 @@ private def apply_ide_settings(
 )
   config = load_config
   val = config.fetch("ide_product", "")
-  # Validate that the build code has a version number (e.g. "IC-252" or "RM-2025.2")
-  # If it's just a product code ("RM"), ignore it — old config format
   e_ide_product.text = val =~ /\A[A-Z]+-\d/ ? val : ""
   e_ide_path.text = config.fetch("ide_path", "")
   if config.fetch("brew", "") == "true"
@@ -478,7 +515,6 @@ UIng.init do
   root.padded = false
   window.set_child(root)
 
-  # === Progress bars in a group ===
   pb_group = UIng::Group.new("Progress", margined: true)
   pb_inner = UIng::Box.new(:vertical)
   pb_inner.padded = true
@@ -500,15 +536,12 @@ UIng.init do
   pb_group.child = pb_inner
   root.append(pb_group, false)
 
-  # === Separator ===
   sep1 = UIng::Separator.new("horizontal")
   root.append(sep1, false)
 
-  # === Tabs ===
   tabs = UIng::Tab.new
   root.append(tabs, true)
 
-  # === Log console ===
   log = UIng::MultilineEntry.new(false, true)
   log.on_changed do
     scroll_log(log)
@@ -526,11 +559,9 @@ UIng.init do
     App.push_log(msg)
   }
 
-  # === Separator ===
   sep2 = UIng::Separator.new("horizontal")
   root.append(sep2, false)
 
-  # === Global actions row ===
   actions_row = UIng::Box.new(:horizontal)
   actions_row.padded = true
 
@@ -543,14 +574,12 @@ UIng.init do
   actions_row.append(debug_btn, false)
   root.append(actions_row, false)
 
-  # === Status bar ===
   status_label = UIng::Label.new("Ready")
   status_box = UIng::Box.new(:horizontal)
   status_box.padded = true
   status_box.append(status_label, true)
   root.append(status_box, false)
 
-  # Clear console
   btn_clear_log.on_clicked do
     UIng.queue_main do
       log.text = ""
@@ -559,7 +588,6 @@ UIng.init do
     end
   end
 
-  # DEBUG re-enable
   debug_btn.on_clicked do
     UIng.queue_main do
       App.debug_reenable
@@ -571,7 +599,6 @@ UIng.init do
   plugins_tab = UIng::Box.new(:vertical)
   plugins_tab.padded = true
 
-  # Product detection section
   prod_group = UIng::Group.new("Product Detection", margined: true)
   prod_form = UIng::Form.new
   prod_form.padded = true
@@ -579,7 +606,6 @@ UIng.init do
   combo_products = UIng::Combobox.new
   detected = JBUpdater::DetectProducts.all
 
-  # Sort detected products alphabetically by name (Dir.glob order is undefined)
   detected.sort_by!(&.name)
 
   combo_products.append("Manual / Custom")
@@ -592,7 +618,6 @@ UIng.init do
   prod_group.child = prod_form
   plugins_tab.append(prod_group, false)
 
-  # Configuration section
   config_group = UIng::Group.new("Configuration", margined: true)
   config_form = UIng::Form.new
   config_form.padded = true
@@ -614,11 +639,9 @@ UIng.init do
   config_group.child = config_form
   plugins_tab.append(config_group, false)
 
-  # Dry run checkbox
   chk_dry = UIng::Checkbox.new("Dry run")
   plugins_tab.append(chk_dry, false)
 
-  # Action buttons
   btn_group = UIng::Box.new(:vertical)
   btn_group.padded = true
 
@@ -646,11 +669,9 @@ UIng.init do
   end
   btn_group.append(btn_detect, false)
 
-  # Separator in btn_group
   btn_group_sep = UIng::Separator.new("horizontal")
   btn_group.append(btn_group_sep, false)
 
-  # Main action buttons
   main_actions = UIng::Box.new(:horizontal)
   main_actions.padded = true
 
@@ -686,7 +707,6 @@ UIng.init do
   browse_header.append(btn_refresh, false)
   browse_tab.append(browse_header, false)
 
-  # Table for plugin results — model kept alive
   browse_model_handler = UIng::Table::Model::Handler.new do
     num_columns { 3 }
     column_type { |_col| UIng::Table::Value::Type::String }
@@ -719,7 +739,6 @@ UIng.init do
 
   browse_tab.append(browse_table, true)
 
-  # Store model/handler in App to prevent GC
   App.browse_table_model = browse_model
   App.browse_handler = browse_model_handler
 
@@ -771,7 +790,6 @@ UIng.init do
   ide_tab.append(ide_actions, false)
   tabs.append("IDE", ide_tab)
 
-  # --- Product selection handler --------------------------------------
   combo_products.on_selected do
     UIng.queue_main do
       idx = combo_products.selected
@@ -796,7 +814,6 @@ UIng.init do
     end
   end
 
-  # Register buttons for busy state
   all_buttons = [] of UIng::Button
   all_buttons.concat([btn_list, btn_install, btn_update])
   all_buttons.concat([btn_list_releases, btn_upgrade])
@@ -812,11 +829,9 @@ UIng.init do
     1
   end
 
-  # --- Apply saved settings -------------------------------------------
   apply_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry, log)
   apply_ide_settings(e_ide_product, e_ide_path, chk_brew)
 
-  # Sync e_ide_product.text from the combobox selection (programmatic set doesn't fire on_selected)
   idx = combo_products.selected
   if idx > 0 && idx <= detected.size
     prod = detected[idx - 1]
@@ -827,7 +842,6 @@ UIng.init do
   log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
   status_label.text = "Ready"
 
-  # ---- Wire Remove cache ---------------------------------------------
   btn_remove_cache.on_clicked do
     UIng.queue_main do
       raw = e_plugins_dir.text
@@ -867,7 +881,6 @@ UIng.init do
     end
   end
 
-  # ---- Wire buttons: Plugins tab actions -----------------------------
   btn_list.on_clicked do
     UIng.queue_main do
       raw = e_plugins_dir.text
@@ -919,7 +932,6 @@ UIng.init do
     end
   end
 
-  # ---- Wire buttons: IDE tab ----------------------------------------
   btn_list_releases.on_clicked do
     UIng.queue_main do
       product = e_ide_product.text
@@ -952,22 +964,18 @@ UIng.init do
     end
   end
 
-  # ---- Resolve build code from IDE tab, Plugins tab, or auto-detect --
   resolve_build = -> : String {
     result = JBUpdater::GUI::Actions.resolve_build(e_ide_product.text, e_build.text, JBUpdater::DetectProducts.all)
     if result != e_ide_product.text && result != e_build.text
-      # Auto-detected from fallback — log it
       log.append("[Browse] Auto-detected build: #{result}\n")
     end
     result
   }
 
-  # ---- Search entry handler ------------------------------------------
   search_entry.on_changed do |_text|
     UIng.queue_main do
       query = search_entry.text
       if query.nil? || query.empty?
-        # Reset to empty
         model = App.browse_table_model.not_nil!
         old_count = App.browse_plugins.size
         (0...old_count).each { |i| model.row_deleted(i) }
@@ -1000,7 +1008,6 @@ UIng.init do
     end
   end
 
-  # ---- Wire buttons: Browse tab --------------------------------------
   btn_top.on_clicked do
     UIng.queue_main do
       browse_status.text = "Loading top plugins..."
@@ -1075,7 +1082,6 @@ UIng.init do
     end
   end
 
-  # Table selection handler
   browse_table.on_selection_changed do |selection|
     row = selection.num_rows > 0 ? selection.rows[0] : -1
     UIng.queue_main do

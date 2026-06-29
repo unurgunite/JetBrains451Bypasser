@@ -3,20 +3,45 @@ require "http/client"
 require "xml"
 
 module JBUpdater
+  # Metadata for a plugin listed on the JetBrains Marketplace.
   struct PluginInfo
+    # Numeric ID on the marketplace.
     getter id : Int64
+    # XML identifier (e.g. `"org.intellij.plugins.yaml"`).
     getter xml_id : String
+    # Display name.
     getter name : String
+    # Plugin description (raw HTML).
     getter description : String
+    # URL to the plugin icon, or `nil`.
     getter icon : String?
+    # Category tags assigned to the plugin.
     getter categories : Array(String)
+    # Total download count.
     getter downloads : Int64
+    # Average star rating.
     getter rating : Float64
+    # Author name, or `nil`.
     getter author : String?
+    # Arbitrary tag strings.
     getter tags : Array(String)
+    # Vendor name, or `nil`.
     getter vendor : String?
+    # Preview image URL, or `nil`.
     getter preview : String?
 
+    # @param id [Int64] Marketplace numeric ID
+    # @param xml_id [String] XML identifier
+    # @param name [String] Display name
+    # @param description [String] HTML description
+    # @param icon [String?] Icon URL
+    # @param categories [Array(String)?] Category list
+    # @param downloads [Int64] Download count
+    # @param rating [Float64] Star rating
+    # @param author [String?] Author name
+    # @param tags [Array(String)] Tag list
+    # @param vendor [String?] Vendor name
+    # @param preview [String?] Preview image URL
     def initialize(
       @id : Int64,
       @xml_id : String,
@@ -35,10 +60,15 @@ module JBUpdater
       @tags ||= [] of String
     end
 
+    # Parses the JetBrains Marketplace XML response into an array of `PluginInfo`.
+    #
+    # Strips malformed `<ff>` tags before parsing.
+    #
+    # @param xml_str [String] Raw XML from the marketplace API
+    # @return [Array(PluginInfo)] Parsed plugins (empty on error)
     def self.parse(xml_str : String) : Array(PluginInfo)
       result = [] of PluginInfo
 
-      # Clean malformed <ff> tags, then use fast XML parser
       cleaned = xml_str.gsub(/<ff>[^<]*<\/ff>/, "")
       begin
         doc = XML.parse(cleaned)
@@ -87,24 +117,36 @@ module JBUpdater
           )
         end
       rescue ex
-        # fallback: return empty
       end
 
       result
     end
 
+    # Returns the direct file download URL for this plugin.
+    #
+    # @return [String] e.g. `"https://plugins.jetbrains.com/files/yaml/12345"`
     def download_url : String
       "https://plugins.jetbrains.com/files/#{Utils.escape(xml_id)}/#{id}"
     end
 
+    # Returns the generic install URL (always grabs the latest version).
+    #
+    # @return [String] e.g. `"https://plugins.jetbrains.com/plugin/download?pluginId=yaml"`
     def download_install_url : String
       "https://plugins.jetbrains.com/plugin/download?pluginId=#{Utils.escape(xml_id)}"
     end
 
+    # Returns the marketplace URL for downloading this plugin for a specific IDE build.
+    #
+    # @param build [String] IDE build string (e.g. `"RM-252"`)
+    # @return [String] Full URL with build parameter
     def download_for_build_url(build : String) : String
       "https://plugins.jetbrains.com/pluginManager?action=download&id=#{Utils.escape(xml_id)}&build=#{Utils.escape(build)}"
     end
 
+    # Formats the download count with K/M suffixes.
+    #
+    # @return [String] e.g. `"1.2M"` or `"450K"` or `"123"`
     def formatted_downloads : String
       if downloads >= 1_000_000
         "#{(downloads.to_f / 1_000_000).round(1)}M"
@@ -115,18 +157,36 @@ module JBUpdater
       end
     end
 
+    # Placeholder star rating display.
+    #
+    # Currently always returns five stars.
+    #
+    # @return [String] `"⭐⭐⭐⭐⭐"`
     def star_rating : String
       "⭐" * 5
     end
   end
 
+  # Client for the JetBrains Plugin Marketplace API.
+  #
+  # Provides methods to list, search, and download plugins from
+  # `plugins.jetbrains.com`. Results are cached in memory by
+  # build string to avoid redundant requests.
   class PluginMarketplace
     @@cache = {} of String => Array(PluginInfo)
 
+    # Clears the in-memory plugin list cache.
     def self.clear_cache
       @@cache.clear
     end
 
+    # Fetches (or returns cached) plugin list for a given IDE build.
+    #
+    # HTTPS GET to `plugins.jetbrains.com/plugins/list/?build=...`,
+    # parsed via `PluginInfo.parse`.
+    #
+    # @param build [String] IDE build string
+    # @return [Array(PluginInfo)] List of available plugins
     def self.list_by_build(build : String) : Array(PluginInfo)
       cached = @@cache[build]?
       return cached if cached
@@ -140,16 +200,28 @@ module JBUpdater
       plugins
     end
 
+    # Returns the first cached build key, or `nil`.
+    #
+    # @return [String?]
     def self.cached_build : String?
       @@cache.keys.first?
     end
 
+    # Returns the total number of cached plugins across all builds.
+    #
+    # @return [Int32]
     def self.cached_plugin_count : Int32
       @@cache.values.sum(&.size)
     end
 
+    # Filters the plugin list by a search query.
+    #
+    # Matches against name, description, and XML ID (case-insensitive).
+    #
+    # @param query [String] Search text
+    # @param build [String] IDE build (default `"RM-2025.2"`)
+    # @return [Array(PluginInfo)] Matching plugins
     def self.search(query : String, build : String = "RM-2025.2") : Array(PluginInfo)
-      # Get all plugins for the build and filter
       plugins = list_by_build(build)
 
       if query.empty?
@@ -164,10 +236,19 @@ module JBUpdater
       end
     end
 
+    # Returns the full plugin list for a given build.
+    #
+    # @param build [String] IDE build (default `"RM-2025.2"`)
+    # @return [Array(PluginInfo)]
     def self.list_all(build : String = "RM-2025.2") : Array(PluginInfo)
       list_by_build(build)
     end
 
+    # Returns plugins sorted by download count, most popular first.
+    #
+    # @param build [String] IDE build (default `"RM-2025.2"`)
+    # @param max_count [Int32] Maximum results (default 100)
+    # @return [Array(PluginInfo)] Top downloaded plugins
     def self.top_downloaded(build : String = "RM-2025.2", max_count = 100) : Array(PluginInfo)
       Log.info "PluginMarketplace: fetching top downloaded for build #{build}"
       plugins = list_by_build(build)
@@ -176,6 +257,11 @@ module JBUpdater
       sorted
     end
 
+    # Returns the most recently listed plugins.
+    #
+    # @param build [String] IDE build (default `"RM-2025.2"`)
+    # @param max_count [Int32] Maximum results (default 100)
+    # @return [Array(PluginInfo)] Newest plugins
     def self.newest(build : String = "RM-2025.2", max_count = 100) : Array(PluginInfo)
       Log.info "PluginMarketplace: fetching newest for build #{build}"
       result = list_by_build(build)[0...max_count] || [] of PluginInfo
@@ -183,6 +269,11 @@ module JBUpdater
       result
     end
 
+    # Filters plugins by a specific category tag.
+    #
+    # @param category [String] Category name (e.g. `"Web"`)
+    # @param build [String] IDE build (default `"RM-2025.2"`)
+    # @return [Array(PluginInfo)] Plugins in the given category
     def self.by_category(category : String, build : String = "RM-2025.2") : Array(PluginInfo)
       plugins = list_by_build(build)
       cat_lower = category.downcase
@@ -191,11 +282,18 @@ module JBUpdater
       end
     end
 
+    # Finds a single plugin by its XML ID.
+    #
+    # @param xml_id [String] Plugin identifier
+    # @return [PluginInfo?] Matching plugin or `nil`
     def self.by_id(xml_id : String) : PluginInfo?
       plugins = list_by_build("RM-2025.2")
       plugins.find { |plugin| plugin.xml_id == xml_id }
     end
 
+    # Returns a hardcoded list of known marketplace categories.
+    #
+    # @return [Array(String)] 22 category names
     def self.categories : Array(String)
       [
         "All",
@@ -223,6 +321,14 @@ module JBUpdater
       ]
     end
 
+    # Fetches the marketplace XML with automatic retry on transient errors.
+    #
+    # Retries up to `max_retries` times on `IO::Error` or HTTP 429
+    # with exponential backoff.
+    #
+    # @param url [String] Marketplace API URL
+    # @param max_retries [Int32] Maximum retry count (default 3)
+    # @return [String?] Response body or `nil` on persistent failure
     private def self.fetch_raw_with_retry(url : String, max_retries : Int32 = 3) : String?
       max_retries.times do |attempt|
         begin
@@ -242,6 +348,10 @@ module JBUpdater
       raise "API request failed after #{max_retries} retries"
     end
 
+    # Performs the raw HTTP GET to the marketplace, handling redirects and errors.
+    #
+    # @param url [String] Marketplace API URL
+    # @return [String?] Response body or empty string on 404
     private def self.fetch_raw(url : String) : String?
       Log.info "Fetching plugin list: #{url}"
 

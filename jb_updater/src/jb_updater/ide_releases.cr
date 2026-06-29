@@ -5,23 +5,45 @@ require "./logger"
 require "./utils"
 
 module JBUpdater
+  # A single IDE release entry returned by the JetBrains releases API.
   struct IDERelease
+    # Version string (e.g. `"2025.2"`).
     getter version : String
+    # Release channel (`"release"`, `"eap"`, etc.).
     getter channel : String
+    # Release date string.
     getter date : String
+    # Download URL (with CDN host override applied).
     getter link : URI
 
+    # @param version [String] Version string
+    # @param channel [String] Release channel
+    # @param date [String] Release date
+    # @param link [URI] Download URL
     def initialize(@version : String, @channel : String, @date : String, @link : URI)
     end
   end
 
+  # Fetches and lists IDE releases from the JetBrains releases API.
+  #
+  # Queries `data.services.jetbrains.com/products/releases` and
+  # returns structured {IDERelease} entries filtered by the target
+  # platform and architecture.
   module IDEReleases
     extend self
 
-    # product_code examples:
-    #   "WS" for WebStorm, "RM" for RubyMine, etc.
-    # channel: "release" | "eap" | ...
-    # latest: true -> only latest per channel, false -> full history
+    # Fetches IDE releases for a given product code.
+    #
+    # Supports filtering by channel, architecture, and recency.
+    # Download URLs are automatically rewritten through
+    # {HTTPClient.override_ide_repo_host}.
+    #
+    # @param product_code [String] Product code (e.g. `"RM"`, `"WS"`)
+    # @param channel [String] Release channel (default `"release"`)
+    # @param downloads_host [String?] Custom CDN host override
+    # @param arch [String?] Target architecture (`"arm"` or `"intel"`); autodetected if nil
+    # @param latest [Bool] Only latest per channel (default true)
+    # @return [Array(IDERelease)] Available releases
     def fetch(
       product_code : String,
       channel : String = "release",
@@ -65,7 +87,6 @@ module JBUpdater
           elsif downloads["mac"]?
             "mac"
           else
-            # no mac build for this release; skip
             next
           end
 
@@ -76,7 +97,6 @@ module JBUpdater
         link_s = link_any.as_s
         uri = URI.parse(link_s)
 
-        # Apply IDE host override (download.jetbrains.com → download-cdn.jetbrains.com or custom)
         uri = HTTPClient.override_ide_repo_host(uri, downloads_host)
 
         releases << IDERelease.new(version: ver, channel: ch, date: dt, link: uri)
@@ -85,6 +105,9 @@ module JBUpdater
       releases
     end
 
+    # Detects the CPU architecture by running `uname -m`.
+    #
+    # @return [String] `"arm"` or `"intel"`
     private def autodetect_arch : String
       io = IO::Memory.new
       status = Process.run("uname", args: ["-m"], output: io)
