@@ -1,6 +1,32 @@
 require "./spec_helper"
 include JBUpdater
 
+# Creates a temporary fixture directory with product-info.json at the right path
+# for the current platform. Returns {app_path, cleanup_proc}.
+private def with_product_info_fixture(build_number : String)
+  tmpdir = Dir.tempdir
+  subdir = File.join(tmpdir, "jb_spec_#{Process.pid}_#{Random.rand(10000)}")
+  Dir.mkdir(subdir)
+
+  app_path = nil
+  info_json_path = nil
+
+  if {{ flag?(:darwin) }}
+    resources = File.join(subdir, "Contents", "Resources")
+    Dir.mkdir_p(resources)
+    info_json_path = File.join(resources, "product-info.json")
+    app_path = subdir
+  else
+    ide_dir = File.join(subdir, "ide")
+    Dir.mkdir(ide_dir)
+    info_json_path = File.join(subdir, "product-info.json")
+    app_path = ide_dir
+  end
+
+  File.write(info_json_path.not_nil!, %({"buildNumber": "#{build_number}"}))
+  {app_path.not_nil!, ->{ FileUtils.rm_rf(subdir) }}
+end
+
 describe DetectProducts do
   describe ".infer_code" do
     it "maps RubyMine to RM" do
@@ -74,31 +100,40 @@ describe DetectProducts do
     end
 
     it "reads from app bundle when no version in name" do
-      app_path = "/Applications/RubyMine.app"
-      # We only test that it tries to read; if the app doesn't exist, falls through
-      result = DetectProducts.build_code("RubyMine", "RM", app_path)
-      # On this machine it should exist and return something like RM-261.25134.97
-      result.should match(/\ARM-\d+/)
+      app_path, cleanup = with_product_info_fixture("261.99999.999")
+      begin
+        result = DetectProducts.build_code("RubyMine", "RM", app_path)
+        result.should eq "RM-261.99999.999"
+      ensure
+        cleanup.call
+      end
     end
   end
 
   describe ".read_build_from_app" do
-    it "reads from product-info.json for a real app" do
-      result = DetectProducts.read_build_from_app("/Applications/RubyMine.app", "RM")
-      result.should_not be_nil
-      result.should match(/\ARM-/)
+    it "reads from product-info.json using a temp fixture" do
+      app_path, cleanup = with_product_info_fixture("261.12345.67")
+      begin
+        result = DetectProducts.read_build_from_app(app_path, "RM")
+        result.should eq "RM-261.12345.67"
+      ensure
+        cleanup.call
+      end
     end
 
     it "returns nil for non-existent path" do
-      result = DetectProducts.read_build_from_app("/Applications/NonExistentIDE.app", "XX")
-      result.should be_nil
+      DetectProducts.read_build_from_app("/tmp/__nonexistent_ide_app__", "XX").should be_nil
     end
   end
 
   describe ".app_metadata_path" do
-    it "constructs the correct macOS path for product-info.json" do
+    it "constructs the correct platform-specific path for product-info.json" do
       path = DetectProducts.app_metadata_path("/Applications/RubyMine.app", "product-info.json")
-      path.should eq "/Applications/RubyMine.app/Contents/Resources/product-info.json"
+      {% if flag?(:darwin) %}
+        path.should eq "/Applications/RubyMine.app/Contents/Resources/product-info.json"
+      {% else %}
+        path.should eq "/Applications/product-info.json"
+      {% end %}
     end
   end
 
@@ -108,21 +143,21 @@ describe DetectProducts do
       products.should be_a(Array(DetectedProduct))
     end
 
-    it "contains RubyMine, WebStorm, and CLion on this machine" do
-      products = DetectProducts.all
-      names = products.map(&.name)
-      names.any? { |n| n =~ /RubyMine|Rubymine/i }.should be_true
-      names.any? { |n| n =~ /WebStorm|Webstorm/i }.should be_true
-      names.any? { |n| n =~ /CLion|Clion/i }.should be_true
-    end
-
-    it "has non-empty code and build for each product" do
+    it "has non-empty code and build for each product when any found" do
       products = DetectProducts.all
       products.each do |p|
         p.code.should_not be_empty
         p.build.should_not be_empty
         p.build.should match(/\A[A-Z]+-\d/)
       end
+    end
+
+    it "sorts detected products alphabetically by name" do
+      products = DetectProducts.all
+      # If we have at least 2 products, verify ordering
+      next if products.size < 2
+      names = products.map(&.name.downcase)
+      names.should eq names.sort
     end
   end
 end

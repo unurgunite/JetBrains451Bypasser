@@ -112,6 +112,7 @@ module JBUpdater
         end
       {% end %}
 
+      products.sort_by!(&.name.downcase)
       products
     end
 
