@@ -20,6 +20,9 @@ module App
   @@browse_table_model : UIng::Table::Model? = nil
   @@browse_handler : UIng::Table::Model::Handler? = nil
   @@selected_xml_id : String? = nil
+  @@search_id : Int64 = 0
+  @@detected_products : Array(JBUpdater::DetectedProduct)? = nil
+  @@installed_plugins : Hash(String, JBUpdater::PluginMeta)? = nil
 
   # Background operation state
   @@op_status : String = ""
@@ -112,6 +115,30 @@ module App
 
   def self.selected_xml_id=(id : String?)
     @@selected_xml_id = id
+  end
+
+  def self.search_id
+    @@search_id
+  end
+
+  def self.search_id=(id : Int64)
+    @@search_id = id
+  end
+
+  def self.detected_products
+    @@detected_products
+  end
+
+  def self.detected_products=(products : Array(JBUpdater::DetectedProduct)?)
+    @@detected_products = products
+  end
+
+  def self.installed_plugins
+    @@installed_plugins
+  end
+
+  def self.installed_plugins=(plugins : Hash(String, JBUpdater::PluginMeta)?)
+    @@installed_plugins = plugins
   end
 
   # Registers the log, progress bars, and tracked buttons for global access.
@@ -609,6 +636,7 @@ UIng.init do
 
   combo_products = UIng::Combobox.new
   detected = JBUpdater::DetectProducts.all
+  App.detected_products = detected
 
   detected.sort_by!(&.name)
 
@@ -712,7 +740,7 @@ UIng.init do
   browse_tab.append(browse_header, false)
 
   browse_model_handler = UIng::Table::Model::Handler.new do
-    num_columns { 3 }
+    num_columns { 4 }
     column_type { |_col| UIng::Table::Value::Type::String }
     num_rows { App.browse_plugins.size }
     cell_value { |row, col|
@@ -720,7 +748,11 @@ UIng.init do
         plugin = App.browse_plugins[row]
         case col
         when 0 then UIng::Table::Value.new(plugin.name)
-        when 1 then UIng::Table::Value.new(plugin.formatted_downloads)
+        when 1
+          installed = App.installed_plugins
+          value = installed ? (installed.has_key?(plugin.xml_id) ? "✓" : "") : "—"
+          UIng::Table::Value.new(value)
+        when 2 then UIng::Table::Value.new(plugin.formatted_downloads)
         else        UIng::Table::Value.new(plugin.star_rating)
         end
       else
@@ -735,11 +767,36 @@ UIng.init do
   browse_table.selection_mode = :one
 
   browse_table.append_text_column("Plugin", 0, -1)
-  browse_table.append_text_column("Downloads", 1, -1)
-  browse_table.append_text_column("Rating", 2, -1)
-  browse_table.column_set_width(0, 280)
-  browse_table.column_set_width(1, 120)
-  browse_table.column_set_width(2, 80)
+  browse_table.append_text_column("Installed", 1, -1)
+  browse_table.append_text_column("Downloads", 2, -1)
+  browse_table.append_text_column("Rating", 3, -1)
+  browse_table.column_set_width(0, 260)
+  browse_table.column_set_width(1, 60)
+  browse_table.column_set_width(2, 100)
+  browse_table.column_set_width(3, 80)
+
+  browse_table.on_header_clicked do |column|
+    next unless {0, 2, 3}.includes?(column)
+
+    (0...4).each do |col|
+      browse_table.header_set_sort_indicator(col, :none) if col != column
+    end
+
+    current = browse_table.header_sort_indicator(column)
+    ascending = current.none? || current.descending?
+
+    plugins = App.browse_plugins
+    case column
+    when 0 then plugins.sort! { |x, y| ascending ? x.name <=> y.name : y.name <=> x.name }
+    when 2 then plugins.sort! { |x, y| ascending ? x.downloads <=> y.downloads : y.downloads <=> x.downloads }
+    when 3 then plugins.sort! { |x, y| ascending ? x.rating <=> y.rating : y.rating <=> x.rating }
+    end
+
+    new_indicator = ascending ? UIng::Table::SortIndicator::Ascending : UIng::Table::SortIndicator::Descending
+    browse_table.header_set_sort_indicator(column, new_indicator)
+
+    plugins.each_with_index { |_, i| browse_model.row_changed(i) }
+  end
 
   browse_tab.append(browse_table, true)
 
@@ -969,104 +1026,126 @@ UIng.init do
   end
 
   resolve_build = -> : String {
-    result = JBUpdater::GUI::Actions.resolve_build(e_ide_product.text, e_build.text, JBUpdater::DetectProducts.all)
+    products = App.detected_products || JBUpdater::DetectProducts.all
+    result = JBUpdater::GUI::Actions.resolve_build(e_ide_product.text, e_build.text, products)
     if result != e_ide_product.text && result != e_build.text
       log.append("[Browse] Auto-detected build: #{result}\n")
     end
     result
   }
 
+  load_installed_for_browse = -> {
+    raw = e_plugins_dir.text
+    if raw && !raw.empty?
+      dir = expand_tilde(raw)
+      App.installed_plugins = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
+    else
+      App.installed_plugins = nil
+    end
+  }
+
   search_entry.on_changed do |_text|
-    UIng.queue_main do
-      query = search_entry.text
-      if query.nil? || query.empty?
-        model = App.browse_table_model || next
-        old_count = App.browse_plugins.size
-        (0...old_count).each { |i| model.row_deleted(i) }
+    search_id = App.search_id + 1
+    App.search_id = search_id
+
+    query = search_entry.text
+    if query.nil? || query.empty?
+      UIng.queue_main do
+        model = App.browse_table_model
+        if model
+          old_count = App.browse_plugins.size
+          (0...old_count).each { |i| model.row_deleted(i) }
+        end
         App.browse_plugins = [] of JBUpdater::PluginInfo
         App.selected_xml_id = nil
         browse_status.text = "Type to search plugins..."
-      else
-        Thread.new do
-          begin
-            build = resolve_build.call
-            plugins = JBUpdater::PluginMarketplace.search(query, build)
-            UIng.queue_main do
-              old_count = App.browse_plugins.size
-              App.browse_plugins = plugins
-              model = App.browse_table_model || next
-              if old_count == 0
-                plugins.each_with_index { |_, i| model.row_inserted(i) }
-              else
-                plugins.each_with_index { |_, i| model.row_changed(i) }
-              end
-              browse_status.text = "Found #{plugins.size} results for '#{query}'"
-            end
-          rescue ex
-            UIng.queue_main do
-              browse_status.text = "Search error: #{ex.message}"
-            end
-          end
+      end
+      next
+    end
+
+    Thread.new do
+      begin
+        build = resolve_build.call
+        plugins = JBUpdater::PluginMarketplace.search(query, build)
+        load_installed_for_browse.call
+
+        UIng.queue_main do
+          next if App.shutting_down?
+          next if search_id != App.search_id
+
+          model = App.browse_table_model
+          next unless model
+
+          old_count = App.browse_plugins.size
+          App.browse_plugins = plugins
+          (0...old_count).each { |i| model.row_deleted(i) }
+          plugins.each_with_index { |_, i| model.row_inserted(i) }
+          browse_status.text = "Found #{plugins.size} results for '#{query}'"
+        end
+      rescue ex
+        UIng.queue_main do
+          next if App.shutting_down?
+          browse_status.text = "Search error: #{ex.message}"
         end
       end
     end
   end
 
   btn_top.on_clicked do
-    UIng.queue_main do
-      browse_status.text = "Loading top plugins..."
-      build = resolve_build.call
-      log.append("[Browse] Fetching top downloaded for build #{build}...\n")
-      Thread.new do
-        begin
-          plugins = JBUpdater::PluginMarketplace.top_downloaded(build, 100)
-          UIng.queue_main do
-            old_count = App.browse_plugins.size
-            App.browse_plugins = plugins
-            model = App.browse_table_model || next
-            if old_count == 0
-              plugins.each_with_index { |_, i| model.row_inserted(i) }
-            else
-              plugins.each_with_index { |_, i| model.row_changed(i) }
-            end
-            browse_status.text = "Loaded #{plugins.size} plugins (top downloads)"
-            log.append("[Browse] Loaded #{plugins.size} plugins\n")
-          end
-        rescue ex
-          UIng.queue_main do
-            browse_status.text = "Error: #{ex.message}"
-            log.append("[Browse] ERROR: #{ex.message}\n")
-          end
+    browse_status.text = "Loading top plugins..."
+    build = resolve_build.call
+    log.append("[Browse] Fetching top downloaded for build #{build}...\n")
+    Thread.new do
+      begin
+        plugins = JBUpdater::PluginMarketplace.top_downloaded(build, 100)
+        load_installed_for_browse.call
+        UIng.queue_main do
+          next if App.shutting_down?
+          model = App.browse_table_model
+          next unless model
+
+          old_count = App.browse_plugins.size
+          App.browse_plugins = plugins
+          (0...old_count).each { |i| model.row_deleted(i) }
+          plugins.each_with_index { |_, i| model.row_inserted(i) }
+          browse_status.text = "Loaded #{plugins.size} plugins (top downloads)"
+          log.append("[Browse] Loaded #{plugins.size} plugins\n")
+        end
+      rescue ex
+        UIng.queue_main do
+          next if App.shutting_down?
+          browse_status.text = "Error: #{ex.message}"
+          log.append("[Browse] ERROR: #{ex.message}\n")
         end
       end
     end
   end
 
   btn_newest.on_clicked do
-    UIng.queue_main do
-      browse_status.text = "Loading latest plugins..."
-      build = resolve_build.call
-      log.append("[Browse] Fetching newest for build #{build}...\n")
-      Thread.new do
-        begin
-          plugins = JBUpdater::PluginMarketplace.newest(build, 100)
-          UIng.queue_main do
-            old_count = App.browse_plugins.size
-            App.browse_plugins = plugins
-            model = App.browse_table_model || next
-            if old_count == 0
-              plugins.each_with_index { |_, i| model.row_inserted(i) }
-            else
-              plugins.each_with_index { |_, i| model.row_changed(i) }
-            end
-            browse_status.text = "Loaded #{plugins.size} plugins (latest)"
-            log.append("[Browse] Loaded #{plugins.size} plugins\n")
-          end
-        rescue ex
-          UIng.queue_main do
-            browse_status.text = "Error: #{ex.message}"
-            log.append("[Browse] ERROR: #{ex.message}\n")
-          end
+    browse_status.text = "Loading latest plugins..."
+    build = resolve_build.call
+    log.append("[Browse] Fetching newest for build #{build}...\n")
+    Thread.new do
+      begin
+        plugins = JBUpdater::PluginMarketplace.newest(build, 100)
+        load_installed_for_browse.call
+        UIng.queue_main do
+          next if App.shutting_down?
+          model = App.browse_table_model
+          next unless model
+
+          old_count = App.browse_plugins.size
+          App.browse_plugins = plugins
+          (0...old_count).each { |i| model.row_deleted(i) }
+          plugins.each_with_index { |_, i| model.row_inserted(i) }
+          browse_status.text = "Loaded #{plugins.size} plugins (latest)"
+          log.append("[Browse] Loaded #{plugins.size} plugins\n")
+        end
+      rescue ex
+        UIng.queue_main do
+          next if App.shutting_down?
+          browse_status.text = "Error: #{ex.message}"
+          log.append("[Browse] ERROR: #{ex.message}\n")
         end
       end
     end
@@ -1074,6 +1153,7 @@ UIng.init do
 
   btn_refresh.on_clicked do
     UIng.queue_main do
+      App.installed_plugins = nil
       model = App.browse_table_model
       if model
         old_count = App.browse_plugins.size
