@@ -9,3 +9,8 @@ jb_updater.exe
 dist/
 artifacts/
 jb_updater/lib
+jb_updater/jb_updater_gui
+jb_updater/jb_updater_cli
+jb_updater/bin/ameba
+jb_updater/bin/jb_updater
+jb_updater/bin/jb_updater_gui

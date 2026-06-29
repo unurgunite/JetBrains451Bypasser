@@ -30,12 +30,12 @@ jobs:
       - name: Install shards
         working-directory: jb_updater
         run: shards install
-      - name: Run specs
-        working-directory: jb_updater
-        run: crystal spec -v
       - name: Run Ameba linter
         working-directory: jb_updater
         run: ./bin/lint
+      - name: Run specs
+        working-directory: jb_updater
+        run: crystal spec -v
       - name: Build binaries (CLI + GUI)
         run: |
           cd jb_updater
@@ -73,7 +73,7 @@ jobs:
           - arch: arm64
             runs_on: macos-latest
           - arch: x86_64
-            runs_on: macos-13
+            runs_on: macos-15-intel
     runs-on: ${{ matrix.runs_on }}
     env:
       ARCH: ${{ matrix.arch }}
@@ -87,12 +87,12 @@ jobs:
       - name: Install shards
         working-directory: jb_updater
         run: shards install
-      - name: Run specs
-        working-directory: jb_updater
-        run: crystal spec -v
       - name: Run Ameba linter
         working-directory: jb_updater
         run: ./bin/lint
+      - name: Run specs
+        working-directory: jb_updater
+        run: crystal spec -v
       - name: Build binaries (CLI + GUI)
         run: |
           cd jb_updater
