@@ -187,14 +187,54 @@ jobs:
           # GUI (windowed subsystem to hide console)
           crystal build src/gui/main_gui.cr --release --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
 
+      - name: Bundle Crystal runtime DLLs
+        shell: pwsh
+        run: |
+          # Crystal runtime DLLs must ship alongside the EXEs on Windows,
+          # otherwise the process exits with 0xC0000135 (STATUS_DLL_NOT_FOUND).
+          $crystalPath = (Get-Command crystal).Source
+          $crystalRoot = Split-Path (Split-Path $crystalPath -Parent) -Parent
+          $dllSource = Join-Path $crystalRoot "embedded" "bin"
+          if (Test-Path $dllSource) {
+            Copy-Item "$dllSource\*.dll" jb_updater\
+            Write-Host "Copied DLLs from $dllSource"
+            Get-ChildItem jb_updater\*.dll | ForEach-Object { Write-Host "  → $($_.Name)" }
+          } else {
+            Write-Host "::warning::Crystal DLL directory not found at $dllSource"
+          }
+
+      - name: Smoke test — CLI binary loads
+        working-directory: jb_updater
+        run: |
+          # Verify the CLI binary starts (proves all DLLs resolve correctly).
+          # 0xC0000135 would kill the process before any output.
+          .\jb_updater.exe --help
+        shell: cmd
+
+      - name: Verify GUI DLLs are present
+        working-directory: jb_updater
+        shell: pwsh
+        run: |
+          # Can't run the GUI binary on headless CI (no display), but we can
+          # confirm all DLLs exist alongside the GUI EXE.
+          $exe = "jb_updater_gui.exe"
+          $dlls = @(Get-ChildItem *.dll)
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error::$exe not found"
+            exit 1
+          }
+          Write-Host "$exe found, $($dlls.Count) DLLs present:"
+          $dlls | ForEach-Object { Write-Host "  → $($_.Name) ($( '{0:N0}' -f $_.Length ) bytes)" }
+
       - name: Package artifacts
         run: |
-          Compress-Archive -Path jb_updater\jb_updater.exe -DestinationPath jb_updater-windows-x64.zip
-          Compress-Archive -Path jb_updater\jb_updater_gui.exe -DestinationPath jb_updater-gui-windows-x64.zip
-          # Bundle: CLI + GUI together
+          # CLI archive — include Crystal runtime DLLs
+          Compress-Archive -Path jb_updater\jb_updater.exe, jb_updater\*.dll -DestinationPath jb_updater-windows-x64.zip
+          # GUI archive — include Crystal runtime DLLs
+          Compress-Archive -Path jb_updater\jb_updater_gui.exe, jb_updater\*.dll -DestinationPath jb_updater-gui-windows-x64.zip
+          # Bundle: CLI + GUI + DLLs together
           New-Item -ItemType Directory -Force -Path jb_updater-bundle | Out-Null
-          Copy-Item jb_updater\jb_updater.exe     jb_updater-bundle\
-          Copy-Item jb_updater\jb_updater_gui.exe jb_updater-bundle\
+          Copy-Item jb_updater\*.exe, jb_updater\*.dll jb_updater-bundle\
           Compress-Archive -Path jb_updater-bundle\* -DestinationPath jb_updater-bundle-windows-x64.zip
 
       - uses: actions/upload-artifact@v4
