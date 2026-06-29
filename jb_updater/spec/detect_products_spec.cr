@@ -130,7 +130,7 @@ describe DetectProducts do
       {% if flag?(:darwin) %}
         path.should eq "/Applications/RubyMine.app/Contents/Resources/product-info.json"
       {% else %}
-        path.should eq "/Applications/product-info.json"
+        path.should eq File.join("/Applications", "product-info.json")
       {% end %}
     end
   end
