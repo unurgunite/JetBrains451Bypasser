@@ -7,7 +7,7 @@ module JBUpdater
       def self.resolve_build(
         ide_product_text : String?,
         build_text : String?,
-        detected : Array(DetectedProduct)
+        detected : Array(DetectedProduct),
       ) : String
         code = ide_product_text
         return code if code && !code.empty?

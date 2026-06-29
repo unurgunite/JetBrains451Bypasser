@@ -8,23 +8,21 @@ private def with_product_info_fixture(build_number : String)
   subdir = File.join(tmpdir, "jb_spec_#{Process.pid}_#{Random.rand(10000)}")
   Dir.mkdir(subdir)
 
-  app_path = nil
-  info_json_path = nil
+  result = if {{ flag?(:darwin) }}
+             resources = File.join(subdir, "Contents", "Resources")
+             Dir.mkdir_p(resources)
+             info_json_path = File.join(resources, "product-info.json")
+             {subdir, info_json_path}
+           else
+             ide_dir = File.join(subdir, "ide")
+             Dir.mkdir(ide_dir)
+             info_json_path = File.join(subdir, "product-info.json")
+             {ide_dir, info_json_path}
+           end
 
-  if {{ flag?(:darwin) }}
-    resources = File.join(subdir, "Contents", "Resources")
-    Dir.mkdir_p(resources)
-    info_json_path = File.join(resources, "product-info.json")
-    app_path = subdir
-  else
-    ide_dir = File.join(subdir, "ide")
-    Dir.mkdir(ide_dir)
-    info_json_path = File.join(subdir, "product-info.json")
-    app_path = ide_dir
-  end
-
-  File.write(info_json_path.not_nil!, %({"buildNumber": "#{build_number}"}))
-  {app_path.not_nil!, ->{ FileUtils.rm_rf(subdir) }}
+  app_path, info_json_path = result
+  File.write(info_json_path, %({"buildNumber": "#{build_number}"}))
+  {app_path, -> { FileUtils.rm_rf(subdir) }}
 end
 
 describe DetectProducts do
@@ -145,10 +143,10 @@ describe DetectProducts do
 
     it "has non-empty code and build for each product when any found" do
       products = DetectProducts.all
-      products.each do |p|
-        p.code.should_not be_empty
-        p.build.should_not be_empty
-        p.build.should match(/\A[A-Z]+-\d/)
+      products.each do |product|
+        product.code.should_not be_empty
+        product.build.should_not be_empty
+        product.build.should match(/\A[A-Z]+-\d/)
       end
     end
 

@@ -135,8 +135,8 @@ module JBUpdater
     # Convert "RubyMine2025.2" and code "RM" → "RM-252"
     # If name has no version number, fallback to reading from app bundle
     def build_code(name : String, code : String, ide_path : String? = nil) : String
-      ver = name.gsub(/[^0-9.]/, "") # "2025.2"
-      parts = ver.split(".").first(2)  # ["2025", "2"]
+      ver = name.gsub(/[^0-9.]/, "")  # "2025.2"
+      parts = ver.split(".").first(2) # ["2025", "2"]
       if parts.size == 2 && !ver.empty?
         year = parts[0]                # "2025"
         major = parts[1]               # "2"

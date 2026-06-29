@@ -35,63 +35,63 @@ module JBUpdater
       @tags ||= [] of String
     end
 
- def self.parse(xml_str : String) : Array(PluginInfo)
-    result = [] of PluginInfo
+    def self.parse(xml_str : String) : Array(PluginInfo)
+      result = [] of PluginInfo
 
-    # Clean malformed <ff> tags, then use fast XML parser
-    cleaned = xml_str.gsub(/<ff>[^<]*<\/ff>/, "")
-    begin
-      doc = XML.parse(cleaned)
-      doc.xpath_nodes("//idea-plugin").each do |plugin_node|
-        next unless plugin_node
+      # Clean malformed <ff> tags, then use fast XML parser
+      cleaned = xml_str.gsub(/<ff>[^<]*<\/ff>/, "")
+      begin
+        doc = XML.parse(cleaned)
+        doc.xpath_nodes("//idea-plugin").each do |plugin_node|
+          next unless plugin_node
 
-        xml_id = ""
-        name = ""
-        description = ""
-        vendor = ""
+          xml_id = ""
+          name = ""
+          description = ""
+          vendor = ""
 
-        if id_node = plugin_node.xpath_node("id")
-          xml_id = id_node.content
-        end
-        if name_node = plugin_node.xpath_node("name")
-          name = name_node.content
-        end
-        if desc_node = plugin_node.xpath_node("description")
-          description = desc_node.content
-        end
-        if vendor_node = plugin_node.xpath_node("vendor")
-          vendor = vendor_node.content
-        end
-
-        downloads = 0_i64
-        if dm = plugin_node["downloads"]?
-          downloads = dm.to_i64 rescue 0_i64
-        end
-
-        categories = [] of String
-        if tag_node = plugin_node.xpath_node("tags")
-          tag_node.content.split(",").each do |tag|
-            t = tag.strip
-            categories << t unless t.empty? || categories.includes?(t)
+          if id_node = plugin_node.xpath_node("id")
+            xml_id = id_node.content
           end
+          if name_node = plugin_node.xpath_node("name")
+            name = name_node.content
+          end
+          if desc_node = plugin_node.xpath_node("description")
+            description = desc_node.content
+          end
+          if vendor_node = plugin_node.xpath_node("vendor")
+            vendor = vendor_node.content
+          end
+
+          downloads = 0_i64
+          if dm = plugin_node["downloads"]?
+            downloads = dm.to_i64 rescue 0_i64
+          end
+
+          categories = [] of String
+          if tag_node = plugin_node.xpath_node("tags")
+            tag_node.content.split(",").each do |tag|
+              t = tag.strip
+              categories << t unless t.empty? || categories.includes?(t)
+            end
+          end
+
+          result << PluginInfo.new(
+            id: 0_i64,
+            xml_id: xml_id,
+            name: name,
+            description: description.strip.gsub(/\s+/, " "),
+            categories: categories,
+            downloads: downloads,
+            vendor: vendor,
+          )
         end
-
-        result << PluginInfo.new(
-          id: 0_i64,
-          xml_id: xml_id,
-          name: name,
-          description: description.strip.gsub(/\s+/, " "),
-          categories: categories,
-          downloads: downloads,
-          vendor: vendor,
-        )
+      rescue ex
+        # fallback: return empty
       end
-    rescue ex
-      # fallback: return empty
-    end
 
-    result
-  end
+      result
+    end
 
     def download_url : String
       "https://plugins.jetbrains.com/files/#{Utils.escape(xml_id)}/#{id}"
@@ -122,6 +122,7 @@ module JBUpdater
 
   class PluginMarketplace
     @@cache = {} of String => Array(PluginInfo)
+
     def self.clear_cache
       @@cache.clear
     end
@@ -155,10 +156,10 @@ module JBUpdater
         plugins
       else
         query_lower = query.downcase
-        plugins.select do |p|
-          p.name.downcase.includes?(query_lower) ||
-            p.description.downcase.includes?(query_lower) ||
-            p.xml_id.downcase.includes?(query_lower)
+        plugins.select do |plugin|
+          plugin.name.downcase.includes?(query_lower) ||
+            plugin.description.downcase.includes?(query_lower) ||
+            plugin.xml_id.downcase.includes?(query_lower)
         end
       end
     end
@@ -170,7 +171,7 @@ module JBUpdater
     def self.top_downloaded(build : String = "RM-2025.2", max_count = 100) : Array(PluginInfo)
       Log.info "PluginMarketplace: fetching top downloaded for build #{build}"
       plugins = list_by_build(build)
-      sorted = plugins.sort_by { |p| -p.downloads }[0...max_count] || [] of PluginInfo
+      sorted = plugins.sort_by { |plugin| -plugin.downloads }[0...max_count] || [] of PluginInfo
       Log.info "PluginMarketplace: top downloaded: #{sorted.size} plugins"
       sorted
     end
@@ -185,14 +186,14 @@ module JBUpdater
     def self.by_category(category : String, build : String = "RM-2025.2") : Array(PluginInfo)
       plugins = list_by_build(build)
       cat_lower = category.downcase
-      plugins.select do |p|
-        p.categories.any? { |c| c.downcase == cat_lower }
+      plugins.select do |plugin|
+        plugin.categories.any? { |cat| cat.downcase == cat_lower }
       end
     end
 
     def self.by_id(xml_id : String) : PluginInfo?
       plugins = list_by_build("RM-2025.2")
-      plugins.find { |p| p.xml_id == xml_id }
+      plugins.find { |plugin| plugin.xml_id == xml_id }
     end
 
     def self.categories : Array(String)
@@ -246,7 +247,7 @@ module JBUpdater
 
       headers = HTTP::Headers{
         "User-Agent" => HTTPClient::USER_AGENT,
-        "Accept" => "application/xml, text/xml, */*",
+        "Accept"     => "application/xml, text/xml, */*",
       }
       client = HTTP::Client.new(URI.parse(url))
       client.read_timeout = 30.seconds
@@ -273,7 +274,7 @@ module JBUpdater
           raise "redirect without Location header"
         when 404
           Log.warn "Plugin list not found (404) for #{url}"
-          return ""
+          ""
         when 429
           Log.warn "Rate limited (429) for #{url}"
           raise "HTTP 429"

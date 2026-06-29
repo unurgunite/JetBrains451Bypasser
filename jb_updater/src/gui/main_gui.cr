@@ -192,15 +192,16 @@ end
 
 # ---- Settings persistence --------------------------------------------
 module Settings
-  CONFIG_DIR = File.expand_path(File.join(ENV["HOME"], ".jb_updater_gui"))
+  CONFIG_DIR  = File.expand_path(File.join(ENV["HOME"], ".jb_updater_gui"))
   CONFIG_FILE = File.join(CONFIG_DIR, "config.json")
 end
+
 private def load_config : Hash(String, String)
   return {} of String => String unless File.exists?(Settings::CONFIG_FILE)
   begin
     JSON.parse(File.read(Settings::CONFIG_FILE))
       .as_h
-      .transform_values { |v| v.as_s }
+      .transform_values(&.as_s)
   rescue
     {} of String => String
   end
@@ -380,12 +381,9 @@ end
 
 # ---- Helper: auto-scroll log to bottom -------------------------------
 private def scroll_log(log : UIng::MultilineEntry)
-  begin
-    full_text = log.text || ""
-    len = full_text.size
-    log.text = full_text
-  rescue
-  end
+  full_text = log.text || ""
+  log.text = full_text
+rescue
 end
 
 # ---- Helper: save settings -------------------------------------------
@@ -668,7 +666,7 @@ UIng.init do
   plugins_tab.append(btn_group, false)
   tabs.append("Plugins", plugins_tab)
 
- # --- Browse tab -----------------------------------------------------
+  # --- Browse tab -----------------------------------------------------
   browse_tab = UIng::Box.new(:vertical)
   browse_tab.padded = true
 
@@ -691,7 +689,7 @@ UIng.init do
   # Table for plugin results — model kept alive
   browse_model_handler = UIng::Table::Model::Handler.new do
     num_columns { 3 }
-    column_type { |col| UIng::Table::Value::Type::String }
+    column_type { |_col| UIng::Table::Value::Type::String }
     num_rows { App.browse_plugins.size }
     cell_value { |row, col|
       if row < App.browse_plugins.size
@@ -699,7 +697,7 @@ UIng.init do
         case col
         when 0 then UIng::Table::Value.new(plugin.name)
         when 1 then UIng::Table::Value.new(plugin.formatted_downloads)
-        else UIng::Table::Value.new(plugin.star_rating)
+        else        UIng::Table::Value.new(plugin.star_rating)
         end
       else
         UIng::Table::Value.new("")
@@ -955,7 +953,7 @@ UIng.init do
   end
 
   # ---- Resolve build code from IDE tab, Plugins tab, or auto-detect --
-  resolve_build = ->() : String {
+  resolve_build = -> : String {
     result = JBUpdater::GUI::Actions.resolve_build(e_ide_product.text, e_build.text, JBUpdater::DetectProducts.all)
     if result != e_ide_product.text && result != e_build.text
       # Auto-detected from fallback — log it
@@ -979,8 +977,8 @@ UIng.init do
       else
         Thread.new do
           begin
-          build = resolve_build.call()
-          plugins = JBUpdater::PluginMarketplace.search(query, build)
+            build = resolve_build.call
+            plugins = JBUpdater::PluginMarketplace.search(query, build)
             UIng.queue_main do
               old_count = App.browse_plugins.size
               App.browse_plugins = plugins
@@ -1006,7 +1004,7 @@ UIng.init do
   btn_top.on_clicked do
     UIng.queue_main do
       browse_status.text = "Loading top plugins..."
-      build = resolve_build.call()
+      build = resolve_build.call
       log.append("[Browse] Fetching top downloaded for build #{build}...\n")
       Thread.new do
         begin
@@ -1036,7 +1034,7 @@ UIng.init do
   btn_newest.on_clicked do
     UIng.queue_main do
       browse_status.text = "Loading latest plugins..."
-      build = resolve_build.call()
+      build = resolve_build.call
       log.append("[Browse] Fetching newest for build #{build}...\n")
       Thread.new do
         begin
@@ -1105,8 +1103,7 @@ UIng.init do
       next
     end
 
-    build = resolve_build.call()
-    product = e_product.text || ""
+    build = resolve_build.call
 
     log.append("[Browse] Installing plugin: #{xml_id} for build #{build}\n")
 
