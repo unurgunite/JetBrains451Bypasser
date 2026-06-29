@@ -45,7 +45,7 @@ module JBUpdater
       raise "Could not detect IDE build; pass --build" unless @build
 
       act = action || begin
-        if @opts.list
+        if @opts.list?
           :list
         elsif !@opts.install_ids.empty?
           :install
@@ -74,7 +74,9 @@ module JBUpdater
     #
     # @return [String?] Detected build string or `nil`
     private def detect_build_info : String?
-      base_name = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
+      plugins_dir = @opts.plugins_dir
+      return nil unless plugins_dir
+      base_name = File.basename(File.dirname(plugins_dir)).gsub(/\d.*$/, "")
       info_json = ""
       build_txt = ""
 
@@ -202,9 +204,12 @@ module JBUpdater
     #
     # @return [Hash(String, PluginMeta)] Plugin ID to metadata mapping
     private def installed_plugins : Hash(String, PluginMeta)
-      return @installed_plugins.not_nil! if @installed_plugins
-
-      @installed_plugins = PluginMeta.scan_dir(@opts.plugins_dir.not_nil!)
+      if plugins = @installed_plugins
+        return plugins
+      end
+      dir = @opts.plugins_dir
+      raise "plugins_dir not set" unless dir
+      @installed_plugins = PluginMeta.scan_dir(dir)
     end
 
     # Installs plugins by XML ID.
@@ -229,7 +234,8 @@ module JBUpdater
           uri = HTTPClient.override_plugin_repo_host(uri, @opts.downloads_host)
 
           Log.info("#{plugin_num} Resolved URL: #{uri}")
-          dest = File.join(@opts.plugins_dir.not_nil!, xml_id)
+          dir = @opts.plugins_dir || raise "plugins_dir not set"
+          dest = File.join(dir, xml_id)
           backup = "#{dest}.bak.#{Time.utc.to_unix}"
 
           if File.directory?(dest)
@@ -284,19 +290,16 @@ module JBUpdater
     private def update_plugin(meta : PluginMeta) : Nil
       xml_id = meta.id
       target_dir = meta.path
-      current_ver = meta.version
       tmp_zip : String? = nil
 
       begin
         uri = final_uri(xml_id)
         uri = HTTPClient.override_plugin_repo_host(uri, @opts.downloads_host)
-        want_ver = @opts.pin_versions[xml_id]? ||
-                   File.basename(uri.path).sub(/\.zip$/, "").split('-').last?
 
-        Log.info "  → #{current_ver} → #{want_ver || "?"}"
+        Log.info "  → #{meta.version} → #{resolved_version(xml_id, uri)}"
         Log.info "    URL: #{uri}"
 
-        if @opts.dry_run
+        if @opts.dry_run?
           Log.info "    (dry-run) would download and install into #{target_dir}"
           return
         end
@@ -305,15 +308,26 @@ module JBUpdater
         HTTPClient.download(uri, tmp_zip)
         Utils.extract_zip(tmp_zip, target_dir)
 
-        if post = PluginMeta.parse_from_dir(target_dir)
-          compat = Utils.build_in_range?(@build.not_nil!, post.since, post.until_build)
-          suffix = compat ? "" : " (still incompatible)"
-          Log.success "  installed: #{post.id} #{post.version} [since=#{post.since || "-"} until=#{post.until_build || "-"}]#{suffix}"
-        else
-          Log.warn "  re-parse failed; installed plugin may be broken"
-        end
+        log_install_result(target_dir)
       ensure
         FileUtils.rm_rf(tmp_zip) if tmp_zip && File.exists?(tmp_zip)
+      end
+    end
+
+    private def resolved_version(xml_id : String, uri : URI) : String
+      @opts.pin_versions[xml_id]? ||
+        File.basename(uri.path).sub(/\.zip$/, "").split('-').last? || "?"
+    end
+
+    private def log_install_result(target_dir : String)
+      if post = PluginMeta.parse_from_dir(target_dir)
+        since = post.since || "-"
+        until_build = post.until_build || "-"
+        compat = Utils.build_in_range?(@build || raise("build not set"), post.since, post.until_build)
+        suffix = compat ? "" : " (still incompatible)"
+        Log.success "  installed: #{post.id} #{post.version} [since=#{since} until=#{until_build}]#{suffix}"
+      else
+        Log.warn "  re-parse failed; installed plugin may be broken"
       end
     end
 
@@ -331,7 +345,7 @@ module JBUpdater
       elsif ver = @opts.pin_versions[xml_id]?
         resolve_download_url_for_version(xml_id, ver)
       else
-        resolve_download_url_via_plugin_manager(xml_id, @build.not_nil!)
+        resolve_download_url_via_plugin_manager(xml_id, @build || raise("build not set"))
       end
     end
 

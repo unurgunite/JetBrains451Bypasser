@@ -11,11 +11,14 @@ describe PluginMeta do
       </idea-plugin>
     XML
 
-    plugin = PluginMeta.parse_xml(xml, "/tmp/fake").not_nil!
-    plugin.id.should eq "org.jetbrains.demo"
-    plugin.version.should eq "2025.1.0"
-    plugin.since.should eq "252.0"
-    plugin.until_build.should eq "260.*"
+    if p = PluginMeta.parse_xml(xml, "/tmp/fake")
+      p.id.should eq "org.jetbrains.demo"
+      p.version.should eq "2025.1.0"
+      p.since.should eq "252.0"
+      p.until_build.should eq "260.*"
+    else
+      fail "expected plugin to be parsed"
+    end
   end
 
   it "returns nil for broken xml" do

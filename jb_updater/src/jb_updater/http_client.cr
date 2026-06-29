@@ -90,6 +90,23 @@ module JBUpdater
       end
     end
 
+    # Follows an HTTP redirect by parsing the Location header.
+    private def self.follow_redirect(response : HTTP::Client::Response, uri : URI, dest_path : String, depth : Int32) : Nil
+      raise "Too many redirects: #{depth}" if depth > 5
+      loc = response.headers["Location"]?
+      raise "redirect without Location header for #{uri}" unless loc
+      next_uri = URI.parse(loc)
+      unless next_uri.absolute?
+        next_uri = URI.new(
+          scheme: uri.scheme,
+          host: uri.host,
+          port: uri.port,
+          path: loc,
+        )
+      end
+      download(next_uri, dest_path, depth + 1)
+    end
+
     # Downloads a file to disk with streaming, progress tracking, and redirect handling.
     #
     # Follows HTTP 301/302 redirects (up to 5). Shows a TTY progress bar
@@ -115,63 +132,58 @@ module JBUpdater
         client.get(uri.request_target, headers: headers) do |response|
           case response.status_code
           when 200
-            length_header = response.headers["Content-Length"]?
-            total = length_header ? length_header.to_i64 : 0_i64
-            Log.info "Download started: #{fname} (#{total > 0 ? Utils.format_bytes(total) : "unknown size"})"
-            downloaded = 0_i64
-
-            File.open(dest_path, "wb") do |file|
-              bar_width = 40
-
-              if stream = response.body_io
-                buf = Bytes.new(16384)
-                loop do
-                  read_bytes = stream.read(buf)
-                  break if read_bytes == 0
-                  file.write(buf[0, read_bytes])
-                  downloaded += read_bytes
-                  notify_progress(downloaded, total)
-
-                  if total > 0 && !HTTPClient.no_tty_progress_bar?
-                    progress = (downloaded.to_f / total * bar_width)
-                      .clamp(0, bar_width).to_i
-                    percent = (downloaded.to_f / total * 100).round(1)
-                    bar = "#" * progress + " " * (bar_width - progress)
-                    print "\r[#{bar}] #{percent}%"
-                    STDOUT.flush
-                  end
-                end
-              end
-            end
-            Log.info "Download complete: #{fname} (#{Utils.format_bytes(downloaded)})"
-            if HTTPClient.no_tty_progress_bar?
-              puts "Download complete: #{dest_path}"
-            else
-              puts "\rDownload complete#{" " * 40}"
-            end
+            downloaded = stream_to_file(response, dest_path, fname)
+            notify_download_complete(fname, dest_path, downloaded)
           when 301, 302
-            loc = response.headers["Location"]?
-            Log.info "Redirect #{depth + 1}: #{uri} → #{loc}"
-            if loc
-              next_uri = URI.parse(loc)
-              unless next_uri.absolute?
-                next_uri = URI.new(
-                  scheme: uri.scheme,
-                  host: uri.host,
-                  port: uri.port,
-                  path: loc
-                )
-              end
-              return download(next_uri, dest_path, depth + 1)
-            else
-              raise "redirect without Location header for #{uri}"
-            end
+            follow_redirect(response, uri, dest_path, depth)
           else
             raise "HTTP #{response.status_code} #{response.status_message} for #{uri}"
           end
         end
       ensure
         client.close
+      end
+    end
+
+    private def self.stream_to_file(response : HTTP::Client::Response, dest_path : String, fname : String) : Int64
+      length_header = response.headers["Content-Length"]?
+      total = length_header ? length_header.to_i64 : 0_i64
+      Log.info "Download started: #{fname} (#{total > 0 ? Utils.format_bytes(total) : "unknown size"})"
+      downloaded = 0_i64
+
+      File.open(dest_path, "wb") do |file|
+        bar_width = 40
+
+        if stream = response.body_io
+          buf = Bytes.new(16384)
+          loop do
+            read_bytes = stream.read(buf)
+            break if read_bytes == 0
+            file.write(buf[0, read_bytes])
+            downloaded += read_bytes
+            notify_progress(downloaded, total)
+
+            if total > 0 && !HTTPClient.no_tty_progress_bar?
+              progress = (downloaded.to_f / total * bar_width)
+                .clamp(0, bar_width).to_i
+              percent = (downloaded.to_f / total * 100).round(1)
+              bar = "#" * progress + " " * (bar_width - progress)
+              print "\r[#{bar}] #{percent}%"
+              STDOUT.flush
+            end
+          end
+        end
+      end
+
+      Log.info "Download complete: #{fname} (#{Utils.format_bytes(downloaded)})"
+      downloaded
+    end
+
+    private def self.notify_download_complete(fname : String, dest_path : String, downloaded : Int64)
+      if HTTPClient.no_tty_progress_bar?
+        puts "Download complete: #{dest_path}"
+      else
+        puts "\rDownload complete#{" " * 40}"
       end
     end
 

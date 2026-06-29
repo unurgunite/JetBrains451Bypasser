@@ -128,15 +128,15 @@ module App
   end
 
   def self.log : UIng::MultilineEntry
-    @@log.not_nil!
+    @@log || raise "log not initialized"
   end
 
   def self.overall_progress : UIng::ProgressBar
-    @@overall_progress.not_nil!
+    @@overall_progress || raise "overall_progress not initialized"
   end
 
   def self.plugin_progress : UIng::ProgressBar
-    @@plugin_progress.not_nil!
+    @@plugin_progress || raise "plugin_progress not initialized"
   end
 
   def self.busy? : Bool
@@ -251,6 +251,18 @@ end
 # Builds a CLI argument array from the current GUI field values.
 #
 # @return [Array(String)] CLI arguments for `jb_updater`
+private def arch_args(combo_arch : UIng::Combobox) : Array(String)
+  case combo_arch.selected
+  when 1 then ["--arch", "arm"]
+  when 2 then ["--arch", "intel"]
+  else        [] of String
+  end
+end
+
+private def add_opt(args : Array(String), flag : String, value : String?)
+  args.concat([flag, value]) if value && !value.empty?
+end
+
 private def build_args(
   e_plugins_dir : UIng::Entry,
   e_build : UIng::Entry,
@@ -262,20 +274,12 @@ private def build_args(
 ) : Array(String)
   args = [] of String
 
-  plugins_dir = expand_tilde(e_plugins_dir.text)
-  build = e_build.text
-  product = e_product.text
-  install_ids = e_install_ids.text
+  add_opt(args, "--plugins-dir", expand_tilde(e_plugins_dir.text))
+  add_opt(args, "--build", e_build.text)
+  add_opt(args, "--product", e_product.text)
+  add_opt(args, "--install-plugin", e_install_ids.text)
 
-  args += ["--plugins-dir", plugins_dir] if plugins_dir && !plugins_dir.empty?
-  args += ["--build", build] if build && !build.empty?
-  args += ["--product", product] if product && !product.empty?
-  args += ["--install-plugin", install_ids] if install_ids && !install_ids.empty?
-
-  case combo_arch.selected
-  when 1 then args += ["--arch", "arm"]
-  when 2 then args += ["--arch", "intel"]
-  end
+  args.concat(arch_args(combo_arch))
 
   args << "--dry-run" if chk_dry.checked?
   args << "--list" if chk_list.checked?
@@ -797,8 +801,8 @@ UIng.init do
         prod = detected[idx - 1]
         log.append("[GUI] Selected product: #{prod.name} (#{prod.build})\n")
 
-        if prod.plugins_dir
-          e_plugins_dir.text = prod.plugins_dir.not_nil!
+        if dir = prod.plugins_dir
+          e_plugins_dir.text = dir
         end
         e_product.text = prod.name
         e_ide_product.text = prod.build
@@ -976,7 +980,7 @@ UIng.init do
     UIng.queue_main do
       query = search_entry.text
       if query.nil? || query.empty?
-        model = App.browse_table_model.not_nil!
+        model = App.browse_table_model || next
         old_count = App.browse_plugins.size
         (0...old_count).each { |i| model.row_deleted(i) }
         App.browse_plugins = [] of JBUpdater::PluginInfo
@@ -990,7 +994,7 @@ UIng.init do
             UIng.queue_main do
               old_count = App.browse_plugins.size
               App.browse_plugins = plugins
-              model = App.browse_table_model.not_nil!
+              model = App.browse_table_model || next
               if old_count == 0
                 plugins.each_with_index { |_, i| model.row_inserted(i) }
               else
@@ -1019,7 +1023,7 @@ UIng.init do
           UIng.queue_main do
             old_count = App.browse_plugins.size
             App.browse_plugins = plugins
-            model = App.browse_table_model.not_nil!
+            model = App.browse_table_model || next
             if old_count == 0
               plugins.each_with_index { |_, i| model.row_inserted(i) }
             else
@@ -1049,7 +1053,7 @@ UIng.init do
           UIng.queue_main do
             old_count = App.browse_plugins.size
             App.browse_plugins = plugins
-            model = App.browse_table_model.not_nil!
+            model = App.browse_table_model || next
             if old_count == 0
               plugins.each_with_index { |_, i| model.row_inserted(i) }
             else

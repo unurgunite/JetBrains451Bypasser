@@ -63,7 +63,8 @@ module JBUpdater
         raise "IDEReleases: HTTP #{res.status_code} for #{url}"
       end
 
-      data = JSON.parse(res.body.not_nil!)
+      body = res.body || raise "empty response body"
+      data = JSON.parse(body)
       arr = data[product_code]?.try &.as_a?
       raise "IDEReleases: unexpected JSON for #{product_code}" if arr.nil? || arr.empty?
 

@@ -2,7 +2,7 @@ require "./jb_updater"
 
 opts = JBUpdater.parse_cli
 
-JBUpdater::HTTPClient.no_tty_progress_bar = opts.no_tty_progress_bar
+JBUpdater::HTTPClient.no_tty_progress_bar = opts.no_tty_progress_bar?
 
 if opts.product && opts.ide_path
   JBUpdater::Log.fail("Specify either --product or --ide-path, not both.")
@@ -14,7 +14,7 @@ end
 # ---------------------------------------------------------------------
 
 # Case 0: just list IDE releases (Toolbox-like discovery)
-if opts.list_ide_releases
+if opts.list_ide_releases?
   if opts.product.nil?
     JBUpdater::Log.fail("Missing --product when using --list-ide-releases (e.g., WS, RM)")
     exit 1
@@ -37,7 +37,7 @@ if opts.list_ide_releases
 end
 
 # Case 1: explicit IDE upgrade mode
-if opts.upgrade_ide
+if opts.upgrade_ide?
   ide_updater = JBUpdater::IDEUpdater.new(opts)
   ide_updater.run
   exit 0
@@ -47,18 +47,18 @@ end
 # Resolve plugins directory automatically if only --product is passed
 # (for plugin operations only, not IDE modes above)
 # ---------------------------------------------------------------------
-if opts.plugins_dir.nil? && opts.product
-  resolved = JBUpdater::Utils.resolve_product_folder(opts.product.not_nil!)
+if opts.plugins_dir.nil? && (product = opts.product)
+  resolved = JBUpdater::Utils.resolve_product_folder(product)
   opts.plugins_dir = JBUpdater::Utils.expand_jetbrains_plugins_dir(resolved)
   puts "Detected latest config folder: #{resolved}"
 end
 
 # Case 2: normal plugin update / install / list
-if opts.plugins_dir
+if pd = opts.plugins_dir
   # Expand ~ in plugins_dir, if present
-  opts.plugins_dir = JBUpdater::Utils.expand_tilde(opts.plugins_dir.not_nil!)
+  opts.plugins_dir = JBUpdater::Utils.expand_tilde(pd)
 
-  plugins_dir = opts.plugins_dir.not_nil!
+  plugins_dir = opts.plugins_dir || pd
   puts "Scanning #{plugins_dir}"
 
   if Dir.exists?(plugins_dir)

@@ -13,9 +13,9 @@ module JBUpdater
     # Plugin IDs to restrict operations to.
     property only : Array(String)
     # Whether to include incompatible plugins.
-    property only_incompatible : Bool
+    property? only_incompatible : Bool
     # When true, skip actual operations.
-    property dry_run : Bool
+    property? dry_run : Bool
     # Override for the plugin downloads host.
     property downloads_host : String
     # Map of plugin IDs to pinned versions.
@@ -23,11 +23,11 @@ module JBUpdater
     # Map of plugin IDs to direct download URLs.
     property direct_urls : Hash(String, String)
     # When true, list plugins instead of updating.
-    property list : Bool
+    property? list : Bool
     # Custom path to IDE binary (macOS only).
     property bin_path : String?
     # Whether to include bundled plugins.
-    property include_bundled : Bool
+    property? include_bundled : Bool
     # Plugin XML IDs to install (comma-separated on CLI).
     property install_ids : Array(String)
     # IDE product name (e.g. `"RubyMine"` or `"RubyMine2025.2"`).
@@ -37,15 +37,15 @@ module JBUpdater
     # When true, patch a Homebrew cask file instead of installing directly.
     property brew_patch : Bool?
     # When true, upgrade the whole IDE rather than individual plugins.
-    property upgrade_ide : Bool
+    property? upgrade_ide : Bool
     # Override for the IDE downloads host (default: download-cdn.jetbrains.com).
     property ide_downloads_host : String
     # Target architecture (`"arm"` or `"intel"`); autodetected if nil.
     property arch : String?
     # When true, list available IDE releases for `--product`.
-    property list_ide_releases : Bool
+    property? list_ide_releases : Bool
     # When true, disable ASCII download progress bars.
-    property no_tty_progress_bar : Bool
+    property? no_tty_progress_bar : Bool
 
     # All fields default to `nil`, `false`, or empty collections.
     def initialize

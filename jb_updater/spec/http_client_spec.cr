@@ -18,7 +18,7 @@ describe HTTPClient do
       end
     end
 
-    address = server.bind_tcp "127.0.0.1", port
+    server.bind_tcp "127.0.0.1", port
     spawn { server.listen }
 
     # sleep a small, non‑deprecated time span to let it bind

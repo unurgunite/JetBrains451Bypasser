@@ -36,7 +36,7 @@ module JBUpdater
         end
       end
 
-      product = opts.product.not_nil!
+      product = opts.product || raise "product not set"
       build_url = latest_ide_download_url(product)
       final_uri = HTTPClient.override_ide_repo_host(build_url, opts.ide_downloads_host)
 
@@ -64,7 +64,8 @@ module JBUpdater
         raise "JetBrains releases API returned #{res.status_code}"
       end
 
-      data = JSON.parse(res.body.not_nil!)
+      body = res.body || raise "empty response body"
+      data = JSON.parse(body)
       version = data[product_code][0]["version"].as_s
       downloads = data[product_code][0]["downloads"]
       link = nil
