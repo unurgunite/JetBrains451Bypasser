@@ -130,7 +130,9 @@ jobs:
           ./jb_updater --help
           echo "---"
           echo "Checking dylib paths..."
-          otool -L jb_updater | grep -v "System\|@loader_path" && { echo "::error::Found absolute dylib paths"; exit 1; } || echo "All dylib paths use @loader_path"
+          # Skip binary name line, filter out system paths and @loader_path refs.
+          # Any remaining lines are non-system absolute paths → fail.
+          otool -L jb_updater | tail -n +2 | grep -v -e "/usr/lib" -e "/System" -e "@loader_path" && { echo "::error::Found absolute dylib paths"; exit 1; } || echo "All dylib paths use @loader_path"
 
       - name: Package artifacts
         run: |
