@@ -115,7 +115,7 @@ module JBUpdater
       products
     end
 
-    private def infer_code(name : String) : String
+    def infer_code(name : String) : String
       mapping = {
         "RubyMine" => "RM",
         "WebStorm" => "WS",
@@ -133,7 +133,7 @@ module JBUpdater
 
     # Convert "RubyMine2025.2" and code "RM" → "RM-252"
     # If name has no version number, fallback to reading from app bundle
-    private def build_code(name : String, code : String, ide_path : String? = nil) : String
+    def build_code(name : String, code : String, ide_path : String? = nil) : String
       ver = name.gsub(/[^0-9.]/, "") # "2025.2"
       parts = ver.split(".").first(2)  # ["2025", "2"]
       if parts.size == 2 && !ver.empty?
@@ -149,7 +149,7 @@ module JBUpdater
       end
     end
 
-    private def read_build_from_app(ide_path : String, code : String) : String?
+    def read_build_from_app(ide_path : String, code : String) : String?
       info_json = app_metadata_path(ide_path, "product-info.json")
       build_txt = app_metadata_path(ide_path, "build.txt")
 
@@ -175,7 +175,7 @@ module JBUpdater
       nil
     end
 
-    private def app_metadata_path(ide_path : String, file : String) : String
+    def app_metadata_path(ide_path : String, file : String) : String
       {% if flag?(:darwin) %}
         File.join(ide_path, "Contents", "Resources", file)
       {% else %}

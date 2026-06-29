@@ -1,6 +1,7 @@
 require "../jb_updater"
 require "../jb_updater/detect_products"
 require "../jb_updater/plugin_marketplace"
+require "../jb_updater/gui_actions"
 require "file_utils"
 require "json"
 require "uing"
@@ -32,12 +33,6 @@ module App
   @@download_total : Int64 = 0_i64
   @@download_progress_mutex : Mutex = Mutex.new
 
-  # Install queue (xml_id, plugins_dir, build)
-  @@install_queue : Array(Tuple(String, String, String)) = [] of Tuple(String, String, String)
-  @@install_queue_mutex : Mutex = Mutex.new
-  @@install_processing : Bool = false
-  @@install_queue_total : Int32 = 0
-
   def self.drain_log_buffer : Array(String)
     @@log_buffer_mutex.synchronize {
       buf = @@log_buffer.dup
@@ -61,36 +56,6 @@ module App
 
   def self.read_progress : Int32
     @@download_progress_mutex.synchronize { @@download_progress }
-  end
-
-  def self.add_to_queue(xml_id : String, plugins_dir : String, build : String)
-    @@install_queue_mutex.synchronize {
-      @@install_queue << {xml_id, plugins_dir, build}
-    }
-  end
-
-  def self.queue_size : Int32
-    @@install_queue_mutex.synchronize { @@install_queue.size }
-  end
-
-  def self.queue_total=(n : Int32)
-    @@install_queue_mutex.synchronize { @@install_queue_total = n }
-  end
-
-  def self.queue_total : Int32
-    @@install_queue_mutex.synchronize { @@install_queue_total }
-  end
-
-  def self.shift_queue : Tuple(String, String, String)?
-    @@install_queue_mutex.synchronize { @@install_queue.shift? }
-  end
-
-  def self.install_processing? : Bool
-    @@install_queue_mutex.synchronize { @@install_processing }
-  end
-
-  def self.install_processing=(v : Bool)
-    @@install_queue_mutex.synchronize { @@install_processing = v }
   end
 
   def self.op_status : String
@@ -352,29 +317,29 @@ end
 
 # ---- Queue-based installer (multiple plugins, sequential) -------------
 private def queue_install(xml_id : String, plugins_dir : String, build : String)
-  App.add_to_queue(xml_id, plugins_dir, build)
+  JBUpdater::GUI::Actions.enqueue(xml_id, plugins_dir, build)
 
-  App.log.append("[Browser] Queued: #{xml_id} (queue: #{App.queue_size})\n")
+  App.log.append("[Browser] Queued: #{xml_id} (queue: #{JBUpdater::GUI::Actions.queue_size})\n")
 
-  return if App.install_processing?
+  return if JBUpdater::GUI::Actions.processing?
 
-  App.install_processing = true
-  App.queue_total = App.queue_size
+  JBUpdater::GUI::Actions.processing = true
+  JBUpdater::GUI::Actions.total = JBUpdater::GUI::Actions.queue_size
   App.busy = true
   App.plugin_progress.value = 0
   App.update_progress(0_i64, 1_i64)
 
   Thread.new do
     loop do
-      item = App.shift_queue
+      item = JBUpdater::GUI::Actions.dequeue
       break if item.nil?
 
       xml_id, plugins_dir, build = item
       status_msg = ""
 
-      remaining = App.queue_size
-      completed = App.queue_total - remaining
-      App.push_log("[Browser] Installing (#{completed}/#{App.queue_total}): #{xml_id}")
+      remaining = JBUpdater::GUI::Actions.queue_size
+      completed = JBUpdater::GUI::Actions.total - remaining
+      App.push_log("[Browser] Installing (#{completed}/#{JBUpdater::GUI::Actions.total}): #{xml_id}")
 
       begin
         opts = JBUpdater::Options.new
@@ -396,14 +361,14 @@ private def queue_install(xml_id : String, plugins_dir : String, build : String)
       App.push_log("[Browser] #{status_msg}")
 
       # Update overall progress on UI thread
-      completed = App.queue_total - App.queue_size
-      overall_pct = App.queue_total > 0 ? ((completed.to_f / App.queue_total) * 100).to_i : 100
+      completed = JBUpdater::GUI::Actions.total - JBUpdater::GUI::Actions.queue_size
+      overall_pct = JBUpdater::GUI::Actions.total > 0 ? ((completed.to_f / JBUpdater::GUI::Actions.total) * 100).to_i : 100
       UIng.queue_main do
         App.overall_progress.value = overall_pct
       end
     end
 
-    App.install_processing = false
+    JBUpdater::GUI::Actions.processing = false
     UIng.queue_main do
       App.plugin_progress.value = 100
       App.overall_progress.value = 100
@@ -991,16 +956,12 @@ UIng.init do
 
   # ---- Resolve build code from IDE tab, Plugins tab, or auto-detect --
   resolve_build = ->() : String {
-    code = e_ide_product.text
-    return code if code && !code.empty?
-    code = e_build.text
-    return code if code && !code.empty?
-    detected = JBUpdater::DetectProducts.all
-    if d = detected.first?
-      log.append("[Browse] Auto-detected build: #{d.build} from #{d.name}\n")
-      return d.build
+    result = JBUpdater::GUI::Actions.resolve_build(e_ide_product.text, e_build.text, JBUpdater::DetectProducts.all)
+    if result != e_ide_product.text && result != e_build.text
+      # Auto-detected from fallback — log it
+      log.append("[Browse] Auto-detected build: #{result}\n")
     end
-    "IC-252"
+    result
   }
 
   # ---- Search entry handler ------------------------------------------
