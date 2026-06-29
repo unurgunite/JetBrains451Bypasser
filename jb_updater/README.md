@@ -44,19 +44,20 @@ Prebuilt binaries are attached to [GitHub Releases](../releases):
 Per OS you’ll find:
 
 - **CLI only** archives:
-    - `jb_updater-linux-x86_64.tar.gz`
-    - `jb_updater-macos-${arch}.tar.gz`
-    - `jb_updater-windows-x64.zip`
-- **GUI only** archives:
+    - `jb_updater-cli-linux-x86_64.tar.gz`
+    - `jb_updater-cli-macos-${arch}.tar.gz`
+    - `jb_updater-cli-windows-x86_64.zip`
+- **GUI / app** archives:
     - `jb_updater-gui-linux-x86_64.tar.gz`
-    - `jb_updater-gui-macos-${arch}.zip` (contains a `JBUpdater.app`)
-    - `jb_updater-gui-windows-x64.zip`
+    - `jb_updater-app-macos-${arch}.zip` (contains a `JBUpdater.app`)
+    - `jb_updater-gui-windows-x86_64.zip`
 - **Bundles** (CLI + GUI together):
     - `jb_updater-bundle-linux-x86_64.tar.gz`
-    - `jb_updater-macos-${arch}-binaries.zip`
-    - `jb_updater-bundle-windows-x64.zip`
+    - `jb_updater-bundle-macos-${arch}.zip`
+    - `jb_updater-bundle-windows-x86_64.zip`
 
-On macOS, `JBUpdater.app` bundles both `jb_updater_gui` and `jb_updater` in `Contents/MacOS`.
+On macOS, `JBUpdater.app` bundles both `jb_updater_gui` and `jb_updater` plus OpenSSL 3 dylibs in `Contents/MacOS`.
+macOS CLI archives also include the OpenSSL dylibs alongside the binary.
 
 > [!NOTE]
 > macOS builds are unsigned / unnotarized. You may need to clear quarantine locally:
@@ -64,6 +65,10 @@ On macOS, `JBUpdater.app` bundles both `jb_updater_gui` and `jb_updater` in `Con
 > xattr -cr JBUpdater.app
 > open JBUpdater.app
 > ```
+
+> [!NOTE]
+> Windows archives include Crystal runtime DLLs alongside the EXEs. Keep them in the same directory when extracting —
+> otherwise `STATUS_DLL_NOT_FOUND (0xC0000135)` will prevent the process from starting.
 
 ---
 
