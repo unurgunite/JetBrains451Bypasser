@@ -8,3 +8,4 @@ jb_updater.exe
 *.o
 dist/
 artifacts/
+jb_updater/lib

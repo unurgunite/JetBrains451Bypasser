@@ -185,6 +185,7 @@ module JBUpdater
           uri = final_uri(xml_id)
           uri = HTTPClient.override_plugin_repo_host(uri, @opts.downloads_host)
 
+          Log.info("#{plugin_num} Resolved URL: #{uri}")
           dest = File.join(@opts.plugins_dir.not_nil!, xml_id)
           backup = "#{dest}.bak.#{Time.utc.to_unix}"
 
@@ -194,6 +195,7 @@ module JBUpdater
           end
 
           tmp_zip = File.join(Dir.tempdir, "jb-#{Utils.safe(xml_id)}-#{Time.utc.to_unix}.zip")
+          Log.info("#{plugin_num} Downloading #{xml_id} to #{tmp_zip}")
           HTTPClient.download(uri, tmp_zip)
           Utils.extract_zip(tmp_zip, dest)
           Log.success("#{plugin_num} #{xml_id} installed successfully")
@@ -280,14 +282,17 @@ module JBUpdater
 
     private def resolve_download_url_for_version(xml_id : String, version : String) : URI
       base = "https://plugins.jetbrains.com/plugin/download?pluginId=#{Utils.escape(xml_id)}&version=#{Utils.escape(version)}"
+      Log.info "Resolving download URL for #{xml_id} version #{version}: #{base}"
       res = HTTPClient.head_or_get(base)
       case res.status_code
       when 301, 302
         loc = res.headers["Location"]?
         raise "Missing Location header" unless loc
         loc_uri = URI.parse(loc)
+        Log.info "Resolved #{xml_id}@#{version} → #{loc}"
         loc_uri.absolute? ? loc_uri : URI.parse("https://plugins.jetbrains.com#{loc}")
       when 200
+        Log.info "Resolved #{xml_id}@#{version} → direct URL"
         URI.parse(base)
       else
         raise "version download resolve failed (HTTP #{res.status_code}) for #{xml_id}@#{version}"
@@ -295,16 +300,38 @@ module JBUpdater
     end
 
     private def resolve_download_url_via_plugin_manager(xml_id : String, build : String) : URI
+      # Try pluginManager with build first (returns redirect to CDN)
       base = "https://plugins.jetbrains.com/pluginManager?action=download&id=#{Utils.escape(xml_id)}&build=#{Utils.escape(build)}"
+      Log.info "Resolving download URL via pluginManager: #{base}"
       res = HTTPClient.head_or_get(base)
       case res.status_code
       when 301, 302
         loc = res.headers["Location"]?
         raise "Missing Location header from pluginManager" unless loc
         loc_uri = URI.parse(loc)
+        Log.info "pluginManager redirect for #{xml_id}: #{loc}"
         loc_uri.absolute? ? loc_uri : URI.parse("https://plugins.jetbrains.com#{loc}")
       when 200
+        Log.info "pluginManager returned 200 for #{xml_id}, using direct URL"
         URI.parse(base)
+      when 404
+        Log.info "pluginManager 404 for #{xml_id} (incompatible with #{build}), trying plugin/download fallback..."
+        # Plugin not compatible with this build. Try plugin/download without build.
+        fallback = "https://plugins.jetbrains.com/plugin/download?pluginId=#{Utils.escape(xml_id)}"
+        res2 = HTTPClient.head_or_get(fallback)
+        case res2.status_code
+        when 301, 302
+          loc = res2.headers["Location"]?
+          raise "Missing Location header from plugin/download" unless loc
+          loc_uri = URI.parse(loc)
+          Log.info "plugin/download redirect for #{xml_id}: #{loc}"
+          loc_uri.absolute? ? loc_uri : URI.parse("https://plugins.jetbrains.com#{loc}")
+        when 200
+          Log.info "plugin/download returned 200 for #{xml_id}, using direct URL"
+          URI.parse(fallback)
+        else
+          raise "plugin not found for #{xml_id} (pluginManager 404, plugin/download #{res2.status_code})"
+        end
       else
         raise "pluginManager failed (HTTP #{res.status_code}) for #{xml_id} build #{build}"
       end

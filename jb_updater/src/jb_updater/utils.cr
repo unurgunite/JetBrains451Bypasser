@@ -78,6 +78,18 @@ module JBUpdater
       URI.encode_path_segment(str).gsub("%20", "+")
     end
 
+    def self.format_bytes(bytes : Int64) : String
+      if bytes >= 1_000_000_000
+        "#{(bytes.to_f / 1_000_000_000).round(2)} GB"
+      elsif bytes >= 1_000_000
+        "#{(bytes.to_f / 1_000_000).round(2)} MB"
+      elsif bytes >= 1_000
+        "#{(bytes.to_f / 1_000).round(2)} KB"
+      else
+        "#{bytes} B"
+      end
+    end
+
     # --------------------------------------------------------------------------
     # JetBrains directory helpers
     # --------------------------------------------------------------------------

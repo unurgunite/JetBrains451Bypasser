@@ -6,5 +6,5 @@ shards:
 
   uing:
     git: https://github.com/kojix2/uing.git
-    version: 0.0.3
+    version: 0.1.1
 

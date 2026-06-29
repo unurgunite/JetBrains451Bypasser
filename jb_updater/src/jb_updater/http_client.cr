@@ -16,14 +16,39 @@ module JBUpdater
       @@no_tty_progress_bar
     end
 
+    # Optional callback invoked before each HTTP request
+    @@request_callback : Proc(String, String, Nil)? = nil
+
+    def self.on_request=(cb : Proc(String, String, Nil)?)
+      @@request_callback = cb
+    end
+
+    private def self.notify_request(method : String, url : String)
+      @@request_callback.try(&.call(method, url))
+    end
+
+    # Optional callback for download progress (downloaded_bytes, total_bytes)
+    @@progress_callback : Proc(Int64, Int64, Nil)? = nil
+
+    def self.on_progress=(cb : Proc(Int64, Int64, Nil)?)
+      @@progress_callback = cb
+    end
+
+    private def self.notify_progress(downloaded : Int64, total : Int64)
+      @@progress_callback.try(&.call(downloaded, total))
+    end
+
     # ----------------------------------------------------------------------
     # Perform a HEAD or GET and return the Response
     # ----------------------------------------------------------------------
     def self.head_or_get(url : String, method : Symbol = :get) : HTTP::Client::Response
       uri = URI.parse(url)
+      notify_request(method.to_s.upcase, url)
       headers = HTTP::Headers{"User-Agent" => USER_AGENT}
 
       client = HTTP::Client.new(uri)
+      client.read_timeout = 30.seconds
+      client.connect_timeout = 15.seconds
       client.before_request(&.headers.merge!(headers))
 
       begin
@@ -43,18 +68,25 @@ module JBUpdater
     # ----------------------------------------------------------------------
     def self.download(uri : URI, dest_path : String, depth = 0) : Nil
       raise "Too many redirects: #{depth}" if depth > 5
+      fname = File.basename(dest_path)
+      Log.info "Downloading: #{fname} ← #{uri}"
+      notify_request("GET", uri.to_s)
       headers = HTTP::Headers{"User-Agent" => USER_AGENT}
       client = HTTP::Client.new(uri)
+      client.read_timeout = 60.seconds
+      client.connect_timeout = 15.seconds
       client.before_request(&.headers.merge!(headers))
 
       begin
         client.get(uri.request_target, headers: headers) do |response|
           case response.status_code
           when 200
+            length_header = response.headers["Content-Length"]?
+            total = length_header ? length_header.to_i64 : 0_i64
+            Log.info "Download started: #{fname} (#{total > 0 ? Utils.format_bytes(total) : "unknown size"})"
+            downloaded = 0_i64
+
             File.open(dest_path, "wb") do |file|
-              length_header = response.headers["Content-Length"]?
-              total = length_header ? length_header.to_i64 : 0_i64
-              downloaded = 0_i64
               bar_width = 40
 
               if stream = response.body_io
@@ -64,6 +96,7 @@ module JBUpdater
                   break if read_bytes == 0
                   file.write(buf[0, read_bytes])
                   downloaded += read_bytes
+                  notify_progress(downloaded, total)
 
                   if total > 0 && !HTTPClient.no_tty_progress_bar?
                     progress = (downloaded.to_f / total * bar_width)
@@ -76,13 +109,16 @@ module JBUpdater
                 end
               end
             end
+            Log.info "Download complete: #{fname} (#{Utils.format_bytes(downloaded)})"
             if HTTPClient.no_tty_progress_bar?
-              puts "Download complete"
+              puts "Download complete: #{dest_path}"
             else
               puts "\rDownload complete#{" " * 40}"
             end
           when 301, 302
-            if loc = response.headers["Location"]?
+            loc = response.headers["Location"]?
+            Log.info "Redirect #{depth + 1}: #{uri} → #{loc}"
+            if loc
               next_uri = URI.parse(loc)
               unless next_uri.absolute?
                 next_uri = URI.new(

@@ -4,26 +4,46 @@ module JBUpdater
   module Log
     extend self
 
+    @@listener : Proc(String, Nil)? = nil
+
+    def listener=(cb : Proc(String, Nil)?)
+      @@listener = cb
+    end
+
+    private def emit(msg : String)
+      @@listener.try(&.call(msg))
+    end
+
     def header(line : String)
-      puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      sep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      puts sep
+      emit("── #{line} ──")
       puts line.colorize(:cyan)
-      puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      puts sep
     end
 
     def info(msg : String)
-      puts "• #{msg}"
+      line = "• #{msg}"
+      puts line
+      emit(line)
     end
 
     def success(msg : String)
-      puts "✔ #{msg}".colorize(:green)
+      line = "✔ #{msg}"
+      puts line.colorize(:green)
+      emit(line)
     end
 
     def warn(msg : String)
-      STDERR.puts "⚠ #{msg}".colorize(:yellow)
+      line = "⚠ #{msg}"
+      STDERR.puts line.colorize(:yellow)
+      emit(line)
     end
 
     def fail(msg : String)
-      STDERR.puts "✖ #{msg}".colorize(:red)
+      line = "✖ #{msg}"
+      STDERR.puts line.colorize(:red)
+      emit(line)
     end
   end
 end
