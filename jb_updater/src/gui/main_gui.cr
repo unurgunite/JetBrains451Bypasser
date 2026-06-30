@@ -838,7 +838,7 @@ UIng.init do
   browse_detail_box = UIng::Box.new(:vertical)
   browse_detail_box.padded = true
   detail_label = UIng::Label.new("Plugin Details")
-  browse_detail = UIng::MultilineEntry.new(false, true)
+  browse_detail = UIng::MultilineEntry.new(true, true)
   browse_detail.text = "Select a plugin to view details"
   App.browse_detail = browse_detail
   browse_detail_box.append(detail_label, false)

@@ -242,7 +242,6 @@ module JBUpdater
         query_lower = query.downcase
         plugins.select do |plugin|
           plugin.name.downcase.includes?(query_lower) ||
-            html_strip(plugin.description).downcase.includes?(query_lower) ||
             plugin.xml_id.downcase.includes?(query_lower)
         end
       end
