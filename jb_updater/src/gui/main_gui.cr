@@ -839,14 +839,9 @@ UIng.init do
   browse_detail_box.padded = true
   detail_label = UIng::Label.new("Plugin Details")
   browse_detail = UIng::MultilineEntry.new(true, true)
-  browse_detail.text = "Select a plugin to view details"
   App.browse_detail = browse_detail
 
-  # Debug: test that the MultilineEntry works
-  log.append("[Browse] Detail entry created and text set: #{browse_detail.text.inspect}\n")
-  detail_label_t = UIng::Label.new("test123")
   browse_detail_box.append(detail_label, false)
-  browse_detail_box.append(detail_label_t, false)
   browse_detail_box.append(browse_detail, true)
   browse_content.append(browse_detail_box, true)
 
@@ -1204,14 +1199,14 @@ UIng.init do
             stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
             detail = App.browse_detail
             if detail
-              lines = [plugin.name]
-              lines << "by #{plugin.vendor}" if plugin.vendor
-              lines << "Downloads: #{plugin.formatted_downloads}  |  Rating: #{plugin.star_rating}"
-              lines << "XML ID: #{plugin.xml_id}"
-              lines << "Categories: #{cats}"
-              lines << ""
-              lines << stripped
-              detail.text = lines.join("\n")
+              detail.text = ""
+              detail.append("#{plugin.name}\n")
+              detail.append("by #{plugin.vendor}\n") if plugin.vendor
+              detail.append("Downloads: #{plugin.formatted_downloads}  |  Rating: #{plugin.star_rating}\n")
+              detail.append("XML ID: #{plugin.xml_id}\n")
+              detail.append("Categories: #{cats}\n")
+              detail.append("\n")
+              detail.append(stripped)
             end
             browse_status.text = "#{plugin.name} — #{stripped[0..80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
           end
