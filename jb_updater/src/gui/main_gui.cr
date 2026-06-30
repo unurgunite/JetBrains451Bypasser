@@ -843,7 +843,7 @@ UIng.init do
   App.browse_detail = browse_detail
   browse_detail_box.append(detail_label, false)
   browse_detail_box.append(browse_detail, true)
-  browse_content.append(browse_detail_box, false)
+  browse_content.append(browse_detail_box, true)
 
   browse_tab.append(browse_content, true)
 
@@ -1198,15 +1198,14 @@ UIng.init do
           stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
           detail = App.browse_detail
           if detail
-            detail.text = <<-DETAIL
-              #{plugin.name}
-              #{plugin.vendor ? "by #{plugin.vendor}" : ""}
-              Downloads: #{plugin.formatted_downloads}  |  Rating: #{plugin.star_rating}
-              XML ID: #{plugin.xml_id}
-              Categories: #{cats}
-
-              #{stripped}
-            DETAIL
+            lines = [plugin.name]
+            lines << "by #{plugin.vendor}" if plugin.vendor
+            lines << "Downloads: #{plugin.formatted_downloads}  |  Rating: #{plugin.star_rating}"
+            lines << "XML ID: #{plugin.xml_id}"
+            lines << "Categories: #{cats}"
+            lines << ""
+            lines << stripped
+            detail.text = lines.join("\n")
           end
           browse_status.text = "#{plugin.name} — #{stripped[0..80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
         end
