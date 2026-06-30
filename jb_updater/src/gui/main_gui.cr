@@ -1189,35 +1189,29 @@ UIng.init do
 
   browse_table.on_selection_changed do |selection|
     row = selection.num_rows > 0 ? selection.rows[0] : -1
-    UIng.queue_main do
-      begin
-        if row >= 0
-          plugin = App.browse_plugins[row]?
-          if plugin
-            App.selected_xml_id = plugin.xml_id
-            cats = plugin.categories.empty? ? "no categories" : plugin.categories[0..2].join(", ")
-            stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
-            detail = App.browse_detail
-            if detail
-              detail.text = ""
-              detail.append("#{plugin.name}\n")
-              detail.append("by #{plugin.vendor}\n") if plugin.vendor
-              detail.append("Downloads: #{plugin.formatted_downloads}  |  Rating: #{plugin.star_rating}\n")
-              detail.append("XML ID: #{plugin.xml_id}\n")
-              detail.append("Categories: #{cats}\n")
-              detail.append("\n")
-              detail.append(stripped)
-            end
-            browse_status.text = "#{plugin.name} — #{stripped[0..80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
-          end
-        else
-          detail = App.browse_detail
-          detail.text = "Select a plugin to view details" if detail
-          App.selected_xml_id = nil
+    if row >= 0
+      plugin = App.browse_plugins[row]?
+      if plugin
+        App.selected_xml_id = plugin.xml_id
+        cats = plugin.categories.empty? ? "no categories" : plugin.categories[0..2].join(", ")
+        stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
+        detail = App.browse_detail
+        if detail
+          detail.text = ""
+          detail.append("#{plugin.name}\n")
+          detail.append("by #{plugin.vendor}\n") if plugin.vendor
+          detail.append("Downloads: #{plugin.formatted_downloads}  |  Rating: #{plugin.star_rating}\n")
+          detail.append("XML ID: #{plugin.xml_id}\n")
+          detail.append("Categories: #{cats}\n")
+          detail.append("\n")
+          detail.append(stripped)
         end
-      rescue ex
-        log.append("[Browse] Detail error: #{ex.message}\n")
+        browse_status.text = "#{plugin.name} — #{stripped[0..80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
       end
+    else
+      detail = App.browse_detail
+      detail.text = "Select a plugin to view details" if detail
+      App.selected_xml_id = nil
     end
   end
 
