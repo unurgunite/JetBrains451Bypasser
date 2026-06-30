@@ -1054,39 +1054,44 @@ UIng.init do
   }
 
   search_entry.on_changed do |_text|
-    query = search_entry.text
-    if query.nil? || query.empty?
-      model = App.browse_table_model
-      if model
-        old_count = App.browse_plugins.size
-        (0...old_count).each { |i| model.row_deleted(i) }
+    begin
+      query = search_entry.text
+      if query.nil? || query.empty?
+        model = App.browse_table_model
+        if model
+          old_count = App.browse_plugins.size
+          (0...old_count).each { |i| model.row_deleted(i) }
+        end
+        App.browse_plugins = [] of JBUpdater::PluginInfo
+        App.selected_xml_id = nil
+        browse_status.text = "Type to search plugins..."
+        next
       end
-      App.browse_plugins = [] of JBUpdater::PluginInfo
-      App.selected_xml_id = nil
-      browse_status.text = "Type to search plugins..."
-      next
+
+      build = resolve_build.call
+      plugins = JBUpdater::PluginMarketplace.search(query, build)
+
+      model = App.browse_table_model
+      next unless model
+
+      old_count = App.browse_plugins.size
+      App.browse_plugins = plugins
+      if old_count == 0
+        plugins.each_with_index { |_, i| model.row_inserted(i) }
+      elsif plugins.size >= old_count
+        (0...old_count).each { |i| model.row_changed(i) }
+        (old_count...plugins.size).each { |i| model.row_inserted(i) }
+      else
+        (0...plugins.size).each { |i| model.row_changed(i) }
+        (plugins.size...old_count).each { |i| model.row_deleted(i) }
+      end
+      browse_status.text = "Found #{plugins.size} results for '#{query}'"
+      log.append("[Browse] Found #{plugins.size} plugins for '#{query}'\n")
+      plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
+    rescue ex
+      log.append("[Browse] Search error: #{ex.message}\n")
+      browse_status.text = "Search error: #{ex.message}"
     end
-
-    build = resolve_build.call
-    plugins = JBUpdater::PluginMarketplace.search(query, build)
-
-    model = App.browse_table_model
-    next unless model
-
-    old_count = App.browse_plugins.size
-    App.browse_plugins = plugins
-    if old_count == 0
-      plugins.each_with_index { |_, i| model.row_inserted(i) }
-    elsif plugins.size >= old_count
-      (0...old_count).each { |i| model.row_changed(i) }
-      (old_count...plugins.size).each { |i| model.row_inserted(i) }
-    else
-      (0...plugins.size).each { |i| model.row_changed(i) }
-      (plugins.size...old_count).each { |i| model.row_deleted(i) }
-    end
-    browse_status.text = "Found #{plugins.size} results for '#{query}'"
-    log.append("[Browse] Found #{plugins.size} plugins for '#{query}'\n")
-    plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
   end
 
   btn_top.on_clicked do
