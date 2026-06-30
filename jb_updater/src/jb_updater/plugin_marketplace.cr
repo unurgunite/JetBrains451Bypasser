@@ -201,7 +201,7 @@ module JBUpdater
     end
 
     # Strips HTML tags and decodes entities from a string.
-    private def self.html_strip(html : String) : String
+    def self.html_strip(html : String) : String
       text = html.gsub(/<[^>]*>/, " ")
         .gsub("&amp;", "&")
         .gsub("&lt;", "<")

@@ -141,6 +141,14 @@ module App
     @@installed_plugins = plugins
   end
 
+  def self.browse_detail
+    @@browse_detail
+  end
+
+  def self.browse_detail=(entry : UIng::MultilineEntry?)
+    @@browse_detail = entry
+  end
+
   # Registers the log, progress bars, and tracked buttons for global access.
   def self.set_widgets(
     log : UIng::MultilineEntry,
@@ -723,6 +731,12 @@ UIng.init do
   browse_tab = UIng::Box.new(:vertical)
   browse_tab.padded = true
 
+  browse_content = UIng::Box.new(:horizontal)
+  browse_content.padded = true
+
+  browse_left = UIng::Box.new(:vertical)
+  browse_left.padded = true
+
   browse_header = UIng::Box.new(:horizontal)
   browse_header.padded = true
 
@@ -737,7 +751,7 @@ UIng.init do
   browse_header.append(btn_top, false)
   browse_header.append(btn_newest, false)
   browse_header.append(btn_refresh, false)
-  browse_tab.append(browse_header, false)
+  browse_left.append(browse_header, false)
 
   browse_model_handler = UIng::Table::Model::Handler.new do
     num_columns { 4 }
@@ -798,7 +812,7 @@ UIng.init do
     plugins.each_with_index { |_, i| browse_model.row_changed(i) }
   end
 
-  browse_tab.append(browse_table, true)
+  browse_left.append(browse_table, true)
 
   App.browse_table_model = browse_model
   App.browse_handler = browse_model_handler
@@ -811,13 +825,27 @@ UIng.init do
 
   browse_actions.append(btn_install_browse, false)
   browse_actions.append(btn_copy_id, false)
-  browse_tab.append(browse_actions, false)
+  browse_left.append(browse_actions, false)
 
   browse_status = UIng::Label.new("Click search or a button to browse plugins")
   browse_status_box = UIng::Box.new(:horizontal)
   browse_status_box.padded = true
   browse_status_box.append(browse_status, true)
-  browse_tab.append(browse_status_box, false)
+  browse_left.append(browse_status_box, false)
+
+  browse_content.append(browse_left, true)
+
+  browse_detail_box = UIng::Box.new(:vertical)
+  browse_detail_box.padded = true
+  detail_label = UIng::Label.new("Plugin Details")
+  browse_detail = UIng::MultilineEntry.new(false, true)
+  browse_detail.text = "Select a plugin to view details"
+  App.browse_detail = browse_detail
+  browse_detail_box.append(detail_label, false)
+  browse_detail_box.append(browse_detail, true)
+  browse_content.append(browse_detail_box, false)
+
+  browse_tab.append(browse_content, true)
 
   tabs.append("Browse", browse_tab)
 
@@ -1167,8 +1195,25 @@ UIng.init do
         if plugin
           App.selected_xml_id = plugin.xml_id
           cats = plugin.categories.empty? ? "no categories" : plugin.categories[0..2].join(", ")
-          browse_status.text = "#{plugin.name} — #{plugin.description[0..80].gsub(/\n/, " ")}... [#{plugin.formatted_downloads} dl] [#{cats}]"
+          stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
+          detail = App.browse_detail
+          if detail
+            detail.text = <<-DETAIL
+              #{plugin.name}
+              #{plugin.vendor ? "by #{plugin.vendor}" : ""}
+              Downloads: #{plugin.formatted_downloads}  |  Rating: #{plugin.star_rating}
+              XML ID: #{plugin.xml_id}
+              Categories: #{cats}
+
+              #{stripped}
+            DETAIL
+          end
+          browse_status.text = "#{plugin.name} — #{stripped[0..80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
         end
+      else
+        detail = App.browse_detail
+        detail.text = "Select a plugin to view details" if detail
+        App.selected_xml_id = nil
       end
     end
   end
