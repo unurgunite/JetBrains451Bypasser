@@ -1045,6 +1045,14 @@ UIng.init do
   }
   load_installed_for_browse.call
 
+  # Warm marketplace cache after UI is visible (1s delay)
+  UIng.timer(1_000) {
+    build = resolve_build.call
+    JBUpdater::PluginMarketplace.list_by_build(build)
+    log.append("[Browse] Marketplace cache warmed: #{build}\n")
+    0
+  }
+
   search_entry.on_changed do |_text|
     query = search_entry.text
     if query.nil? || query.empty?
