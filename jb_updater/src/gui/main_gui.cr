@@ -841,7 +841,12 @@ UIng.init do
   browse_detail = UIng::MultilineEntry.new(true, true)
   browse_detail.text = "Select a plugin to view details"
   App.browse_detail = browse_detail
+
+  # Debug: test that the MultilineEntry works
+  log.append("[Browse] Detail entry created and text set: #{browse_detail.text.inspect}\n")
+  detail_label_t = UIng::Label.new("test123")
   browse_detail_box.append(detail_label, false)
+  browse_detail_box.append(detail_label_t, false)
   browse_detail_box.append(browse_detail, true)
   browse_content.append(browse_detail_box, true)
 
