@@ -1003,7 +1003,7 @@ UIng.init do
             end
           end
           installed_status.text = "Deleted: #{plugin.id}"
-  btn_uninstall.disable
+          btn_uninstall.disable
         end
       end
     end
