@@ -854,8 +854,8 @@ UIng.init do
   browse_detail_box = UIng::Box.new(:vertical)
   browse_detail_box.padded = true
   detail_label = UIng::Label.new("Plugin Details")
-  browse_detail = UIng::MultilineEntry.new(true, false)
-  browse_detail.text = "Select a plugin to view details"
+  browse_detail = UIng::MultilineEntry.new(true, true)
+  App.safe_set_text(browse_detail, "Select a plugin to view details")
   App.browse_detail = browse_detail
 
   browse_detail_box.append(detail_label, false)
@@ -1101,43 +1101,43 @@ UIng.init do
   }
 
   search_entry.on_changed do |_text|
-    begin
-      query = search_entry.text
-      if query.nil? || query.empty?
-        model = App.browse_table_model
-        if model
-          old_count = App.browse_plugins.size
-          (0...old_count).each { |i| model.row_deleted(i) }
+    UIng.queue_main do
+      begin
+        query = search_entry.text || ""
+        if query.empty?
+          model = App.browse_table_model
+          if model
+            old_count = App.browse_plugins.size
+            (0...old_count).each { |i| model.row_deleted(i) }
+          end
+          App.browse_plugins = [] of JBUpdater::PluginInfo
+          App.selected_xml_id = nil
+          browse_status.text = "Type to search plugins..."
+          next
         end
-        App.browse_plugins = [] of JBUpdater::PluginInfo
-        App.selected_xml_id = nil
-        browse_status.text = "Type to search plugins..."
-        next
+
+        build = resolve_build.call
+        plugins = JBUpdater::PluginMarketplace.search(query, build)
+
+        model = App.browse_table_model
+        next unless model
+
+        old_count = App.browse_plugins.size
+        App.browse_plugins = plugins
+        if old_count == 0
+          plugins.each_with_index { |_, i| model.row_inserted(i) }
+        elsif plugins.size >= old_count
+          (0...old_count).each { |i| model.row_changed(i) }
+          (old_count...plugins.size).each { |i| model.row_inserted(i) }
+        else
+          (0...plugins.size).each { |i| model.row_changed(i) }
+          (plugins.size...old_count).each { |i| model.row_deleted(i) }
+        end
+        browse_status.text = "Found #{plugins.size} results"
+      rescue ex
+        log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
+        browse_status.text = "Search error: #{ex.class} #{ex.message}"
       end
-
-      build = resolve_build.call
-      plugins = JBUpdater::PluginMarketplace.search(query, build)
-
-      model = App.browse_table_model
-      next unless model
-
-      old_count = App.browse_plugins.size
-      App.browse_plugins = plugins
-      if old_count == 0
-        plugins.each_with_index { |_, i| model.row_inserted(i) }
-      elsif plugins.size >= old_count
-        (0...old_count).each { |i| model.row_changed(i) }
-        (old_count...plugins.size).each { |i| model.row_inserted(i) }
-      else
-        (0...plugins.size).each { |i| model.row_changed(i) }
-        (plugins.size...old_count).each { |i| model.row_deleted(i) }
-      end
-      browse_status.text = "Found #{plugins.size} results for '#{query}'"
-      log.append("[Browse] Found #{plugins.size} plugins for '#{query}'\n")
-      plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
-    rescue ex
-      log.append("[Browse] Search error: #{ex.message}\n")
-      browse_status.text = "Search error: #{ex.message}"
     end
   end
 
@@ -1214,9 +1214,9 @@ UIng.init do
       stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
       preview = stripped[0, 500]
       App.log.append("[Browse] detail: #{preview.size}B #{preview.count('\n')} lines (#{preview.size - preview.count('\n')} non-newline)\n")
-      browse_detail.text = preview
+      App.safe_set_text(browse_detail, preview)
     else
-      browse_detail.text = "Select a plugin to view details"
+      App.safe_set_text(browse_detail, "Select a plugin to view details")
       App.selected_xml_id = nil
     end
   end
