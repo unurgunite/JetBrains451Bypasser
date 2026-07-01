@@ -6,6 +6,21 @@ require "file_utils"
 require "json"
 require "uing"
 
+{% if flag?(:darwin) %}
+  {% run("./compile_helper.cr") %}
+  @[Link(framework: "AppKit")]
+  lib AppKit_
+    fun objc_getClass(name : UInt8*) : Void*
+    fun sel_registerName(name : UInt8*) : Void*
+    fun objc_msgSend(recv : Void*, sel : Void*, ...) : Void*
+  end
+  @[Link(ldflags: "/tmp/jb_layout.o")]
+  lib LayoutHelper
+    fun create_width_constraint(item : Void*, relative_to : Void*, multiplier : Float64) : Void*
+    fun add_constraint_to_view(view : Void*, constraint : Void*) : Void
+  end
+{% end %}
+
 # Global access to log/progress widgets and browser state.
 module App
   @@log : UIng::MultilineEntry?
@@ -65,12 +80,6 @@ module App
   def self.safe_set_text(entry : UIng::MultilineEntry, text : String)
     entry.read_only = false
     entry.text = text
-    entry.read_only = true
-  end
-
-  def self.safe_append(entry : UIng::MultilineEntry, text : String)
-    entry.read_only = false
-    entry.append(text)
     entry.read_only = true
   end
 
@@ -468,13 +477,6 @@ private def queue_install(xml_id : String, plugins_dir : String, build : String)
   end
 end
 
-# Forces the log scrollbar to the bottom by re-assigning the text.
-private def scroll_log(log : UIng::MultilineEntry)
-  full_text = log.text || ""
-  log.text = full_text
-rescue
-end
-
 # Saves Plugins tab UI field values to config.
 private def save_plugins_settings(
   e_plugins_dir : UIng::Entry,
@@ -556,7 +558,7 @@ end
 
 # ---- UI --------------------------------------------------------------
 UIng.init do
-  window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 960, 660)
+  window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660)
 
   window.on_closing do
     App.mark_shutting_down
@@ -596,9 +598,6 @@ UIng.init do
   root.append(tabs, true)
 
   log = UIng::MultilineEntry.new(false, false)
-  log.on_changed do
-    scroll_log(log)
-  end
 
   # Log all HTTP requests and Log.* messages to the console
   JBUpdater::HTTPClient.on_request = ->(method : String, url : String) {
@@ -747,7 +746,7 @@ UIng.init do
   browse_tab.padded = true
 
   browse_content = UIng::Box.new(:horizontal)
-  browse_content.padded = false
+  browse_content.padded = true
 
   browse_left = UIng::Box.new(:vertical)
   browse_left.padded = true
@@ -851,14 +850,14 @@ UIng.init do
   browse_detail_box = UIng::Box.new(:vertical)
   browse_detail_box.padded = true
   detail_label = UIng::Label.new("Plugin Details")
-  browse_detail = UIng::MultilineEntry.new(true, true)
-  App.safe_set_text(browse_detail, "Select a plugin to view details")
+  browse_detail = UIng::MultilineEntry.new(true, false)
+  browse_detail.text = "Select a plugin to view details"
   App.browse_detail = browse_detail
 
   browse_detail_box.append(detail_label, false)
   browse_detail_box.append(browse_detail, true)
   browse_content.append(browse_left, true)
-  browse_content.append(browse_detail_box, true)
+  browse_content.append(browse_detail_box, false)
   browse_tab.append(browse_content, true)
 
   tabs.append("Browse", browse_tab)
@@ -1206,13 +1205,12 @@ UIng.init do
     plugin = row >= 0 ? App.browse_plugins[row]? : nil
     if plugin
       App.selected_xml_id = plugin.xml_id
-      cats = plugin.categories.empty? ? "no categories" : plugin.categories[0, 3].join(", ")
       stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
-      browse_status.text = "#{plugin.name} — #{stripped[0, 80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
-      App.safe_set_text(browse_detail, stripped[0, 2000])
+      preview = stripped[0, 500]
+      App.log.append("[Browse] detail: #{preview.size}B #{preview.count('\n')} lines (#{preview.size - preview.count('\n')} non-newline)\n")
+      browse_detail.text = preview
     else
-      browse_status.text = "Select a plugin to view details"
-      App.safe_set_text(browse_detail, "Select a plugin to view details")
+      browse_detail.text = "Select a plugin to view details"
       App.selected_xml_id = nil
     end
   end
@@ -1246,6 +1244,19 @@ UIng.init do
       browse_status.text = "Copied to clipboard: #{xml_id}"
     end
   end
+
+  {% if flag?(:darwin) %}
+    constraint_added = false
+    tabs.on_selected do |idx|
+      if idx == 1 && !constraint_added
+        constraint_added = true
+        right_view = browse_detail_box.handle
+        super_view = browse_content.handle
+        c = LayoutHelper.create_width_constraint(right_view, super_view, 0.3_f64)
+        LayoutHelper.add_constraint_to_view(super_view, c)
+      end
+    end
+  {% end %}
 
   window.show
   UIng.main
