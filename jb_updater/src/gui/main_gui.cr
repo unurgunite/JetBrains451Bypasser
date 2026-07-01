@@ -60,6 +60,20 @@ module App
     }
   end
 
+  # macOS Sonoma bug: setEditable:NO prevents NSTextStorage text changes.
+  # Workaround: temporarily enable editing, set text, disable editing.
+  def self.safe_set_text(entry : UIng::MultilineEntry, text : String)
+    entry.read_only = false
+    entry.text = text
+    entry.read_only = true
+  end
+
+  def self.safe_append(entry : UIng::MultilineEntry, text : String)
+    entry.read_only = false
+    entry.append(text)
+    entry.read_only = true
+  end
+
   # Reads the current download progress percentage.
   def self.read_progress : Int32
     @@download_progress_mutex.synchronize { @@download_progress }
@@ -581,7 +595,7 @@ UIng.init do
   tabs = UIng::Tab.new
   root.append(tabs, true)
 
-  log = UIng::MultilineEntry.new(false, true)
+  log = UIng::MultilineEntry.new(false, false)
   log.on_changed do
     scroll_log(log)
   end
@@ -611,6 +625,8 @@ UIng.init do
   actions_row.append(btn_remove_cache, false)
   actions_row.append(debug_btn, false)
   root.append(actions_row, false)
+
+  root.append(log, true)
 
   status_label = UIng::Label.new("Ready")
   status_box = UIng::Box.new(:horizontal)
@@ -731,7 +747,7 @@ UIng.init do
   browse_tab.padded = true
 
   browse_content = UIng::Box.new(:horizontal)
-  browse_content.padded = true
+  browse_content.padded = false
 
   browse_left = UIng::Box.new(:vertical)
   browse_left.padded = true
@@ -832,12 +848,17 @@ UIng.init do
   browse_status_box.append(browse_status, true)
   browse_left.append(browse_status_box, false)
 
+  browse_detail_box = UIng::Box.new(:vertical)
+  browse_detail_box.padded = true
+  detail_label = UIng::Label.new("Plugin Details")
   browse_detail = UIng::MultilineEntry.new(true, true)
-  browse_detail.text = "Select a plugin to view details"
+  App.safe_set_text(browse_detail, "Select a plugin to view details")
   App.browse_detail = browse_detail
-  browse_left.append(browse_detail, false)
 
+  browse_detail_box.append(detail_label, false)
+  browse_detail_box.append(browse_detail, true)
   browse_content.append(browse_left, true)
+  browse_content.append(browse_detail_box, true)
   browse_tab.append(browse_content, true)
 
   tabs.append("Browse", browse_tab)
@@ -1182,17 +1203,16 @@ UIng.init do
 
   browse_table.on_selection_changed do |selection|
     row = selection.num_rows > 0 ? selection.rows[0] : -1
-    if row >= 0
-      plugin = App.browse_plugins[row]?
-      if plugin
-        App.selected_xml_id = plugin.xml_id
-        cats = plugin.categories.empty? ? "no categories" : plugin.categories[0..2].join(", ")
-        stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
-        browse_detail.text = stripped[0..200]
-        browse_status.text = "#{plugin.name} — #{stripped[0..80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
-      end
+    plugin = row >= 0 ? App.browse_plugins[row]? : nil
+    if plugin
+      App.selected_xml_id = plugin.xml_id
+      cats = plugin.categories.empty? ? "no categories" : plugin.categories[0, 3].join(", ")
+      stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
+      browse_status.text = "#{plugin.name} — #{stripped[0, 80]}... [#{plugin.formatted_downloads} dl] [#{cats}]"
+      App.safe_set_text(browse_detail, stripped[0, 2000])
     else
-      browse_detail.text = "Select a plugin to view details"
+      browse_status.text = "Select a plugin to view details"
+      App.safe_set_text(browse_detail, "Select a plugin to view details")
       App.selected_xml_id = nil
     end
   end
