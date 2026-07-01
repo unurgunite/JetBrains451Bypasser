@@ -38,6 +38,9 @@ module App
   @@search_id : Int64 = 0
   @@detected_products : Array(JBUpdater::DetectedProduct)? = nil
   @@installed_plugins : Hash(String, JBUpdater::PluginMeta)? = nil
+  @@installed_plugins_arr : Array(JBUpdater::PluginMeta) = [] of JBUpdater::PluginMeta
+  @@installed_table : UIng::Table? = nil
+  @@installed_model : UIng::Table::Model? = nil
 
   # Background operation state
   @@op_status : String = ""
@@ -162,6 +165,35 @@ module App
 
   def self.installed_plugins=(plugins : Hash(String, JBUpdater::PluginMeta)?)
     @@installed_plugins = plugins
+    refresh_installed_list
+  end
+
+  def self.installed_plugins_arr
+    @@installed_plugins_arr
+  end
+
+  def self.refresh_installed_list
+    if hash = @@installed_plugins
+      @@installed_plugins_arr = hash.values.sort_by!(&.id)
+    else
+      @@installed_plugins_arr = [] of JBUpdater::PluginMeta
+    end
+  end
+
+  def self.installed_table
+    @@installed_table
+  end
+
+  def self.installed_table=(table : UIng::Table?)
+    @@installed_table = table
+  end
+
+  def self.installed_model
+    @@installed_model
+  end
+
+  def self.installed_model=(model : UIng::Table::Model?)
+    @@installed_model = model
   end
 
   def self.browse_detail
@@ -866,6 +898,117 @@ UIng.init do
 
   tabs.append("Browse", browse_tab)
 
+  # --- Installed tab ---------------------------------------------------
+  installed_tab = UIng::Box.new(:vertical)
+  installed_tab.padded = true
+
+  installed_handler = UIng::Table::Model::Handler.new do
+    num_columns { 5 }
+    column_type { |_col| UIng::Table::Value::Type::String }
+    num_rows { App.installed_plugins_arr.size }
+    cell_value { |row, col|
+      plugin = App.installed_plugins_arr[row]?
+      next UIng::Table::Value.new("") unless plugin
+      case col
+      when 0 then UIng::Table::Value.new(plugin.name || plugin.id)
+      when 1 then UIng::Table::Value.new(plugin.id)
+      when 2 then UIng::Table::Value.new(plugin.version)
+      when 3 then UIng::Table::Value.new(plugin.since || "—")
+      else        UIng::Table::Value.new(plugin.until_build || "—")
+      end
+    }
+  end
+  installed_model = UIng::Table::Model.new(installed_handler)
+  App.installed_table = installed_table = UIng::Table.new(installed_model)
+  App.installed_model = installed_model
+  installed_table.header_visible = true
+  installed_table.append_text_column("Name", 0, -1)
+  installed_table.append_text_column("Plugin ID", 1, -1)
+  installed_table.append_text_column("Version", 2, -1)
+  installed_table.append_text_column("Since Build", 3, -1)
+  installed_table.append_text_column("Until Build", 4, -1)
+  installed_table.selection_mode = :one
+
+  installed_actions = UIng::Box.new(:horizontal)
+  installed_actions.padded = true
+
+  btn_scan_installed = UIng::Button.new("Scan")
+  btn_uninstall = UIng::Button.new("Uninstall selected")
+  btn_uninstall.disable
+
+  installed_actions.append(btn_scan_installed, false)
+  installed_actions.append(btn_uninstall, false)
+
+  installed_status = UIng::Label.new("Click Scan to list installed plugins")
+
+  installed_tab.append(installed_actions, false)
+  installed_tab.append(installed_table, true)
+  installed_tab.append(installed_status, false)
+
+  tabs.append("Installed", installed_tab)
+
+  btn_scan_installed.on_clicked do
+    dir = expand_tilde(e_plugins_dir.text) || e_plugins_dir.text || ""
+    if dir.empty?
+      installed_status.text = "Set Plugins Directory first"
+      next
+    end
+    scanned = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
+    if scanned
+      old_count = App.installed_plugins_arr.size
+      App.installed_plugins = scanned
+      if old_count == 0
+        App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
+      else
+        (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
+        if App.installed_plugins_arr.size > old_count
+          (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
+        elsif App.installed_plugins_arr.size < old_count
+          (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
+        end
+      end
+      installed_status.text = "Found #{scanned.size} installed plugins"
+    else
+      installed_status.text = "Error scanning plugins directory"
+    end
+  end
+
+  installed_table.on_selection_changed do |selection|
+    if selection.num_rows > 0
+      btn_uninstall.enable
+    else
+      btn_uninstall.disable
+    end
+  end
+
+  btn_uninstall.on_clicked do
+    UIng.queue_main do
+      installed_table.selection do |sel|
+        next if sel.num_rows == 0
+        row = sel.rows[0]
+        plugin = App.installed_plugins_arr[row]?
+        if plugin
+          FileUtils.rm_rf(plugin.path)
+          scanned = JBUpdater::PluginMeta.scan_dir(File.dirname(plugin.path)) rescue nil
+          old_count = App.installed_plugins_arr.size
+          App.installed_plugins = scanned
+          if old_count == 0
+            App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
+          else
+            (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
+            if App.installed_plugins_arr.size > old_count
+              (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
+            elsif App.installed_plugins_arr.size < old_count
+              (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
+            end
+          end
+          installed_status.text = "Deleted: #{plugin.id}"
+  btn_uninstall.disable
+        end
+      end
+    end
+  end
+
   # --- IDE tab --------------------------------------------------------
   ide_tab = UIng::Box.new(:vertical)
   ide_tab.padded = true
@@ -1092,6 +1235,12 @@ UIng.init do
   }
   load_installed_for_browse.call
 
+  # Populate installed tab model with startup data
+  inst = App.installed_plugins
+  if inst && inst.size > 0
+    App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
+  end
+
   # Warm marketplace cache after UI is visible (1s delay)
   UIng.timer(1_000) {
     build = resolve_build.call
@@ -1100,44 +1249,42 @@ UIng.init do
     0
   }
 
-  search_entry.on_changed do |_text|
-    UIng.queue_main do
-      begin
-        query = search_entry.text || ""
-        if query.empty?
-          model = App.browse_table_model
-          if model
-            old_count = App.browse_plugins.size
-            (0...old_count).each { |i| model.row_deleted(i) }
-          end
-          App.browse_plugins = [] of JBUpdater::PluginInfo
-          App.selected_xml_id = nil
-          browse_status.text = "Type to search plugins..."
-          next
-        end
-
-        build = resolve_build.call
-        plugins = JBUpdater::PluginMarketplace.search(query, build)
-
+  search_entry.on_changed do |text|
+    begin
+      query = text || ""
+      if query.empty?
         model = App.browse_table_model
-        next unless model
-
-        old_count = App.browse_plugins.size
-        App.browse_plugins = plugins
-        if old_count == 0
-          plugins.each_with_index { |_, i| model.row_inserted(i) }
-        elsif plugins.size >= old_count
-          (0...old_count).each { |i| model.row_changed(i) }
-          (old_count...plugins.size).each { |i| model.row_inserted(i) }
-        else
-          (0...plugins.size).each { |i| model.row_changed(i) }
-          (plugins.size...old_count).each { |i| model.row_deleted(i) }
+        if model
+          old_count = App.browse_plugins.size
+          App.browse_plugins = [] of JBUpdater::PluginInfo
+          (0...old_count).each { |i| model.row_deleted(0) }
         end
-        browse_status.text = "Found #{plugins.size} results"
-      rescue ex
-        log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
-        browse_status.text = "Search error: #{ex.class} #{ex.message}"
+        App.selected_xml_id = nil
+        browse_status.text = "Type to search plugins..."
+        next
       end
+
+      build = resolve_build.call
+      plugins = JBUpdater::PluginMarketplace.search(query, build)
+
+      model = App.browse_table_model
+      next unless model
+
+      old_count = App.browse_plugins.size
+      App.browse_plugins = plugins
+      if old_count == 0
+        plugins.each_with_index { |_, i| model.row_inserted(i) }
+      elsif plugins.size >= old_count
+        (0...old_count).each { |i| model.row_changed(i) }
+        (old_count...plugins.size).each { |i| model.row_inserted(i) }
+      else
+        (0...plugins.size).each { |i| model.row_changed(i) }
+        (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+      end
+      browse_status.text = "Found #{plugins.size} results"
+    rescue ex
+      log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
+      browse_status.text = "Search error: #{ex.class} #{ex.message}"
     end
   end
 
@@ -1161,7 +1308,7 @@ UIng.init do
       (old_count...plugins.size).each { |i| model.row_inserted(i) }
     else
       (0...plugins.size).each { |i| model.row_changed(i) }
-      (plugins.size...old_count).each { |i| model.row_deleted(i) }
+      (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
     end
     browse_status.text = "Loaded #{plugins.size} plugins (top downloads)"
   end
@@ -1211,7 +1358,7 @@ UIng.init do
     plugin = row >= 0 ? App.browse_plugins[row]? : nil
     if plugin
       App.selected_xml_id = plugin.xml_id
-      stripped = JBUpdater::PluginMarketplace.html_strip(plugin.description)
+      stripped = plugin.description[0, 500]
       preview = stripped[0, 500]
       App.log.append("[Browse] detail: #{preview.size}B #{preview.count('\n')} lines (#{preview.size - preview.count('\n')} non-newline)\n")
       App.safe_set_text(browse_detail, preview)
