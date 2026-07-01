@@ -610,22 +610,24 @@ UIng.init do
     App.push_log(msg)
   }
 
-  sep2 = UIng::Separator.new("horizontal")
-  root.append(sep2, false)
+  {% if flag?(:gui_log) %}
+    sep2 = UIng::Separator.new("horizontal")
+    root.append(sep2, false)
 
-  actions_row = UIng::Box.new(:horizontal)
-  actions_row.padded = true
+    actions_row = UIng::Box.new(:horizontal)
+    actions_row.padded = true
 
-  btn_clear_log = UIng::Button.new("Clear console")
-  btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
-  debug_btn = UIng::Button.new("Debug: Re-enable UI")
+    btn_clear_log = UIng::Button.new("Clear console")
+    btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
+    debug_btn = UIng::Button.new("Debug: Re-enable UI")
 
-  actions_row.append(btn_clear_log, false)
-  actions_row.append(btn_remove_cache, false)
-  actions_row.append(debug_btn, false)
-  root.append(actions_row, false)
+    actions_row.append(btn_clear_log, false)
+    actions_row.append(btn_remove_cache, false)
+    actions_row.append(debug_btn, false)
+    root.append(actions_row, false)
 
-  root.append(log, true)
+    root.append(log, true)
+  {% end %}
 
   status_label = UIng::Label.new("Ready")
   status_box = UIng::Box.new(:horizontal)
@@ -633,20 +635,22 @@ UIng.init do
   status_box.append(status_label, true)
   root.append(status_box, false)
 
-  btn_clear_log.on_clicked do
-    UIng.queue_main do
-      log.text = ""
-      log.append("Console cleared at #{Time.local}\n")
-      status_label.text = "Console cleared"
+  {% if flag?(:gui_log) %}
+    btn_clear_log.on_clicked do
+      UIng.queue_main do
+        log.text = ""
+        log.append("Console cleared at #{Time.local}\n")
+        status_label.text = "Console cleared"
+      end
     end
-  end
 
-  debug_btn.on_clicked do
-    UIng.queue_main do
-      App.debug_reenable
-      status_label.text = "UI re-enabled"
+    debug_btn.on_clicked do
+      UIng.queue_main do
+        App.debug_reenable
+        status_label.text = "UI re-enabled"
+      end
     end
-  end
+  {% end %}
 
   # --- Plugins tab ----------------------------------------------------
   plugins_tab = UIng::Box.new(:vertical)
@@ -944,44 +948,46 @@ UIng.init do
   log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
   status_label.text = "Ready"
 
-  btn_remove_cache.on_clicked do
-    UIng.queue_main do
-      raw = e_plugins_dir.text
-      if raw.nil? || raw.empty?
-        log.append("ERROR: Plugins dir is required for Remove cache.\n")
-        status_label.text = "Error: missing plugins dir"
-      else
-        plugins_dir = expand_tilde(raw) || raw
-        if !Dir.exists?(plugins_dir)
-          log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
-          status_label.text = "Error: dir not found"
+  {% if flag?(:gui_log) %}
+    btn_remove_cache.on_clicked do
+      UIng.queue_main do
+        raw = e_plugins_dir.text
+        if raw.nil? || raw.empty?
+          log.append("ERROR: Plugins dir is required for Remove cache.\n")
+          status_label.text = "Error: missing plugins dir"
         else
-          begin
-            removed = 0
-            Dir.each_child(plugins_dir) do |entry|
-              if entry.includes?(".bak")
-                path = File.join(plugins_dir, entry)
-                FileUtils.rm_rf(path)
-                removed += 1
-                log.append("Removed backup: #{path}\n")
+          plugins_dir = expand_tilde(raw) || raw
+          if !Dir.exists?(plugins_dir)
+            log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
+            status_label.text = "Error: dir not found"
+          else
+            begin
+              removed = 0
+              Dir.each_child(plugins_dir) do |entry|
+                if entry.includes?(".bak")
+                  path = File.join(plugins_dir, entry)
+                  FileUtils.rm_rf(path)
+                  removed += 1
+                  log.append("Removed backup: #{path}\n")
+                end
               end
-            end
 
-            if removed == 0
-              log.append("No *.bak* backup entries found under #{plugins_dir}\n")
-              status_label.text = "No backups found"
-            else
-              log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
-              status_label.text = "Removed #{removed} backup(s)"
+              if removed == 0
+                log.append("No *.bak* backup entries found under #{plugins_dir}\n")
+                status_label.text = "No backups found"
+              else
+                log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
+                status_label.text = "Removed #{removed} backup(s)"
+              end
+            rescue ex
+              log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
+              status_label.text = "Error during cache removal"
             end
-          rescue ex
-            log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
-            status_label.text = "Error during cache removal"
           end
         end
       end
     end
-  end
+  {% end %}
 
   btn_list.on_clicked do
     UIng.queue_main do
