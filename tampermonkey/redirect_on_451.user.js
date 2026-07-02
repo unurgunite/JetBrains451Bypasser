@@ -9,23 +9,23 @@
 // @grant        none
 // ==/UserScript==
 
-(function() {
-    'use strict';
-    fetch(window.location.href, { method: 'HEAD' })
-        .then(response => {
-        if (response.status === 451) {
-            let originalUrl = window.location.href;
-            let newUrl = null;
-            if (originalUrl.match(/plugins.jetbrains.com/)) {
-                newUrl = window.location.href.replace('plugins.jetbrains.com', 'downloads.marketplace.jetbrains.com');
-            } else if (originalUrl.match(/download.jetbrains.com/)) {
-                newUrl = window.location.href.replace('download.jetbrains.com', 'download-cdn.jetbrains.com');
-            }
-            window.location.replace(newUrl);
+(function () {
+  'use strict';
+  fetch(window.location.href, {method: 'HEAD'})
+    .then(response => {
+      if (response.status === 451) {
+        let originalUrl = window.location.href;
+        let newUrl = null;
+        if (originalUrl.match(/plugins.jetbrains.com/)) {
+          newUrl = window.location.href.replace('plugins.jetbrains.com', 'downloads.marketplace.jetbrains.com');
+        } else if (originalUrl.match(/download.jetbrains.com/)) {
+          newUrl = window.location.href.replace('download.jetbrains.com', 'download-cdn.jetbrains.com');
         }
+        window.location.replace(newUrl);
+      }
     })
-        .catch(error => {
-        console.error('Error checking status:', error);
+    .catch(error => {
+      console.error('Error checking status:', error);
     });
 })();
 

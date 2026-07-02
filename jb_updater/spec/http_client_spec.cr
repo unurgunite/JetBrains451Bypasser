@@ -41,4 +41,35 @@ describe HTTPClient do
     new_uri.host.should eq "cdn.jetbrains.io"
     new_uri.path.should eq "/files/1234/yaml.zip"
   end
+
+  it "overrides IDE host correctly" do
+    uri = URI.parse("https://download.jetbrains.com/ruby/RM-252.0.dmg")
+    new_uri = HTTPClient.override_ide_repo_host(uri, "custom-cdn.example.com")
+    new_uri.host.should eq "custom-cdn.example.com"
+  end
+
+  describe ".no_tty_progress_bar" do
+    it "defaults to false" do
+      HTTPClient.no_tty_progress_bar?.should be_false
+    end
+
+    it "can be set and read back" do
+      HTTPClient.no_tty_progress_bar = true
+      HTTPClient.no_tty_progress_bar?.should be_true
+      HTTPClient.no_tty_progress_bar = false
+    end
+  end
+
+  describe ".override_plugin_repo_host" do
+    it "returns original URI when downloads_host is nil" do
+      uri = URI.parse("https://plugins.jetbrains.com/files/test.zip")
+      HTTPClient.override_plugin_repo_host(uri, nil).should be uri
+    end
+
+    it "returns original URI when host doesn't match" do
+      uri = URI.parse("https://other.host.com/files/test.zip")
+      new_uri = HTTPClient.override_plugin_repo_host(uri, "cdn.example.com")
+      new_uri.should be uri
+    end
+  end
 end

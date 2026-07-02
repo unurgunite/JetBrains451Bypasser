@@ -18,6 +18,8 @@ require "uing"
   lib LayoutHelper
     fun create_width_constraint(item : Void*, relative_to : Void*, multiplier : Float64) : Void*
     fun add_constraint_to_view(view : Void*, constraint : Void*) : Void
+    fun set_app_icon(icns_path : UInt8*) : Void
+    fun setup_menu_bar : Void
   end
 {% end %}
 
@@ -588,713 +590,705 @@ private def apply_ide_settings(
   end
 end
 
+{% if flag?(:darwin) %}
+  private def do_setup_icon_and_keys
+    exe_path = Process.executable_path
+    if exe_path
+      dir = File.dirname(exe_path)
+      icon_path = if dir.ends_with?("/MacOS")
+                    File.join(dir, "..", "Resources", "jb_updater.icns")
+                  else
+                    File.join(dir, "assets", "jb_updater.icns")
+                  end
+      LayoutHelper.set_app_icon(icon_path)
+    end
+    LayoutHelper.setup_menu_bar
+  end
+{% end %}
+
 # ---- UI --------------------------------------------------------------
-UIng.init do
-  window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660)
+UIng.init
 
-  window.on_closing do
-    App.mark_shutting_down
-    UIng.quit
-    true
-  end
+{% if flag?(:darwin) %}
+  do_setup_icon_and_keys
+{% end %}
 
-  root = UIng::Box.new(:vertical)
-  root.padded = false
-  window.set_child(root)
+window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660)
 
-  pb_group = UIng::Group.new("Progress", margined: true)
-  pb_inner = UIng::Box.new(:vertical)
-  pb_inner.padded = true
+window.on_closing do
+  App.mark_shutting_down
+  UIng.quit
+  true
+end
 
-  overall_label = UIng::Label.new("Overall:")
-  overall_bar = UIng::ProgressBar.new
-  overall_row = UIng::Box.new(:horizontal)
-  overall_row.append(overall_label, false)
-  overall_row.append(overall_bar, true)
+root = UIng::Box.new(:vertical)
+root.padded = false
+window.set_child(root)
 
-  plugin_label = UIng::Label.new("Current plugin:")
-  plugin_bar = UIng::ProgressBar.new
-  plugin_row = UIng::Box.new(:horizontal)
-  plugin_row.append(plugin_label, false)
-  plugin_row.append(plugin_bar, true)
+pb_group = UIng::Group.new("Progress", margined: true)
+pb_inner = UIng::Box.new(:vertical)
+pb_inner.padded = true
 
-  pb_inner.append(overall_row, false)
-  pb_inner.append(plugin_row, false)
-  pb_group.child = pb_inner
-  root.append(pb_group, false)
+overall_label = UIng::Label.new("Overall:")
+overall_bar = UIng::ProgressBar.new
+overall_row = UIng::Box.new(:horizontal)
+overall_row.append(overall_label, false)
+overall_row.append(overall_bar, true)
 
-  sep1 = UIng::Separator.new("horizontal")
-  root.append(sep1, false)
+plugin_label = UIng::Label.new("Current plugin:")
+plugin_bar = UIng::ProgressBar.new
+plugin_row = UIng::Box.new(:horizontal)
+plugin_row.append(plugin_label, false)
+plugin_row.append(plugin_bar, true)
 
-  tabs = UIng::Tab.new
-  root.append(tabs, true)
+pb_inner.append(overall_row, false)
+pb_inner.append(plugin_row, false)
+pb_group.child = pb_inner
+root.append(pb_group, false)
 
-  log = UIng::MultilineEntry.new(false, false)
+sep1 = UIng::Separator.new("horizontal")
+root.append(sep1, false)
 
-  # Log all HTTP requests and Log.* messages to the console
-  JBUpdater::HTTPClient.on_request = ->(method : String, url : String) {
-    App.push_log("[HTTP] #{method} #{url}")
-  }
-  JBUpdater::HTTPClient.on_progress = ->(downloaded : Int64, total : Int64) {
-    App.update_progress(downloaded, total)
-  }
-  JBUpdater::Log.listener = ->(msg : String) {
-    App.push_log(msg)
-  }
+tabs = UIng::Tab.new
+root.append(tabs, true)
 
-  {% if flag?(:gui_log) %}
-    sep2 = UIng::Separator.new("horizontal")
-    root.append(sep2, false)
+log = UIng::MultilineEntry.new(false, false)
 
-    actions_row = UIng::Box.new(:horizontal)
-    actions_row.padded = true
+# Log all HTTP requests and Log.* messages to the console
+JBUpdater::HTTPClient.on_request = ->(method : String, url : String) {
+  App.push_log("[HTTP] #{method} #{url}")
+}
+JBUpdater::HTTPClient.on_progress = ->(downloaded : Int64, total : Int64) {
+  App.update_progress(downloaded, total)
+}
+JBUpdater::Log.listener = ->(msg : String) {
+  App.push_log(msg)
+}
 
-    btn_clear_log = UIng::Button.new("Clear console")
-    btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
-    debug_btn = UIng::Button.new("Debug: Re-enable UI")
+{% if flag?(:gui_log) %}
+  sep2 = UIng::Separator.new("horizontal")
+  root.append(sep2, false)
 
-    actions_row.append(btn_clear_log, false)
-    actions_row.append(btn_remove_cache, false)
-    actions_row.append(debug_btn, false)
-    root.append(actions_row, false)
+  actions_row = UIng::Box.new(:horizontal)
+  actions_row.padded = true
 
-    root.append(log, true)
-  {% end %}
+  btn_clear_log = UIng::Button.new("Clear console")
+  btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
+  debug_btn = UIng::Button.new("Debug: Re-enable UI")
 
-  status_label = UIng::Label.new("Ready")
-  status_box = UIng::Box.new(:horizontal)
-  status_box.padded = true
-  status_box.append(status_label, true)
-  root.append(status_box, false)
+  actions_row.append(btn_clear_log, false)
+  actions_row.append(btn_remove_cache, false)
+  actions_row.append(debug_btn, false)
+  root.append(actions_row, false)
 
-  {% if flag?(:gui_log) %}
-    btn_clear_log.on_clicked do
-      UIng.queue_main do
-        log.text = ""
-        log.append("Console cleared at #{Time.local}\n")
-        status_label.text = "Console cleared"
-      end
-    end
+  root.append(log, true)
+{% end %}
 
-    debug_btn.on_clicked do
-      UIng.queue_main do
-        App.debug_reenable
-        status_label.text = "UI re-enabled"
-      end
-    end
-  {% end %}
+status_label = UIng::Label.new("Ready")
+status_box = UIng::Box.new(:horizontal)
+status_box.padded = true
+status_box.append(status_label, true)
+root.append(status_box, false)
 
-  # --- Plugins tab ----------------------------------------------------
-  plugins_tab = UIng::Box.new(:vertical)
-  plugins_tab.padded = true
-
-  prod_group = UIng::Group.new("Product Detection", margined: true)
-  prod_form = UIng::Form.new
-  prod_form.padded = true
-
-  combo_products = UIng::Combobox.new
-  detected = JBUpdater::DetectProducts.all
-  App.detected_products = detected
-
-  detected.sort_by!(&.name)
-
-  combo_products.append("Manual / Custom")
-  detected.each do |prod|
-    combo_products.append("#{prod.name} (#{prod.build})")
-  end
-  combo_products.selected = 0
-
-  prod_form.append("IDE / Product", combo_products, false)
-  prod_group.child = prod_form
-  plugins_tab.append(prod_group, false)
-
-  config_group = UIng::Group.new("Configuration", margined: true)
-  config_form = UIng::Form.new
-  config_form.padded = true
-
-  e_plugins_dir = UIng::Entry.new
-  e_build = UIng::Entry.new
-  e_product = UIng::Entry.new
-  e_install_ids = UIng::Entry.new
-
-  combo_arch = UIng::Combobox.new
-  ["Auto", "arm", "intel"].each { |arch_label| combo_arch.append arch_label }
-  combo_arch.selected = 0
-
-  config_form.append("Plugins dir", e_plugins_dir, true)
-  config_form.append("Build", e_build, false)
-  config_form.append("Product", e_product, false)
-  config_form.append("Install IDs", e_install_ids, false)
-  config_form.append("Arch", combo_arch, false)
-  config_group.child = config_form
-  plugins_tab.append(config_group, false)
-
-  chk_dry = UIng::Checkbox.new("Dry run")
-  plugins_tab.append(chk_dry, false)
-
-  btn_group = UIng::Box.new(:vertical)
-  btn_group.padded = true
-
-  btn_detect = UIng::Button.new("Detect from Product")
-  btn_detect.on_clicked do
+{% if flag?(:gui_log) %}
+  btn_clear_log.on_clicked do
     UIng.queue_main do
-      product = e_product.text
-      if product.nil? || product.empty?
-        log.append("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect.\n")
-        status_label.text = "Error: missing product"
-      else
-        begin
-          resolved = JBUpdater::Utils.resolve_product_folder(product)
-          path = JBUpdater::Utils.expand_jetbrains_plugins_dir(resolved)
-          e_plugins_dir.text = path
-          log.append("Detected plugins dir: #{path}\n")
-          status_label.text = "Detected: #{path}"
-          save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
-        rescue ex
-          log.append("ERROR: #{ex.message}\n")
-          status_label.text = "Error: #{ex.message}"
-        end
+      log.text = ""
+      log.append("Console cleared at #{Time.local}\n")
+      status_label.text = "Console cleared"
+    end
+  end
+
+  debug_btn.on_clicked do
+    UIng.queue_main do
+      App.debug_reenable
+      status_label.text = "UI re-enabled"
+    end
+  end
+{% end %}
+
+# --- Plugins tab ----------------------------------------------------
+plugins_tab = UIng::Box.new(:vertical)
+plugins_tab.padded = true
+
+prod_group = UIng::Group.new("Product Detection", margined: true)
+prod_form = UIng::Form.new
+prod_form.padded = true
+
+combo_products = UIng::Combobox.new
+detected = JBUpdater::DetectProducts.all
+App.detected_products = detected
+
+detected.sort_by!(&.name)
+
+combo_products.append("Manual / Custom")
+detected.each do |prod|
+  combo_products.append("#{prod.name} (#{prod.build})")
+end
+combo_products.selected = 0
+
+prod_form.append("IDE / Product", combo_products, false)
+prod_group.child = prod_form
+plugins_tab.append(prod_group, false)
+
+config_group = UIng::Group.new("Configuration", margined: true)
+config_form = UIng::Form.new
+config_form.padded = true
+
+e_plugins_dir = UIng::Entry.new
+e_build = UIng::Entry.new
+e_product = UIng::Entry.new
+e_install_ids = UIng::Entry.new
+
+combo_arch = UIng::Combobox.new
+["Auto", "arm", "intel"].each { |arch_label| combo_arch.append arch_label }
+combo_arch.selected = 0
+
+config_form.append("Plugins dir", e_plugins_dir, true)
+config_form.append("Build", e_build, false)
+config_form.append("Product", e_product, false)
+config_form.append("Install IDs", e_install_ids, false)
+config_form.append("Arch", combo_arch, false)
+config_group.child = config_form
+plugins_tab.append(config_group, false)
+
+chk_dry = UIng::Checkbox.new("Dry run")
+plugins_tab.append(chk_dry, false)
+
+btn_group = UIng::Box.new(:vertical)
+btn_group.padded = true
+
+btn_detect = UIng::Button.new("Detect from Product")
+btn_detect.on_clicked do
+  UIng.queue_main do
+    product = e_product.text
+    if product.nil? || product.empty?
+      log.append("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect.\n")
+      status_label.text = "Error: missing product"
+    else
+      begin
+        resolved = JBUpdater::Utils.resolve_product_folder(product)
+        path = JBUpdater::Utils.expand_jetbrains_plugins_dir(resolved)
+        e_plugins_dir.text = path
+        log.append("Detected plugins dir: #{path}\n")
+        status_label.text = "Detected: #{path}"
+        save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
+      rescue ex
+        log.append("ERROR: #{ex.message}\n")
+        status_label.text = "Error: #{ex.message}"
       end
     end
   end
-  btn_group.append(btn_detect, false)
+end
+btn_group.append(btn_detect, false)
 
-  btn_group_sep = UIng::Separator.new("horizontal")
-  btn_group.append(btn_group_sep, false)
+btn_group_sep = UIng::Separator.new("horizontal")
+btn_group.append(btn_group_sep, false)
 
-  main_actions = UIng::Box.new(:horizontal)
-  main_actions.padded = true
+main_actions = UIng::Box.new(:horizontal)
+main_actions.padded = true
 
-  btn_list = UIng::Button.new("List installed")
-  btn_install = UIng::Button.new("Install by IDs")
-  btn_update = UIng::Button.new("Update all")
+btn_list = UIng::Button.new("List installed")
+btn_install = UIng::Button.new("Install by IDs")
+btn_update = UIng::Button.new("Update all")
 
-  main_actions.append(btn_list, false)
-  main_actions.append(btn_install, false)
-  main_actions.append(btn_update, false)
-  btn_group.append(main_actions, false)
+main_actions.append(btn_list, false)
+main_actions.append(btn_install, false)
+main_actions.append(btn_update, false)
+btn_group.append(main_actions, false)
 
-  plugins_tab.append(btn_group, false)
-  tabs.append("Plugins", plugins_tab)
+plugins_tab.append(btn_group, false)
+tabs.append("Plugins", plugins_tab)
 
-  # --- Browse tab -----------------------------------------------------
-  browse_tab = UIng::Box.new(:vertical)
-  browse_tab.padded = true
+# --- Browse tab -----------------------------------------------------
+browse_tab = UIng::Box.new(:vertical)
+browse_tab.padded = true
 
-  browse_content = UIng::Box.new(:horizontal)
-  browse_content.padded = true
+browse_content = UIng::Box.new(:horizontal)
+browse_content.padded = true
 
-  browse_left = UIng::Box.new(:vertical)
-  browse_left.padded = true
+browse_left = UIng::Box.new(:vertical)
+browse_left.padded = true
 
-  browse_header = UIng::Box.new(:horizontal)
-  browse_header.padded = true
+browse_header = UIng::Box.new(:horizontal)
+browse_header.padded = true
 
-  search_entry = UIng::Entry.new
-  search_entry.text = ""
+search_entry = UIng::Entry.new
+search_entry.text = ""
 
-  btn_top = UIng::Button.new("Top Downloaded")
-  btn_newest = UIng::Button.new("Newest")
-  btn_refresh = UIng::Button.new("Refresh")
+btn_top = UIng::Button.new("Top Downloaded")
+btn_newest = UIng::Button.new("Newest")
+btn_refresh = UIng::Button.new("Refresh")
 
-  browse_header.append(search_entry, true)
-  browse_header.append(btn_top, false)
-  browse_header.append(btn_newest, false)
-  browse_header.append(btn_refresh, false)
-  browse_left.append(browse_header, false)
+browse_header.append(search_entry, true)
+browse_header.append(btn_top, false)
+browse_header.append(btn_newest, false)
+browse_header.append(btn_refresh, false)
+browse_left.append(browse_header, false)
 
-  browse_model_handler = UIng::Table::Model::Handler.new do
-    num_columns { 4 }
-    column_type { |_col| UIng::Table::Value::Type::String }
-    num_rows { App.browse_plugins.size }
-    cell_value { |row, col|
-      if row < App.browse_plugins.size
-        plugin = App.browse_plugins[row]
-        case col
-        when 0 then UIng::Table::Value.new(plugin.name)
-        when 1
-          installed = App.installed_plugins
-          value = installed ? (installed.has_key?(plugin.xml_id) ? "✓" : "") : "—"
-          UIng::Table::Value.new(value)
-        when 2 then UIng::Table::Value.new(plugin.formatted_downloads)
-        else        UIng::Table::Value.new(plugin.star_rating)
-        end
-      else
-        UIng::Table::Value.new("")
-      end
-    }
-  end
-
-  browse_model = UIng::Table::Model.new(browse_model_handler)
-  browse_table = UIng::Table.new(browse_model)
-  browse_table.header_visible = true
-  browse_table.selection_mode = :one
-
-  browse_table.append_text_column("Plugin", 0, -1)
-  browse_table.append_text_column("Installed", 1, -1)
-  browse_table.append_text_column("Downloads", 2, -1)
-  browse_table.append_text_column("Rating", 3, -1)
-  browse_table.column_set_width(0, 260)
-  browse_table.column_set_width(1, 60)
-  browse_table.column_set_width(2, 100)
-  browse_table.column_set_width(3, 80)
-
-  browse_table.on_header_clicked do |column|
-    next unless {0, 2, 3}.includes?(column)
-
-    (0...4).each do |col|
-      browse_table.header_set_sort_indicator(col, :none) if col != column
-    end
-
-    current = browse_table.header_sort_indicator(column)
-    ascending = current.none? || current.descending?
-
-    plugins = App.browse_plugins
-    case column
-    when 0 then plugins.sort! { |x, y| ascending ? x.name <=> y.name : y.name <=> x.name }
-    when 2 then plugins.sort! { |x, y| ascending ? x.downloads <=> y.downloads : y.downloads <=> x.downloads }
-    when 3 then plugins.sort! { |x, y| ascending ? x.rating <=> y.rating : y.rating <=> x.rating }
-    end
-
-    new_indicator = ascending ? UIng::Table::SortIndicator::Ascending : UIng::Table::SortIndicator::Descending
-    browse_table.header_set_sort_indicator(column, new_indicator)
-
-    plugins.each_with_index { |_, i| browse_model.row_changed(i) }
-  end
-
-  browse_left.append(browse_table, true)
-
-  App.browse_table_model = browse_model
-  App.browse_handler = browse_model_handler
-
-  browse_actions = UIng::Box.new(:horizontal)
-  browse_actions.padded = true
-
-  btn_install_browse = UIng::Button.new("Install Selected")
-  btn_copy_id = UIng::Button.new("Copy XML ID")
-
-  browse_actions.append(btn_install_browse, false)
-  browse_actions.append(btn_copy_id, false)
-  browse_left.append(browse_actions, false)
-
-  browse_status = UIng::Label.new("Click search or a button to browse plugins")
-  browse_status_box = UIng::Box.new(:horizontal)
-  browse_status_box.padded = true
-  browse_status_box.append(browse_status, true)
-  browse_left.append(browse_status_box, false)
-
-  browse_detail_box = UIng::Box.new(:vertical)
-  browse_detail_box.padded = true
-  detail_label = UIng::Label.new("Plugin Details")
-  browse_detail = UIng::MultilineEntry.new(true, true)
-  App.safe_set_text(browse_detail, "Select a plugin to view details")
-  App.browse_detail = browse_detail
-
-  browse_detail_box.append(detail_label, false)
-  browse_detail_box.append(browse_detail, true)
-  browse_content.append(browse_left, true)
-  browse_content.append(browse_detail_box, false)
-  browse_tab.append(browse_content, true)
-
-  tabs.append("Browse", browse_tab)
-
-  # --- Installed tab ---------------------------------------------------
-  installed_tab = UIng::Box.new(:vertical)
-  installed_tab.padded = true
-
-  installed_handler = UIng::Table::Model::Handler.new do
-    num_columns { 5 }
-    column_type { |_col| UIng::Table::Value::Type::String }
-    num_rows { App.installed_plugins_arr.size }
-    cell_value { |row, col|
-      plugin = App.installed_plugins_arr[row]?
-      next UIng::Table::Value.new("") unless plugin
+browse_model_handler = UIng::Table::Model::Handler.new do
+  num_columns { 4 }
+  column_type { |_col| UIng::Table::Value::Type::String }
+  num_rows { App.browse_plugins.size }
+  cell_value { |row, col|
+    if row < App.browse_plugins.size
+      plugin = App.browse_plugins[row]
       case col
-      when 0 then UIng::Table::Value.new(plugin.name || plugin.id)
-      when 1 then UIng::Table::Value.new(plugin.id)
-      when 2 then UIng::Table::Value.new(plugin.version)
-      when 3 then UIng::Table::Value.new(plugin.since || "—")
-      else        UIng::Table::Value.new(plugin.until_build || "—")
+      when 0 then UIng::Table::Value.new(plugin.name)
+      when 1
+        installed = App.installed_plugins
+        value = installed ? (installed.has_key?(plugin.xml_id) ? "✓" : "") : "—"
+        UIng::Table::Value.new(value)
+      when 2 then UIng::Table::Value.new(plugin.formatted_downloads)
+      else        UIng::Table::Value.new(plugin.star_rating)
       end
-    }
-  end
-  installed_model = UIng::Table::Model.new(installed_handler)
-  App.installed_table = installed_table = UIng::Table.new(installed_model)
-  App.installed_model = installed_model
-  installed_table.header_visible = true
-  installed_table.append_text_column("Name", 0, -1)
-  installed_table.append_text_column("Plugin ID", 1, -1)
-  installed_table.append_text_column("Version", 2, -1)
-  installed_table.append_text_column("Since Build", 3, -1)
-  installed_table.append_text_column("Until Build", 4, -1)
-  installed_table.selection_mode = :one
-
-  installed_actions = UIng::Box.new(:horizontal)
-  installed_actions.padded = true
-
-  btn_scan_installed = UIng::Button.new("Scan")
-  btn_uninstall = UIng::Button.new("Uninstall selected")
-  btn_uninstall.disable
-
-  installed_actions.append(btn_scan_installed, false)
-  installed_actions.append(btn_uninstall, false)
-
-  installed_status = UIng::Label.new("Click Scan to list installed plugins")
-
-  installed_tab.append(installed_actions, false)
-  installed_tab.append(installed_table, true)
-  installed_tab.append(installed_status, false)
-
-  tabs.append("Installed", installed_tab)
-
-  btn_scan_installed.on_clicked do
-    dir = expand_tilde(e_plugins_dir.text) || e_plugins_dir.text || ""
-    if dir.empty?
-      installed_status.text = "Set Plugins Directory first"
-      next
-    end
-    scanned = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
-    if scanned
-      old_count = App.installed_plugins_arr.size
-      App.installed_plugins = scanned
-      if old_count == 0
-        App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
-      else
-        (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
-        if App.installed_plugins_arr.size > old_count
-          (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
-        elsif App.installed_plugins_arr.size < old_count
-          (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
-        end
-      end
-      installed_status.text = "Found #{scanned.size} installed plugins"
     else
-      installed_status.text = "Error scanning plugins directory"
+      UIng::Table::Value.new("")
     end
+  }
+end
+
+browse_model = UIng::Table::Model.new(browse_model_handler)
+browse_table = UIng::Table.new(browse_model)
+browse_table.header_visible = true
+browse_table.selection_mode = :one
+
+browse_table.append_text_column("Plugin", 0, -1)
+browse_table.append_text_column("Installed", 1, -1)
+browse_table.append_text_column("Downloads", 2, -1)
+browse_table.append_text_column("Rating", 3, -1)
+browse_table.column_set_width(0, 260)
+browse_table.column_set_width(1, 60)
+browse_table.column_set_width(2, 100)
+browse_table.column_set_width(3, 80)
+
+browse_table.on_header_clicked do |column|
+  next unless {0, 2, 3}.includes?(column)
+
+  (0...4).each do |col|
+    browse_table.header_set_sort_indicator(col, :none) if col != column
   end
 
-  installed_table.on_selection_changed do |selection|
-    if selection.num_rows > 0
-      btn_uninstall.enable
+  current = browse_table.header_sort_indicator(column)
+  ascending = current.none? || current.descending?
+
+  plugins = App.browse_plugins
+  case column
+  when 0 then plugins.sort! { |x, y| ascending ? x.name <=> y.name : y.name <=> x.name }
+  when 2 then plugins.sort! { |x, y| ascending ? x.downloads <=> y.downloads : y.downloads <=> x.downloads }
+  when 3 then plugins.sort! { |x, y| ascending ? x.rating <=> y.rating : y.rating <=> x.rating }
+  end
+
+  new_indicator = ascending ? UIng::Table::SortIndicator::Ascending : UIng::Table::SortIndicator::Descending
+  browse_table.header_set_sort_indicator(column, new_indicator)
+
+  plugins.each_with_index { |_, i| browse_model.row_changed(i) }
+end
+
+browse_left.append(browse_table, true)
+
+App.browse_table_model = browse_model
+App.browse_handler = browse_model_handler
+
+browse_actions = UIng::Box.new(:horizontal)
+browse_actions.padded = true
+
+btn_install_browse = UIng::Button.new("Install Selected")
+btn_copy_id = UIng::Button.new("Copy XML ID")
+
+browse_actions.append(btn_install_browse, false)
+browse_actions.append(btn_copy_id, false)
+browse_left.append(browse_actions, false)
+
+browse_status = UIng::Label.new("Click search or a button to browse plugins")
+browse_status_box = UIng::Box.new(:horizontal)
+browse_status_box.padded = true
+browse_status_box.append(browse_status, true)
+browse_left.append(browse_status_box, false)
+
+browse_detail_box = UIng::Box.new(:vertical)
+browse_detail_box.padded = true
+detail_label = UIng::Label.new("Plugin Details")
+browse_detail = UIng::MultilineEntry.new(true, true)
+App.safe_set_text(browse_detail, "Select a plugin to view details")
+App.browse_detail = browse_detail
+
+browse_detail_box.append(detail_label, false)
+browse_detail_box.append(browse_detail, true)
+browse_content.append(browse_left, true)
+browse_content.append(browse_detail_box, false)
+browse_tab.append(browse_content, true)
+
+tabs.append("Browse", browse_tab)
+
+# --- Installed tab ---------------------------------------------------
+installed_tab = UIng::Box.new(:vertical)
+installed_tab.padded = true
+
+installed_handler = UIng::Table::Model::Handler.new do
+  num_columns { 5 }
+  column_type { |_col| UIng::Table::Value::Type::String }
+  num_rows { App.installed_plugins_arr.size }
+  cell_value { |row, col|
+    plugin = App.installed_plugins_arr[row]?
+    next UIng::Table::Value.new("") unless plugin
+    case col
+    when 0 then UIng::Table::Value.new(plugin.name || plugin.id)
+    when 1 then UIng::Table::Value.new(plugin.id)
+    when 2 then UIng::Table::Value.new(plugin.version)
+    when 3 then UIng::Table::Value.new(plugin.since || "—")
+    else        UIng::Table::Value.new(plugin.until_build || "—")
+    end
+  }
+end
+installed_model = UIng::Table::Model.new(installed_handler)
+App.installed_table = installed_table = UIng::Table.new(installed_model)
+App.installed_model = installed_model
+installed_table.header_visible = true
+installed_table.append_text_column("Name", 0, -1)
+installed_table.append_text_column("Plugin ID", 1, -1)
+installed_table.append_text_column("Version", 2, -1)
+installed_table.append_text_column("Since Build", 3, -1)
+installed_table.append_text_column("Until Build", 4, -1)
+installed_table.selection_mode = :one
+
+installed_actions = UIng::Box.new(:horizontal)
+installed_actions.padded = true
+
+btn_scan_installed = UIng::Button.new("Scan")
+btn_uninstall = UIng::Button.new("Uninstall selected")
+btn_uninstall.disable
+
+installed_actions.append(btn_scan_installed, false)
+installed_actions.append(btn_uninstall, false)
+
+installed_status = UIng::Label.new("Click Scan to list installed plugins")
+
+installed_tab.append(installed_actions, false)
+installed_tab.append(installed_table, true)
+installed_tab.append(installed_status, false)
+
+tabs.append("Installed", installed_tab)
+
+btn_scan_installed.on_clicked do
+  dir = expand_tilde(e_plugins_dir.text) || e_plugins_dir.text || ""
+  if dir.empty?
+    installed_status.text = "Set Plugins Directory first"
+    next
+  end
+  scanned = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
+  if scanned
+    old_count = App.installed_plugins_arr.size
+    App.installed_plugins = scanned
+    if old_count == 0
+      App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
     else
-      btn_uninstall.disable
-    end
-  end
-
-  btn_uninstall.on_clicked do
-    UIng.queue_main do
-      installed_table.selection do |sel|
-        next if sel.num_rows == 0
-        row = sel.rows[0]
-        plugin = App.installed_plugins_arr[row]?
-        if plugin
-          FileUtils.rm_rf(plugin.path)
-          scanned = JBUpdater::PluginMeta.scan_dir(File.dirname(plugin.path)) rescue nil
-          old_count = App.installed_plugins_arr.size
-          App.installed_plugins = scanned
-          if old_count == 0
-            App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
-          else
-            (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
-            if App.installed_plugins_arr.size > old_count
-              (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
-            elsif App.installed_plugins_arr.size < old_count
-              (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
-            end
-          end
-          installed_status.text = "Deleted: #{plugin.id}"
-          btn_uninstall.disable
-        end
+      (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
+      if App.installed_plugins_arr.size > old_count
+        (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
+      elsif App.installed_plugins_arr.size < old_count
+        (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
       end
     end
+    installed_status.text = "Found #{scanned.size} installed plugins"
+  else
+    installed_status.text = "Error scanning plugins directory"
   end
+end
 
-  # --- IDE tab --------------------------------------------------------
-  ide_tab = UIng::Box.new(:vertical)
-  ide_tab.padded = true
-
-  ide_group = UIng::Group.new("IDE Configuration", margined: true)
-  ide_form = UIng::Form.new
-  ide_form.padded = true
-
-  e_ide_product = UIng::Entry.new
-  e_ide_path = UIng::Entry.new
-
-  ide_form.append("IDE code or name", e_ide_product, false)
-  ide_form.append("IDE Path", e_ide_path, true)
-  ide_group.child = ide_form
-  ide_tab.append(ide_group, false)
-
-  chk_brew = UIng::Checkbox.new("Patch Homebrew cask (macOS)")
-  ide_tab.append(chk_brew, false)
-
-  ide_actions = UIng::Box.new(:vertical)
-  ide_actions.padded = true
-
-  btn_list_releases = UIng::Button.new("List releases")
-  btn_upgrade = UIng::Button.new("Upgrade IDE")
-
-  ide_actions.append(btn_list_releases, false)
-  ide_actions.append(btn_upgrade, false)
-  ide_tab.append(ide_actions, false)
-  tabs.append("IDE", ide_tab)
-
-  combo_products.on_selected do
-    UIng.queue_main do
-      idx = combo_products.selected
-      if idx > 0
-        prod = detected[idx - 1]
-        log.append("[GUI] Selected product: #{prod.name} (#{prod.build})\n")
-
-        if dir = prod.plugins_dir
-          e_plugins_dir.text = dir
-        end
-        e_product.text = prod.name
-        e_ide_product.text = prod.build
-        if path = prod.ide_path
-          e_ide_path.text = path
-        end
-
-        status_label.text = "Selected: #{prod.name}"
-        save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
-      else
-        status_label.text = "Product selection: manual/custom"
-      end
-    end
+installed_table.on_selection_changed do |selection|
+  if selection.num_rows > 0
+    btn_uninstall.enable
+  else
+    btn_uninstall.disable
   end
+end
 
-  all_buttons = [] of UIng::Button
-  all_buttons.concat([btn_list, btn_install, btn_update])
-  all_buttons.concat([btn_list_releases, btn_upgrade])
-  App.set_widgets(log, overall_bar, plugin_bar, all_buttons)
-
-  # Global timer: drain buffered log messages and update progress bars
-  UIng.timer(150) do
-    App.drain_log_buffer.each do |msg|
-      App.log.append(msg + "\n")
-    end
-    pct = App.read_progress
-    App.plugin_progress.value = pct if pct > 0
-    1
-  end
-
-  apply_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry, log)
-  apply_ide_settings(e_ide_product, e_ide_path, chk_brew)
-
-  idx = combo_products.selected
-  if idx > 0 && idx <= detected.size
-    prod = detected[idx - 1]
-    e_ide_product.text = prod.build
-    log.append("[GUI] Restored product: #{prod.name} (#{prod.build})\n")
-  end
-
-  log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
-  status_label.text = "Ready"
-
-  {% if flag?(:gui_log) %}
-    btn_remove_cache.on_clicked do
-      UIng.queue_main do
-        raw = e_plugins_dir.text
-        if raw.nil? || raw.empty?
-          log.append("ERROR: Plugins dir is required for Remove cache.\n")
-          status_label.text = "Error: missing plugins dir"
+btn_uninstall.on_clicked do
+  UIng.queue_main do
+    installed_table.selection do |sel|
+      next if sel.num_rows == 0
+      row = sel.rows[0]
+      plugin = App.installed_plugins_arr[row]?
+      if plugin
+        FileUtils.rm_rf(plugin.path)
+        scanned = JBUpdater::PluginMeta.scan_dir(File.dirname(plugin.path)) rescue nil
+        old_count = App.installed_plugins_arr.size
+        App.installed_plugins = scanned
+        if old_count == 0
+          App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
         else
-          plugins_dir = expand_tilde(raw) || raw
-          if !Dir.exists?(plugins_dir)
-            log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
-            status_label.text = "Error: dir not found"
-          else
-            begin
-              removed = 0
-              Dir.each_child(plugins_dir) do |entry|
-                if entry.includes?(".bak")
-                  path = File.join(plugins_dir, entry)
-                  FileUtils.rm_rf(path)
-                  removed += 1
-                  log.append("Removed backup: #{path}\n")
-                end
-              end
+          (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
+          if App.installed_plugins_arr.size > old_count
+            (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
+          elsif App.installed_plugins_arr.size < old_count
+            (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
+          end
+        end
+        installed_status.text = "Deleted: #{plugin.id}"
+        btn_uninstall.disable
+      end
+    end
+  end
+end
 
-              if removed == 0
-                log.append("No *.bak* backup entries found under #{plugins_dir}\n")
-                status_label.text = "No backups found"
-              else
-                log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
-                status_label.text = "Removed #{removed} backup(s)"
+# --- IDE tab --------------------------------------------------------
+ide_tab = UIng::Box.new(:vertical)
+ide_tab.padded = true
+
+ide_group = UIng::Group.new("IDE Configuration", margined: true)
+ide_form = UIng::Form.new
+ide_form.padded = true
+
+e_ide_product = UIng::Entry.new
+e_ide_path = UIng::Entry.new
+
+ide_form.append("IDE code or name", e_ide_product, false)
+ide_form.append("IDE Path", e_ide_path, true)
+ide_group.child = ide_form
+ide_tab.append(ide_group, false)
+
+chk_brew = UIng::Checkbox.new("Patch Homebrew cask (macOS)")
+ide_tab.append(chk_brew, false)
+
+ide_actions = UIng::Box.new(:vertical)
+ide_actions.padded = true
+
+btn_list_releases = UIng::Button.new("List releases")
+btn_upgrade = UIng::Button.new("Upgrade IDE")
+
+ide_actions.append(btn_list_releases, false)
+ide_actions.append(btn_upgrade, false)
+ide_tab.append(ide_actions, false)
+tabs.append("IDE", ide_tab)
+
+combo_products.on_selected do
+  UIng.queue_main do
+    idx = combo_products.selected
+    if idx > 0
+      prod = detected[idx - 1]
+      log.append("[GUI] Selected product: #{prod.name} (#{prod.build})\n")
+
+      if dir = prod.plugins_dir
+        e_plugins_dir.text = dir
+      end
+      e_product.text = prod.name
+      e_ide_product.text = prod.build
+      if path = prod.ide_path
+        e_ide_path.text = path
+      end
+
+      status_label.text = "Selected: #{prod.name}"
+      save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
+    else
+      status_label.text = "Product selection: manual/custom"
+    end
+  end
+end
+
+all_buttons = [] of UIng::Button
+all_buttons.concat([btn_list, btn_install, btn_update])
+all_buttons.concat([btn_list_releases, btn_upgrade])
+App.set_widgets(log, overall_bar, plugin_bar, all_buttons)
+
+# Global timer: drain buffered log messages and update progress bars
+UIng.timer(150) do
+  App.drain_log_buffer.each do |msg|
+    App.log.append(msg + "\n")
+  end
+  pct = App.read_progress
+  App.plugin_progress.value = pct if pct > 0
+  1
+end
+
+apply_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry, log)
+apply_ide_settings(e_ide_product, e_ide_path, chk_brew)
+
+idx = combo_products.selected
+if idx > 0 && idx <= detected.size
+  prod = detected[idx - 1]
+  e_ide_product.text = prod.build
+  log.append("[GUI] Restored product: #{prod.name} (#{prod.build})\n")
+end
+
+log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
+status_label.text = "Ready"
+
+{% if flag?(:gui_log) %}
+  btn_remove_cache.on_clicked do
+    UIng.queue_main do
+      raw = e_plugins_dir.text
+      if raw.nil? || raw.empty?
+        log.append("ERROR: Plugins dir is required for Remove cache.\n")
+        status_label.text = "Error: missing plugins dir"
+      else
+        plugins_dir = expand_tilde(raw) || raw
+        if !Dir.exists?(plugins_dir)
+          log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
+          status_label.text = "Error: dir not found"
+        else
+          begin
+            removed = 0
+            Dir.each_child(plugins_dir) do |entry|
+              if entry.includes?(".bak")
+                path = File.join(plugins_dir, entry)
+                FileUtils.rm_rf(path)
+                removed += 1
+                log.append("Removed backup: #{path}\n")
               end
-            rescue ex
-              log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
-              status_label.text = "Error during cache removal"
             end
+
+            if removed == 0
+              log.append("No *.bak* backup entries found under #{plugins_dir}\n")
+              status_label.text = "No backups found"
+            else
+              log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
+              status_label.text = "Removed #{removed} backup(s)"
+            end
+          rescue ex
+            log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
+            status_label.text = "Error during cache removal"
           end
         end
       end
     end
-  {% end %}
+  end
+{% end %}
 
-  btn_list.on_clicked do
-    UIng.queue_main do
-      raw = e_plugins_dir.text
-      if raw.nil? || raw.empty?
-        log.append("ERROR: Plugins dir is required for List installed plugins.\n")
-        status_label.text = "Error: missing plugins dir"
-      else
-        plugins_dir = expand_tilde(raw)
-        e_plugins_dir.text = plugins_dir if plugins_dir
-        args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new("")) + ["--list"]
-        new_run_header("List installed plugins", args)
-        run_cli(args)
-        save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
-      end
+btn_list.on_clicked do
+  UIng.queue_main do
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
+      log.append("ERROR: Plugins dir is required for List installed plugins.\n")
+      status_label.text = "Error: missing plugins dir"
+    else
+      plugins_dir = expand_tilde(raw)
+      e_plugins_dir.text = plugins_dir if plugins_dir
+      args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new("")) + ["--list"]
+      new_run_header("List installed plugins", args)
+      run_cli(args)
+      save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
     end
   end
+end
 
-  btn_install.on_clicked do
-    UIng.queue_main do
-      raw = e_plugins_dir.text
-      if raw.nil? || raw.empty?
-        log.append("ERROR: Plugins dir is required for Install plugins.\n")
-        status_label.text = "Error: missing plugins dir"
-      else
-        plugins_dir = expand_tilde(raw)
-        e_plugins_dir.text = plugins_dir if plugins_dir
-        args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
-        new_run_header("Install plugins", args)
-        run_cli(args)
-        save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
-      end
+btn_install.on_clicked do
+  UIng.queue_main do
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
+      log.append("ERROR: Plugins dir is required for Install plugins.\n")
+      status_label.text = "Error: missing plugins dir"
+    else
+      plugins_dir = expand_tilde(raw)
+      e_plugins_dir.text = plugins_dir if plugins_dir
+      args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
+      new_run_header("Install plugins", args)
+      run_cli(args)
+      save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
     end
   end
+end
 
-  btn_update.on_clicked do
-    UIng.queue_main do
-      raw = e_plugins_dir.text
-      if raw.nil? || raw.empty?
-        log.append("ERROR: Plugins dir is required for Update plugins.\n")
-        status_label.text = "Error: missing plugins dir"
-      else
-        plugins_dir = expand_tilde(raw)
-        e_plugins_dir.text = plugins_dir if plugins_dir
-        args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
-        new_run_header("Update plugins", args)
-        run_cli(args)
-        save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
-      end
+btn_update.on_clicked do
+  UIng.queue_main do
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
+      log.append("ERROR: Plugins dir is required for Update plugins.\n")
+      status_label.text = "Error: missing plugins dir"
+    else
+      plugins_dir = expand_tilde(raw)
+      e_plugins_dir.text = plugins_dir if plugins_dir
+      args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
+      new_run_header("Update plugins", args)
+      run_cli(args)
+      save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
     end
   end
+end
 
-  btn_list_releases.on_clicked do
-    UIng.queue_main do
-      product = e_ide_product.text
-      if product.nil? || product.empty?
-        log.append("ERROR: IDE code is required for List releases (e.g., WS, RM).\n")
-        status_label.text = "Error: missing IDE code"
-      else
-        args = ["--list-ide-releases", "--product", product]
-        new_run_header("List IDE releases", args)
-        run_cli(args)
-        save_ide_settings(e_ide_product, e_ide_path, chk_brew)
-      end
-    end
-  end
-
-  btn_upgrade.on_clicked do
-    UIng.queue_main do
-      args = ["--upgrade-ide"]
-
-      ide_product = e_ide_product.text
-      ide_path = e_ide_path.text
-
-      args += ["--product", ide_product] if ide_product && !ide_product.empty?
-      args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
-      args << "--brew" if chk_brew.checked?
-
-      new_run_header("Upgrade IDE", args)
+btn_list_releases.on_clicked do
+  UIng.queue_main do
+    product = e_ide_product.text
+    if product.nil? || product.empty?
+      log.append("ERROR: IDE code is required for List releases (e.g., WS, RM).\n")
+      status_label.text = "Error: missing IDE code"
+    else
+      args = ["--list-ide-releases", "--product", product]
+      new_run_header("List IDE releases", args)
       run_cli(args)
       save_ide_settings(e_ide_product, e_ide_path, chk_brew)
     end
   end
+end
 
-  resolve_build = -> : String {
-    products = App.detected_products || JBUpdater::DetectProducts.all
-    result = JBUpdater::GUI::Actions.resolve_build(e_ide_product.text, e_build.text, products)
-    if result != e_ide_product.text && result != e_build.text
-      log.append("[Browse] Auto-detected build: #{result}\n")
-    end
-    result
-  }
+btn_upgrade.on_clicked do
+  UIng.queue_main do
+    args = ["--upgrade-ide"]
 
-  # Preload installed plugins on main thread at startup
-  load_installed_for_browse = -> {
-    App.installed_plugins = nil
-    raw = e_plugins_dir.text
-    if raw && !raw.empty?
-      dir = expand_tilde(raw) || raw
-      App.installed_plugins = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
-    end
-  }
-  load_installed_for_browse.call
+    ide_product = e_ide_product.text
+    ide_path = e_ide_path.text
 
-  # Populate installed tab model with startup data
-  inst = App.installed_plugins
-  if inst && inst.size > 0
-    App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
+    args += ["--product", ide_product] if ide_product && !ide_product.empty?
+    args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
+    args << "--brew" if chk_brew.checked?
+
+    new_run_header("Upgrade IDE", args)
+    run_cli(args)
+    save_ide_settings(e_ide_product, e_ide_path, chk_brew)
   end
+end
 
-  # Warm marketplace cache after UI is visible (1s delay)
-  UIng.timer(1_000) {
-    build = resolve_build.call
-    JBUpdater::PluginMarketplace.list_by_build(build)
-    log.append("[Browse] Marketplace cache warmed: #{build}\n")
-    0
-  }
+resolve_build = -> : String {
+  products = App.detected_products || JBUpdater::DetectProducts.all
+  result = JBUpdater::GUI::Actions.resolve_build(e_ide_product.text, e_build.text, products)
+  if result != e_ide_product.text && result != e_build.text
+    log.append("[Browse] Auto-detected build: #{result}\n")
+  end
+  result
+}
 
-  search_entry.on_changed do |text|
-    begin
-      query = text || ""
-      if query.empty?
-        model = App.browse_table_model
-        if model
-          old_count = App.browse_plugins.size
-          App.browse_plugins = [] of JBUpdater::PluginInfo
-          (0...old_count).each { |i| model.row_deleted(0) }
-        end
-        App.selected_xml_id = nil
-        browse_status.text = "Type to search plugins..."
-        next
-      end
+# Preload installed plugins on main thread at startup
+load_installed_for_browse = -> {
+  App.installed_plugins = nil
+  raw = e_plugins_dir.text
+  if raw && !raw.empty?
+    dir = expand_tilde(raw) || raw
+    App.installed_plugins = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
+  end
+}
+load_installed_for_browse.call
 
-      build = resolve_build.call
-      plugins = JBUpdater::PluginMarketplace.search(query, build)
+# Populate installed tab model with startup data
+inst = App.installed_plugins
+if inst && inst.size > 0
+  App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
+end
 
+# Warm marketplace cache after UI is visible (1s delay)
+UIng.timer(1_000) {
+  build = resolve_build.call
+  JBUpdater::PluginMarketplace.list_by_build(build)
+  log.append("[Browse] Marketplace cache warmed: #{build}\n")
+  0
+}
+
+search_entry.on_changed do |text|
+  begin
+    query = text || ""
+    if query.empty?
       model = App.browse_table_model
-      next unless model
-
-      old_count = App.browse_plugins.size
-      App.browse_plugins = plugins
-      if old_count == 0
-        plugins.each_with_index { |_, i| model.row_inserted(i) }
-      elsif plugins.size >= old_count
-        (0...old_count).each { |i| model.row_changed(i) }
-        (old_count...plugins.size).each { |i| model.row_inserted(i) }
-      else
-        (0...plugins.size).each { |i| model.row_changed(i) }
-        (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+      if model
+        old_count = App.browse_plugins.size
+        App.browse_plugins = [] of JBUpdater::PluginInfo
+        (0...old_count).each { |i| model.row_deleted(0) }
       end
-      browse_status.text = "Found #{plugins.size} results"
-    rescue ex
-      log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
-      browse_status.text = "Search error: #{ex.class} #{ex.message}"
+      App.selected_xml_id = nil
+      browse_status.text = "Type to search plugins..."
+      next
     end
-  end
 
-  btn_top.on_clicked do
     build = resolve_build.call
-    browse_status.text = "Fetching top plugins (may lag)..."
-    log.append("[Browse] Fetching top downloaded for build #{build}...\n")
-    plugins = JBUpdater::PluginMarketplace.top_downloaded(build, 100)
-    log.append("[Browse] Got #{plugins.size} plugins, updating table...\n")
-    plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
+    plugins = JBUpdater::PluginMarketplace.search(query, build)
 
     model = App.browse_table_model
     next unless model
@@ -1310,107 +1304,135 @@ UIng.init do
       (0...plugins.size).each { |i| model.row_changed(i) }
       (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
     end
-    browse_status.text = "Loaded #{plugins.size} plugins (top downloads)"
+    browse_status.text = "Found #{plugins.size} results"
+  rescue ex
+    log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
+    browse_status.text = "Search error: #{ex.class} #{ex.message}"
   end
-
-  btn_newest.on_clicked do
-    build = resolve_build.call
-    browse_status.text = "Fetching latest plugins..."
-    log.append("[Browse] Fetching newest for build #{build}...\n")
-    plugins = JBUpdater::PluginMarketplace.newest(build, 100)
-    log.append("[Browse] Got #{plugins.size} plugins, updating table...\n")
-    plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
-
-    model = App.browse_table_model
-    next unless model
-
-    old_count = App.browse_plugins.size
-    App.browse_plugins = plugins
-    if old_count == 0
-      plugins.each_with_index { |_, i| model.row_inserted(i) }
-    elsif plugins.size >= old_count
-      (0...old_count).each { |i| model.row_changed(i) }
-      (old_count...plugins.size).each { |i| model.row_inserted(i) }
-    else
-      (0...plugins.size).each { |i| model.row_changed(i) }
-      (plugins.size...old_count).each { |i| model.row_deleted(i) }
-    end
-    browse_status.text = "Loaded #{plugins.size} plugins (latest)"
-  end
-
-  btn_refresh.on_clicked do
-    UIng.queue_main do
-      App.installed_plugins = nil
-      model = App.browse_table_model
-      if model
-        old_count = App.browse_plugins.size
-        (0...old_count).each { |i| model.row_deleted(i) }
-        App.browse_plugins = [] of JBUpdater::PluginInfo
-        App.selected_xml_id = nil
-        JBUpdater::PluginMarketplace.clear_cache
-        browse_status.text = "Cache cleared. Click Top/Refresh to reload."
-      end
-    end
-  end
-
-  browse_table.on_selection_changed do |selection|
-    row = selection.num_rows > 0 ? selection.rows[0] : -1
-    plugin = row >= 0 ? App.browse_plugins[row]? : nil
-    if plugin
-      App.selected_xml_id = plugin.xml_id
-      stripped = plugin.description[0, 500]
-      preview = stripped[0, 500]
-      App.log.append("[Browse] detail: #{preview.size}B #{preview.count('\n')} lines (#{preview.size - preview.count('\n')} non-newline)\n")
-      App.safe_set_text(browse_detail, preview)
-    else
-      App.safe_set_text(browse_detail, "Select a plugin to view details")
-      App.selected_xml_id = nil
-    end
-  end
-
-  btn_install_browse.on_clicked do
-    xml_id = App.selected_xml_id
-    if xml_id.nil? || xml_id.empty?
-      browse_status.text = "Please select a plugin first"
-      next
-    end
-
-    plugins_dir = e_plugins_dir.text
-    if plugins_dir.nil? || plugins_dir.empty?
-      browse_status.text = "Error: plugins dir not set. Switch to Plugins tab."
-      next
-    end
-
-    build = resolve_build.call
-
-    log.append("[Browse] Installing plugin: #{xml_id} for build #{build}\n")
-
-    queue_install(xml_id, plugins_dir, build)
-  end
-
-  btn_copy_id.on_clicked do
-    xml_id = App.selected_xml_id
-    if xml_id.nil? || xml_id.empty?
-      browse_status.text = "Please select a plugin first"
-    else
-      log.append("[Browse] Copied XML ID: #{xml_id}\n")
-      browse_status.text = "Copied to clipboard: #{xml_id}"
-    end
-  end
-
-  {% if flag?(:darwin) %}
-    constraint_added = false
-    tabs.on_selected do |idx|
-      if idx == 1 && !constraint_added
-        constraint_added = true
-        right_view = browse_detail_box.handle
-        super_view = browse_content.handle
-        c = LayoutHelper.create_width_constraint(right_view, super_view, 0.3_f64)
-        LayoutHelper.add_constraint_to_view(super_view, c)
-      end
-    end
-  {% end %}
-
-  window.show
-  UIng.main
 end
+
+btn_top.on_clicked do
+  build = resolve_build.call
+  browse_status.text = "Fetching top plugins (may lag)..."
+  log.append("[Browse] Fetching top downloaded for build #{build}...\n")
+  plugins = JBUpdater::PluginMarketplace.top_downloaded(build, 100)
+  log.append("[Browse] Got #{plugins.size} plugins, updating table...\n")
+  plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
+
+  model = App.browse_table_model
+  next unless model
+
+  old_count = App.browse_plugins.size
+  App.browse_plugins = plugins
+  if old_count == 0
+    plugins.each_with_index { |_, i| model.row_inserted(i) }
+  elsif plugins.size >= old_count
+    (0...old_count).each { |i| model.row_changed(i) }
+    (old_count...plugins.size).each { |i| model.row_inserted(i) }
+  else
+    (0...plugins.size).each { |i| model.row_changed(i) }
+    (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+  end
+  browse_status.text = "Loaded #{plugins.size} plugins (top downloads)"
+end
+
+btn_newest.on_clicked do
+  build = resolve_build.call
+  browse_status.text = "Fetching latest plugins..."
+  log.append("[Browse] Fetching newest for build #{build}...\n")
+  plugins = JBUpdater::PluginMarketplace.newest(build, 100)
+  log.append("[Browse] Got #{plugins.size} plugins, updating table...\n")
+  plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
+
+  model = App.browse_table_model
+  next unless model
+
+  old_count = App.browse_plugins.size
+  App.browse_plugins = plugins
+  if old_count == 0
+    plugins.each_with_index { |_, i| model.row_inserted(i) }
+  elsif plugins.size >= old_count
+    (0...old_count).each { |i| model.row_changed(i) }
+    (old_count...plugins.size).each { |i| model.row_inserted(i) }
+  else
+    (0...plugins.size).each { |i| model.row_changed(i) }
+    (plugins.size...old_count).each { |i| model.row_deleted(i) }
+  end
+  browse_status.text = "Loaded #{plugins.size} plugins (latest)"
+end
+
+btn_refresh.on_clicked do
+  UIng.queue_main do
+    App.installed_plugins = nil
+    model = App.browse_table_model
+    if model
+      old_count = App.browse_plugins.size
+      (0...old_count).each { |i| model.row_deleted(i) }
+      App.browse_plugins = [] of JBUpdater::PluginInfo
+      App.selected_xml_id = nil
+      JBUpdater::PluginMarketplace.clear_cache
+      browse_status.text = "Cache cleared. Click Top/Refresh to reload."
+    end
+  end
+end
+
+browse_table.on_selection_changed do |selection|
+  row = selection.num_rows > 0 ? selection.rows[0] : -1
+  plugin = row >= 0 ? App.browse_plugins[row]? : nil
+  if plugin
+    App.selected_xml_id = plugin.xml_id
+    stripped = plugin.description[0, 500]
+    preview = stripped[0, 500]
+    App.log.append("[Browse] detail: #{preview.size}B #{preview.count('\n')} lines (#{preview.size - preview.count('\n')} non-newline)\n")
+    App.safe_set_text(browse_detail, preview)
+  else
+    App.safe_set_text(browse_detail, "Select a plugin to view details")
+    App.selected_xml_id = nil
+  end
+end
+
+btn_install_browse.on_clicked do
+  xml_id = App.selected_xml_id
+  if xml_id.nil? || xml_id.empty?
+    browse_status.text = "Please select a plugin first"
+    next
+  end
+
+  plugins_dir = e_plugins_dir.text
+  if plugins_dir.nil? || plugins_dir.empty?
+    browse_status.text = "Error: plugins dir not set. Switch to Plugins tab."
+    next
+  end
+
+  build = resolve_build.call
+
+  log.append("[Browse] Installing plugin: #{xml_id} for build #{build}\n")
+
+  queue_install(xml_id, plugins_dir, build)
+end
+
+btn_copy_id.on_clicked do
+  xml_id = App.selected_xml_id
+  if xml_id.nil? || xml_id.empty?
+    browse_status.text = "Please select a plugin first"
+  else
+    log.append("[Browse] Copied XML ID: #{xml_id}\n")
+    browse_status.text = "Copied to clipboard: #{xml_id}"
+  end
+end
+
+{% if flag?(:darwin) %}
+  constraint_added = false
+  tabs.on_selected do |idx|
+    if idx == 1 && !constraint_added
+      constraint_added = true
+      right_view = browse_detail_box.handle
+      super_view = browse_content.handle
+      c = LayoutHelper.create_width_constraint(right_view, super_view, 0.3_f64)
+      LayoutHelper.add_constraint_to_view(super_view, c)
+    end
+  end
+{% end %}
+
+window.show
+UIng.main
