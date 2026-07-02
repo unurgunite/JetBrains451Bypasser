@@ -18,6 +18,8 @@ require "uing"
   lib LayoutHelper
     fun create_width_constraint(item : Void*, relative_to : Void*, multiplier : Float64) : Void*
     fun add_constraint_to_view(view : Void*, constraint : Void*) : Void
+    fun set_app_icon(icns_path : UInt8*) : Void
+    fun setup_menu_bar : Void
   end
 {% end %}
 
@@ -588,28 +590,33 @@ private def apply_ide_settings(
   end
 end
 
+{% if flag?(:darwin) %}
+private def do_setup_icon_and_keys
+  exe_path = Process.executable_path
+  if exe_path
+    dir = File.dirname(exe_path)
+    icon_path = if dir.ends_with?("/MacOS")
+      File.join(dir, "..", "Resources", "jb_updater.icns")
+    else
+      File.join(dir, "assets", "jb_updater.icns")
+    end
+    LayoutHelper.set_app_icon(icon_path)
+  end
+  LayoutHelper.setup_menu_bar
+end
+{% end %}
+
 # ---- UI --------------------------------------------------------------
 UIng.init
 
 {% if flag?(:darwin) %}
-  file_menu = UIng::Menu.new("File")
-  file_menu.append_quit_item
-  UIng.on_should_quit do
-    App.mark_shutting_down
-    true
-  end
+  do_setup_icon_and_keys
 {% end %}
 
-window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660, menubar: {{flag?(:darwin)}})
+window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660)
 
 window.on_closing do
   App.mark_shutting_down
-  if (m = App.browse_table_model)
-    UIng::LibUI.free_table_model(m.to_unsafe)
-  end
-  if (m = App.installed_model)
-    UIng::LibUI.free_table_model(m.to_unsafe)
-  end
   UIng.quit
   true
 end
