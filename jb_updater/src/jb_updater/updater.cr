@@ -13,15 +13,31 @@ require "./http_client"
 module JBUpdater
   INF = Float64::INFINITY
 
+  # Core plugin update orchestrator.
+  #
+  # Handles listing installed plugins, installing new plugins
+  # and checking for/ applying updates. Resolves download URLs
+  # via the JetBrains Plugin Manager API and supports pinned
+  # versions, direct URLs, and host overrides.
   class Updater
     getter opts : Options
+    # Detected or explicitly provided build string (e.g. `"RM-252"`).
     property build : String?
     @installed_plugins : Hash(String, PluginMeta)? = nil
 
+    # @param opts [Options] CLI options
     def initialize(@opts : Options)
       @build = @opts.build
     end
 
+    # Runs the updater with an optional action symbol.
+    #
+    # Determines the action from options if not provided:
+    # - `:list`    — list installed plugins
+    # - `:install` — install plugins by ID
+    # - `:update`  — update all installed plugins (default)
+    #
+    # @param action [Symbol?] One of `:list`, `:install`, `:update`
     def run(action : Symbol? = nil) : Nil
       validate!
 
@@ -29,7 +45,7 @@ module JBUpdater
       raise "Could not detect IDE build; pass --build" unless @build
 
       act = action || begin
-        if @opts.list
+        if @opts.list?
           :list
         elsif !@opts.install_ids.empty?
           :install
@@ -50,12 +66,20 @@ module JBUpdater
       end
     end
 
+    # Attempts to auto-detect the IDE build string from metadata files.
+    #
+    # Checks `--ide-path` first, then common install locations
+    # (`/Applications/*.app` on macOS, `/opt/*` on Linux, etc.).
+    # Reads from `product-info.json` or `build.txt`.
+    #
+    # @return [String?] Detected build string or `nil`
     private def detect_build_info : String?
-      base_name = File.basename(File.dirname(@opts.plugins_dir.not_nil!)).gsub(/\d.*$/, "")
+      plugins_dir = @opts.plugins_dir
+      return nil unless plugins_dir
+      base_name = File.basename(File.dirname(plugins_dir)).gsub(/\d.*$/, "")
       info_json = ""
       build_txt = ""
 
-      # Prefer explicit --ide-path
       if custom = @opts.ide_path
         {% if flag?(:darwin) %}
           info_json, build_txt = ide_metadata_paths(:mac, custom)
@@ -104,6 +128,11 @@ module JBUpdater
       nil
     end
 
+    # Returns platform-specific paths for IDE metadata files.
+    #
+    # @param platform [:mac | :linux | :windows] Target platform
+    # @param root [String] IDE installation root
+    # @return [Tuple(String, String)] `(product-info.json path, build.txt path)`
     private def ide_metadata_paths(platform, root : String) : {String, String}
       case platform
       when :mac
@@ -119,6 +148,12 @@ module JBUpdater
       end
     end
 
+    # Attempts to read build info from `product-info.json` or `build.txt`.
+    #
+    # @param info_json [String] Path to `product-info.json`
+    # @param build_txt [String] Path to `build.txt`
+    # @param base_name [String] Fallback product base name
+    # @return [String?] Build string (e.g. `"RM-252"`) or `nil`
     private def read_build_info(info_json : String, build_txt : String, base_name : String) : String?
       if File.file?(info_json)
         begin
@@ -141,6 +176,7 @@ module JBUpdater
       nil
     end
 
+    # Validates that the plugins directory exists and expands tildes.
     private def validate!
       if dir = @opts.plugins_dir
         dir = Utils.expand_tilde(dir)
@@ -151,6 +187,7 @@ module JBUpdater
       end
     end
 
+    # Prints the list of installed plugins to stdout.
     private def list_plugins : Nil
       plugins = installed_plugins
       if plugins.empty?
@@ -163,12 +200,23 @@ module JBUpdater
       end
     end
 
+    # Scans the plugins directory for installed plugins (cached).
+    #
+    # @return [Hash(String, PluginMeta)] Plugin ID to metadata mapping
     private def installed_plugins : Hash(String, PluginMeta)
-      return @installed_plugins.not_nil! if @installed_plugins
-
-      @installed_plugins = PluginMeta.scan_dir(@opts.plugins_dir.not_nil!)
+      if plugins = @installed_plugins
+        return plugins
+      end
+      dir = @opts.plugins_dir
+      raise "plugins_dir not set" unless dir
+      @installed_plugins = PluginMeta.scan_dir(dir)
     end
 
+    # Installs plugins by XML ID.
+    #
+    # Backs up existing plugin directories before overwriting.
+    #
+    # @raise [RuntimeError] If no plugin IDs provided
     private def install_plugins : Nil
       ids = @opts.install_ids
       if ids.empty?
@@ -186,7 +234,8 @@ module JBUpdater
           uri = HTTPClient.override_plugin_repo_host(uri, @opts.downloads_host)
 
           Log.info("#{plugin_num} Resolved URL: #{uri}")
-          dest = File.join(@opts.plugins_dir.not_nil!, xml_id)
+          dir = @opts.plugins_dir || raise "plugins_dir not set"
+          dest = File.join(dir, xml_id)
           backup = "#{dest}.bak.#{Time.utc.to_unix}"
 
           if File.directory?(dest)
@@ -210,6 +259,7 @@ module JBUpdater
       Log.success("Done. Start the IDE to load newly installed plugins.")
     end
 
+    # Checks all installed plugins for updates and downloads newer versions.
     private def update_plugins : Nil
       plugins = installed_plugins
       if plugins.empty?
@@ -232,22 +282,24 @@ module JBUpdater
       Log.success("Done. Start the IDE to load updated plugins.")
     end
 
+    # Downloads and extracts the latest version of a single plugin.
+    #
+    # Checks compatibility range after installation and logs the result.
+    #
+    # @param meta [PluginMeta] Currently installed plugin metadata
     private def update_plugin(meta : PluginMeta) : Nil
       xml_id = meta.id
       target_dir = meta.path
-      current_ver = meta.version
       tmp_zip : String? = nil
 
       begin
         uri = final_uri(xml_id)
         uri = HTTPClient.override_plugin_repo_host(uri, @opts.downloads_host)
-        want_ver = @opts.pin_versions[xml_id]? ||
-                   File.basename(uri.path).sub(/\.zip$/, "").split('-').last?
 
-        Log.info "  → #{current_ver} → #{want_ver || "?"}"
+        Log.info "  → #{meta.version} → #{resolved_version(xml_id, uri)}"
         Log.info "    URL: #{uri}"
 
-        if @opts.dry_run
+        if @opts.dry_run?
           Log.info "    (dry-run) would download and install into #{target_dir}"
           return
         end
@@ -256,30 +308,54 @@ module JBUpdater
         HTTPClient.download(uri, tmp_zip)
         Utils.extract_zip(tmp_zip, target_dir)
 
-        if post = PluginMeta.parse_from_dir(target_dir)
-          compat = Utils.build_in_range?(@build.not_nil!, post.since, post.until_build)
-          suffix = compat ? "" : " (still incompatible)"
-          Log.success "  installed: #{post.id} #{post.version} [since=#{post.since || "-"} until=#{post.until_build || "-"}]#{suffix}"
-        else
-          Log.warn "  re-parse failed; installed plugin may be broken"
-        end
+        log_install_result(target_dir)
       ensure
         FileUtils.rm_rf(tmp_zip) if tmp_zip && File.exists?(tmp_zip)
       end
     end
 
+    private def resolved_version(xml_id : String, uri : URI) : String
+      @opts.pin_versions[xml_id]? ||
+        File.basename(uri.path).sub(/\.zip$/, "").split('-').last? || "?"
+    end
+
+    private def log_install_result(target_dir : String)
+      if post = PluginMeta.parse_from_dir(target_dir)
+        since = post.since || "-"
+        until_build = post.until_build || "-"
+        compat = Utils.build_in_range?(@build || raise("build not set"), post.since, post.until_build)
+        suffix = compat ? "" : " (still incompatible)"
+        Log.success "  installed: #{post.id} #{post.version} [since=#{since} until=#{until_build}]#{suffix}"
+      else
+        Log.warn "  re-parse failed; installed plugin may be broken"
+      end
+    end
+
     # --- URL-resolution helpers ----------------------------------------------
 
+    # Resolves the final download URI for a plugin XML ID.
+    #
+    # Priority: direct URL > pinned version > pluginManager API.
+    #
+    # @param xml_id [String] Plugin XML identifier
+    # @return [URI] Download URL (may be a redirect endpoint)
     private def final_uri(xml_id : String) : URI
       if @opts.direct_urls.has_key?(xml_id)
         URI.parse(@opts.direct_urls[xml_id])
       elsif ver = @opts.pin_versions[xml_id]?
         resolve_download_url_for_version(xml_id, ver)
       else
-        resolve_download_url_via_plugin_manager(xml_id, @build.not_nil!)
+        resolve_download_url_via_plugin_manager(xml_id, @build || raise("build not set"))
       end
     end
 
+    # Resolves a download URL for a pinned plugin version.
+    #
+    # Performs a HEAD/GET request and follows redirects.
+    #
+    # @param xml_id [String] Plugin XML identifier
+    # @param version [String] Desired version
+    # @return [URI] Redirect target or direct URL
     private def resolve_download_url_for_version(xml_id : String, version : String) : URI
       base = "https://plugins.jetbrains.com/plugin/download?pluginId=#{Utils.escape(xml_id)}&version=#{Utils.escape(version)}"
       Log.info "Resolving download URL for #{xml_id} version #{version}: #{base}"
@@ -299,8 +375,15 @@ module JBUpdater
       end
     end
 
+    # Resolves a download URL via the JetBrains Plugin Manager API.
+    #
+    # Falls back to `plugin/download` if the build-specific endpoint
+    # returns 404 (plugin incompatible with the given build).
+    #
+    # @param xml_id [String] Plugin XML identifier
+    # @param build [String] IDE build string
+    # @return [URI] Resolved download URL
     private def resolve_download_url_via_plugin_manager(xml_id : String, build : String) : URI
-      # Try pluginManager with build first (returns redirect to CDN)
       base = "https://plugins.jetbrains.com/pluginManager?action=download&id=#{Utils.escape(xml_id)}&build=#{Utils.escape(build)}"
       Log.info "Resolving download URL via pluginManager: #{base}"
       res = HTTPClient.head_or_get(base)
@@ -316,7 +399,6 @@ module JBUpdater
         URI.parse(base)
       when 404
         Log.info "pluginManager 404 for #{xml_id} (incompatible with #{build}), trying plugin/download fallback..."
-        # Plugin not compatible with this build. Try plugin/download without build.
         fallback = "https://plugins.jetbrains.com/plugin/download?pluginId=#{Utils.escape(xml_id)}"
         res2 = HTTPClient.head_or_get(fallback)
         case res2.status_code

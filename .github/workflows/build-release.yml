@@ -30,33 +30,33 @@ jobs:
       - name: Install shards
         working-directory: jb_updater
         run: shards install
-      - name: Run specs
-        working-directory: jb_updater
-        run: crystal spec -v
       - name: Run Ameba linter
         working-directory: jb_updater
         run: ./bin/lint
+      - name: Run specs
+        working-directory: jb_updater
+        run: crystal spec -v
       - name: Build binaries (CLI + GUI)
+        working-directory: jb_updater
         run: |
-          cd jb_updater
-          # CLI
-          crystal build src/main.cr --release -o jb_updater
-          # GUI
-          crystal build src/gui/main_gui.cr --release -o jb_updater_gui
-          cd ..
-          # Package CLI
-          tar -czf jb_updater-linux-x86_64.tar.gz -C jb_updater jb_updater
-          # Package GUI
+          crystal build src/main.cr --release --no-debug -o jb_updater
+          crystal build src/gui/main_gui.cr --release --no-debug -o jb_updater_gui
+      - name: Smoke test — CLI binary loads
+        working-directory: jb_updater
+        run: ./jb_updater --help
+      - name: Package artifacts
+        run: |
+          tar -czf jb_updater-cli-linux-x86_64.tar.gz -C jb_updater jb_updater
           tar -czf jb_updater-gui-linux-x86_64.tar.gz -C jb_updater jb_updater_gui
-          # Package bundle: CLI + GUI together
-          mkdir -p jb_updater-bundle-linux
-          cp jb_updater/jb_updater     jb_updater-bundle-linux/
-          cp jb_updater/jb_updater_gui jb_updater-bundle-linux/
-          tar -czf jb_updater-bundle-linux-x86_64.tar.gz -C jb_updater-bundle-linux .
+          mkdir -p jb_updater-bundle
+          cp jb_updater/jb_updater     jb_updater-bundle/
+          cp jb_updater/jb_updater_gui jb_updater-bundle/
+          cp jb_updater/assets/jb_updater.svg jb_updater-bundle/
+          tar -czf jb_updater-bundle-linux-x86_64.tar.gz -C jb_updater-bundle .
       - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-linux-x86_64
-          path: jb_updater-linux-x86_64.tar.gz
+          name: jb_updater-cli-linux-x86_64
+          path: jb_updater-cli-linux-x86_64.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-gui-linux-x86_64
@@ -73,7 +73,7 @@ jobs:
           - arch: arm64
             runs_on: macos-latest
           - arch: x86_64
-            runs_on: macos-13
+            runs_on: macos-15-intel
     runs-on: ${{ matrix.runs_on }}
     env:
       ARCH: ${{ matrix.arch }}
@@ -87,45 +87,74 @@ jobs:
       - name: Install shards
         working-directory: jb_updater
         run: shards install
-      - name: Run specs
-        working-directory: jb_updater
-        run: crystal spec -v
       - name: Run Ameba linter
         working-directory: jb_updater
         run: ./bin/lint
+      - name: Run specs
+        working-directory: jb_updater
+        run: crystal spec -v
       - name: Build binaries (CLI + GUI)
+        working-directory: jb_updater
         run: |
-          cd jb_updater
           brew_prefix=$(brew --prefix openssl@3)
           unset PKG_CONFIG_PATH
           export PKG_CONFIG_PATH="${brew_prefix}/lib/pkgconfig"
           echo "Using OpenSSL from ${brew_prefix}"
 
-          # CLI
           crystal build src/main.cr --release --no-debug \
             --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
             -o jb_updater
-
-          # GUI
           crystal build src/gui/main_gui.cr --release --no-debug \
             --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
             -o jb_updater_gui
 
+      - name: Bundle OpenSSL runtime dylibs
+        working-directory: jb_updater
+        run: |
+          brew_prefix=$(brew --prefix openssl@3)
+          for dylib in libcrypto.3.dylib libssl.3.dylib; do
+            cp "$brew_prefix/lib/$dylib" .
+            install_name_tool -id "@loader_path/$dylib" "$dylib"
+            for dep in $(otool -L "$dylib" | grep "/opt/homebrew\|/usr/local" | awk '{print $1}'); do
+              install_name_tool -change "$dep" "@loader_path/$(basename $dep)" "$dylib"
+            done
+          done
+          for exe in jb_updater jb_updater_gui; do
+            for dep in $(otool -L "$exe" | grep "/opt/homebrew\|/usr/local" | awk '{print $1}'); do
+              install_name_tool -change "$dep" "@loader_path/$(basename $dep)" "$exe"
+            done
+          done
+
+      - name: Smoke test — CLI binary loads
+        working-directory: jb_updater
+        run: |
+          ./jb_updater --help
+          echo "---"
+          echo "Checking dylib paths..."
+          # Skip binary name line, filter out system paths and @loader_path refs.
+          # Any remaining lines are non-system absolute paths → fail.
+          otool -L jb_updater | tail -n +2 | grep -v -e "/usr/lib" -e "/System" -e "@loader_path" && { echo "::error::Found absolute dylib paths"; exit 1; } || echo "All dylib paths use @loader_path"
+
+      - name: Package artifacts
+        run: |
+          cd jb_updater
+          # CLI archive — include bundled dylibs
+          tar -czf ../jb_updater-cli-macos-${ARCH}.tar.gz jb_updater libcrypto.3.dylib libssl.3.dylib
+
+          # Bundle: binaries + dylibs
+          mkdir -p ../jb_updater-bundle
+          cp jb_updater jb_updater_gui libcrypto.3.dylib libssl.3.dylib ../jb_updater-bundle/
           cd ..
-          # Package CLI alone (as before)
-          tar -czf jb_updater-macos-${ARCH}.tar.gz -C jb_updater jb_updater
+          zip -ry jb_updater-bundle-macos-${ARCH}.zip jb_updater-bundle
 
-          # Package raw CLI+GUI binaries together (new)
-          mkdir -p jb_updater-bundle
-          cp jb_updater/jb_updater     jb_updater-bundle/
-          cp jb_updater/jb_updater_gui jb_updater-bundle/
-          zip -ry jb_updater-macos-${ARCH}-binaries.zip jb_updater-bundle
-
-          # Create a simple .app bundle for GUI (includes CLI inside)
+          # .app bundle with dylibs + icon inside
           APP_ROOT="JBUpdater.app/Contents"
           mkdir -p "$APP_ROOT/MacOS" "$APP_ROOT/Resources"
-          cp jb_updater/jb_updater_gui "$APP_ROOT/MacOS/jb_updater_gui"
-          cp jb_updater/jb_updater     "$APP_ROOT/MacOS/jb_updater"
+          cp jb_updater/jb_updater_gui "$APP_ROOT/MacOS/"
+          cp jb_updater/jb_updater     "$APP_ROOT/MacOS/"
+          cp jb_updater/libcrypto.3.dylib "$APP_ROOT/MacOS/"
+          cp jb_updater/libssl.3.dylib    "$APP_ROOT/MacOS/"
+          cp jb_updater/assets/jb_updater.icns "$APP_ROOT/Resources/"
 
           cat > "$APP_ROOT/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -135,30 +164,28 @@ jobs:
           <key>CFBundleIdentifier</key><string>com.example.jb-updater</string>
           <key>CFBundleVersion</key><string>1.0</string>
           <key>CFBundleExecutable</key><string>jb_updater_gui</string>
+          <key>CFBundleIconFile</key><string>jb_updater</string>
           <key>LSMinimumSystemVersion</key><string>11.0</string>
           <key>NSHighResolutionCapable</key><true/>
           </dict></plist>
           PLIST
-          
-          # Package GUI app bundle
-          zip -ry jb_updater-gui-macos-${ARCH}.zip JBUpdater.app
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jb_updater-macos-${{ matrix.arch }}
-          path: jb_updater-macos-${{ matrix.arch }}.tar.gz
 
+          zip -ry jb_updater-app-macos-${ARCH}.zip JBUpdater.app
       - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-gui-macos-${{ matrix.arch }}
-          path: jb_updater-gui-macos-${{ matrix.arch }}.zip
-
+          name: jb_updater-cli-macos-${{ matrix.arch }}
+          path: jb_updater-cli-macos-${{ matrix.arch }}.tar.gz
       - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-macos-${{ matrix.arch }}-binaries
-          path: jb_updater-macos-${{ matrix.arch }}-binaries.zip
+          name: jb_updater-app-macos-${{ matrix.arch }}
+          path: jb_updater-app-macos-${{ matrix.arch }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jb_updater-bundle-macos-${{ matrix.arch }}
+          path: jb_updater-bundle-macos-${{ matrix.arch }}.zip
 
   windows:
-    name: Windows x64
+    name: Windows x86_64
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -175,6 +202,10 @@ jobs:
         working-directory: jb_updater
         run: shards install
 
+      - name: Run Ameba linter
+        working-directory: jb_updater
+        run: ./bin/lint
+
       - name: Run specs
         working-directory: jb_updater
         run: crystal spec -v
@@ -182,35 +213,70 @@ jobs:
       - name: Build binaries (CLI + GUI)
         working-directory: jb_updater
         run: |
-          # CLI
-          crystal build src/main.cr --release -o jb_updater.exe
-          # GUI (windowed subsystem to hide console)
-          crystal build src/gui/main_gui.cr --release --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
+          crystal build src/main.cr --release --no-debug -o jb_updater.exe
+          crystal build src/gui/main_gui.cr --release --no-debug --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
+
+      - name: Bundle Crystal runtime DLLs
+        shell: pwsh
+        run: |
+          # Crystal runtime DLLs must ship alongside the EXEs on Windows,
+          # otherwise the process exits with 0xC0000135 (STATUS_DLL_NOT_FOUND).
+          $crystalPath = (Get-Command crystal).Source
+          $crystalRoot = Split-Path (Split-Path $crystalPath -Parent) -Parent
+          $dllSource = Join-Path $crystalRoot "embedded" "bin"
+          if (Test-Path $dllSource) {
+            Copy-Item "$dllSource\*.dll" jb_updater\
+            Write-Host "Copied DLLs from $dllSource"
+            Get-ChildItem jb_updater\*.dll | ForEach-Object { Write-Host "  → $($_.Name)" }
+          } else {
+            Write-Host "::warning::Crystal DLL directory not found at $dllSource"
+          }
+
+      - name: Smoke test — CLI binary loads
+        working-directory: jb_updater
+        run: |
+          # Verify the CLI binary starts (proves all DLLs resolve correctly).
+          # 0xC0000135 would kill the process before any output.
+          .\jb_updater.exe --help
+        shell: cmd
+
+      - name: Verify GUI DLLs are present
+        working-directory: jb_updater
+        shell: pwsh
+        run: |
+          # Can't run the GUI binary on headless CI (no display), but we can
+          # confirm all DLLs exist alongside the GUI EXE.
+          $exe = "jb_updater_gui.exe"
+          $dlls = @(Get-ChildItem *.dll)
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error::$exe not found"
+            exit 1
+          }
+          Write-Host "$exe found, $($dlls.Count) DLLs present:"
+          $dlls | ForEach-Object { Write-Host "  → $($_.Name) ($( '{0:N0}' -f $_.Length ) bytes)" }
 
       - name: Package artifacts
         run: |
-          Compress-Archive -Path jb_updater\jb_updater.exe -DestinationPath jb_updater-windows-x64.zip
-          Compress-Archive -Path jb_updater\jb_updater_gui.exe -DestinationPath jb_updater-gui-windows-x64.zip
-          # Bundle: CLI + GUI together
+          Compress-Archive -Path jb_updater\jb_updater.exe, jb_updater\*.dll -DestinationPath jb_updater-cli-windows-x86_64.zip
+          Compress-Archive -Path jb_updater\jb_updater_gui.exe, jb_updater\*.dll -DestinationPath jb_updater-gui-windows-x86_64.zip
           New-Item -ItemType Directory -Force -Path jb_updater-bundle | Out-Null
-          Copy-Item jb_updater\jb_updater.exe     jb_updater-bundle\
-          Copy-Item jb_updater\jb_updater_gui.exe jb_updater-bundle\
-          Compress-Archive -Path jb_updater-bundle\* -DestinationPath jb_updater-bundle-windows-x64.zip
+          Copy-Item jb_updater\*.exe, jb_updater\*.dll jb_updater-bundle\
+          Compress-Archive -Path jb_updater-bundle\* -DestinationPath jb_updater-bundle-windows-x86_64.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-windows-x64
-          path: jb_updater-windows-x64.zip
+          name: jb_updater-cli-windows-x86_64
+          path: jb_updater-cli-windows-x86_64.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-gui-windows-x64
-          path: jb_updater-gui-windows-x64.zip
+          name: jb_updater-gui-windows-x86_64
+          path: jb_updater-gui-windows-x86_64.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-bundle-windows-x64
-          path: jb_updater-bundle-windows-x64.zip
+          name: jb_updater-bundle-windows-x86_64
+          path: jb_updater-bundle-windows-x86_64.zip
 
   # =========================================================
   # ===============   RELEASE JOB   =========================
