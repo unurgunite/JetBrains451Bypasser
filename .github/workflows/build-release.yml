@@ -51,6 +51,7 @@ jobs:
           mkdir -p jb_updater-bundle
           cp jb_updater/jb_updater     jb_updater-bundle/
           cp jb_updater/jb_updater_gui jb_updater-bundle/
+          cp jb_updater/assets/jb_updater.svg jb_updater-bundle/
           tar -czf jb_updater-bundle-linux-x86_64.tar.gz -C jb_updater-bundle .
       - uses: actions/upload-artifact@v4
         with:
@@ -146,13 +147,14 @@ jobs:
           cd ..
           zip -ry jb_updater-bundle-macos-${ARCH}.zip jb_updater-bundle
 
-          # .app bundle with dylibs inside
+          # .app bundle with dylibs + icon inside
           APP_ROOT="JBUpdater.app/Contents"
           mkdir -p "$APP_ROOT/MacOS" "$APP_ROOT/Resources"
           cp jb_updater/jb_updater_gui "$APP_ROOT/MacOS/"
           cp jb_updater/jb_updater     "$APP_ROOT/MacOS/"
           cp jb_updater/libcrypto.3.dylib "$APP_ROOT/MacOS/"
           cp jb_updater/libssl.3.dylib    "$APP_ROOT/MacOS/"
+          cp jb_updater/assets/jb_updater.icns "$APP_ROOT/Resources/"
 
           cat > "$APP_ROOT/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -162,6 +164,7 @@ jobs:
           <key>CFBundleIdentifier</key><string>com.example.jb-updater</string>
           <key>CFBundleVersion</key><string>1.0</string>
           <key>CFBundleExecutable</key><string>jb_updater_gui</string>
+          <key>CFBundleIconFile</key><string>jb_updater</string>
           <key>LSMinimumSystemVersion</key><string>11.0</string>
           <key>NSHighResolutionCapable</key><true/>
           </dict></plist>

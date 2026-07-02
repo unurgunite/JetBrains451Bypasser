@@ -589,16 +589,32 @@ private def apply_ide_settings(
 end
 
 # ---- UI --------------------------------------------------------------
-UIng.init do
-  window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660)
+UIng.init
 
-  window.on_closing do
+{% if flag?(:darwin) %}
+  file_menu = UIng::Menu.new("File")
+  file_menu.append_quit_item
+  UIng.on_should_quit do
     App.mark_shutting_down
-    UIng.quit
     true
   end
+{% end %}
 
-  root = UIng::Box.new(:vertical)
+window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660, menubar: {{flag?(:darwin)}})
+
+window.on_closing do
+  App.mark_shutting_down
+  if (m = App.browse_table_model)
+    UIng::LibUI.free_table_model(m.to_unsafe)
+  end
+  if (m = App.installed_model)
+    UIng::LibUI.free_table_model(m.to_unsafe)
+  end
+  UIng.quit
+  true
+end
+
+root = UIng::Box.new(:vertical)
   root.padded = false
   window.set_child(root)
 
@@ -1413,4 +1429,3 @@ UIng.init do
 
   window.show
   UIng.main
-end
