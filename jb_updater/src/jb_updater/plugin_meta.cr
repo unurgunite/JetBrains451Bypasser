@@ -10,6 +10,8 @@ module JBUpdater
   class PluginMeta
     # Plugin XML ID (e.g. `"com.intellij.database"`).
     getter id : String
+    # Plugin display name (e.g. `"Database Tools and SQL"`).
+    getter name : String?
     # Plugin version string (e.g. `"2025.1.0"`).
     getter version : String
     # Minimum compatible IDE build (e.g. `"252.0"`) or `nil`.
@@ -27,12 +29,14 @@ module JBUpdater
     def initialize(
       *,
       id : String,
+      name : String? = nil,
       version : String,
       since : String? = nil,
       until_build : String? = nil,
       path : String,
     )
       @id = id
+      @name = name
       @version = version
       @since = since
       @until_build = until_build
@@ -93,27 +97,26 @@ module JBUpdater
     def self.parse_xml(xml : String, path : String) : PluginMeta?
       doc = XML.parse(xml)
       id_node = doc.xpath_node("//id") || doc.xpath_node("//name")
+      name_node = doc.xpath_node("//name")
       version_node = doc.xpath_node("//version")
       idea_version = doc.xpath_node("//idea-version")
       since = idea_version.try &.["since-build"]? || idea_version.try &.["sinceBuild"]?
       until_build = idea_version.try &.["until-build"]? || idea_version.try &.["untilBuild"]?
       id = id_node.try &.content
+      name = name_node.try &.content
       version = version_node.try &.content
       return nil unless id && version
-      new(id: id.strip, version: version.strip, since: since.try &.strip, until_build: until_build.try &.strip, path: path)
+      new(id: id.strip, name: name.try(&.strip), version: version.strip, since: since.try &.strip, until_build: until_build.try &.strip, path: path)
     rescue ex : XML::Error
       nil
     end
 
-    # Reads a file from inside a JAR using the `unzip -p` command.
-    #
-    # @param jar_path [String] Path to the JAR file
-    # @param inner_path [String] Path inside the JAR (e.g. `"META-INF/plugin.xml"`)
-    # @return [String?] File content or `nil` if not found
+    # Reads a file from inside a JAR using `unzip -p`.
     def self.read_text_from_jar(jar_path : String, inner_path : String) : String?
-      out, status = Utils.run_cmd("unzip", "-p", jar_path, inner_path)
-      status.success? ? out : nil
-    rescue ex
+      io = IO::Memory.new
+      status = Process.run("unzip", {"-p", jar_path, inner_path}, output: io, error: :close)
+      status.success? ? io.to_s : nil
+    rescue
       nil
     end
   end

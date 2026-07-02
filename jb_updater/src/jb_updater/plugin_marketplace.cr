@@ -3,6 +3,18 @@ require "http/client"
 require "xml"
 
 module JBUpdater
+  # Strips HTML tags and decodes entities from a string.
+  def self.html_strip(html : String) : String
+    text = html.gsub(/<[^>]*>/, " ")
+      .gsub("&amp;", "&")
+      .gsub("&lt;", "<")
+      .gsub("&gt;", ">")
+      .gsub("&quot;", "\"")
+      .gsub("&#39;", "'")
+      .gsub(/&#(\d+);/) { $1.to_i.chr rescue "?" }
+    text.gsub(/\s+/, " ").strip
+  end
+
   # Metadata for a plugin listed on the JetBrains Marketplace.
   struct PluginInfo
     # Numeric ID on the marketplace.
@@ -110,7 +122,7 @@ module JBUpdater
             id: 0_i64,
             xml_id: xml_id,
             name: name,
-            description: description.strip.gsub(/\s+/, " "),
+            description: JBUpdater.html_strip(description).gsub(/\s+/, " ").strip,
             categories: categories,
             downloads: downloads,
             vendor: vendor,
@@ -230,7 +242,6 @@ module JBUpdater
         query_lower = query.downcase
         plugins.select do |plugin|
           plugin.name.downcase.includes?(query_lower) ||
-            plugin.description.downcase.includes?(query_lower) ||
             plugin.xml_id.downcase.includes?(query_lower)
         end
       end
