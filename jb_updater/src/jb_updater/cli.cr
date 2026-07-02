@@ -89,10 +89,10 @@ module JBUpdater
   # - `-h` / `--help`
   #
   # @return [Options] Parsed CLI options
-  def self.parse_cli : Options
+  def self.parse_cli(argv = ARGV) : Options
     opts = Options.new
 
-    OptionParser.parse do |parser|
+    OptionParser.parse(argv) do |parser|
       parser.banner = "Usage: jb_updater [options]"
       parser.on("--plugins-dir DIR", "Plugins directory") { |v| opts.plugins_dir = v }
       parser.on("-b", "--build BUILD", "IDE build") { |v| opts.build = v }

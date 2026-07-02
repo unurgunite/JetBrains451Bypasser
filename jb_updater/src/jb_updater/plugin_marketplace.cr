@@ -3,7 +3,10 @@ require "http/client"
 require "xml"
 
 module JBUpdater
-  # Strips HTML tags and decodes entities from a string.
+  # Strips HTML tags and decodes common HTML entities from a string.
+  #
+  # @param html [String] Raw HTML input
+  # @return [String] Plain text with tags removed and entities decoded
   def self.html_strip(html : String) : String
     text = html.gsub(/<[^>]*>/, " ")
       .gsub("&amp;", "&")
@@ -60,7 +63,7 @@ module JBUpdater
       @name : String,
       @description : String,
       @icon : String? = nil,
-      @categories : Array(String)? = nil,
+      @categories : Array(String) = [] of String,
       @downloads : Int64 = 0,
       @rating : Float64 = 0.0,
       @author : String? = nil,
@@ -68,8 +71,6 @@ module JBUpdater
       @vendor : String? = nil,
       @preview : String? = nil,
     )
-      @categories ||= [] of String
-      @tags ||= [] of String
     end
 
     # Parses the JetBrains Marketplace XML response into an array of `PluginInfo`.
