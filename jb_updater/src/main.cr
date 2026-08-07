@@ -21,6 +21,7 @@ if opts.list_ide_releases?
   end
 
   product_code = opts.product || raise "missing --product"
+  product_code = JBUpdater::Utils.product_code(product_code)
 
   releases = JBUpdater::IDEReleases.fetch(
     product_code,
