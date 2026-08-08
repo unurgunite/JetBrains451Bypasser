@@ -153,19 +153,7 @@ module JBUpdater
     # @param name [String] Product name (e.g. "RubyMine2025.2")
     # @return [String] Product code (e.g. "RM")
     def infer_code(name : String) : String
-      mapping = {
-        "RubyMine" => "RM",
-        "WebStorm" => "WS",
-        "PyCharm"  => "PY",
-        "CLion"    => "CL",
-        "GoLand"   => "GO",
-        "IntelliJ" => "IU",
-        "PhpStorm" => "PS",
-        "Rider"    => "RD",
-      }
-
-      key = name.gsub(/[\d ].*/, "")
-      mapping[key]? || name[0, 2].upcase
+      Utils.product_code(name)
     end
 
     # Converts a product name and code into an API build string.

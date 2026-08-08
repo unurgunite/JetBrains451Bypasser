@@ -68,19 +68,51 @@ module JBUpdater
       data = JSON.parse(body)
       version = data[product_code][0]["version"].as_s
       downloads = data[product_code][0]["downloads"]
-      link = nil
 
-      arch = opts.arch || autodetect_arch
+      platform_key = download_key_for(platform, opts.arch)
 
-      if arch == "arm" && downloads["macM1"]?
-        link = downloads["macM1"]["link"].as_s
-      else
-        link = downloads["mac"]["link"].as_s
-      end
+      entry = downloads[platform_key]? || raise "No download entry found for platform '#{platform}' (#{platform_key}) for #{product_code}"
+      link = entry["link"].as_s
 
       dmg_url = link
       Log.success("Latest version #{version}")
       URI.parse(dmg_url)
+    end
+
+    # Determines the current OS platform.
+    #
+    # @return [String] `"mac"`, `"linux"`, or `"windows"`
+    private def platform : String
+      {% if flag?(:darwin) %}
+        "mac"
+      {% elsif flag?(:linux) %}
+        "linux"
+      {% elsif flag?(:win32) %}
+        "windows"
+      {% else %}
+        raise "Unsupported OS"
+      {% end %}
+    end
+
+    # Maps platform + architecture to the JetBrains releases API download key.
+    #
+    # - **mac** (Apple Silicon): `macM1`; otherwise: `mac`
+    # - **linux** (ARM64): `linuxARM64`; otherwise: `linux`
+    # - **windows**: `windows`
+    #
+    # @param platform [String] OS platform (`"mac"`, `"linux"`, `"windows"`)
+    # @param arch [String?] Architecture (`"arm"` or `"intel"`); autodetected if nil
+    # @return [String] Download key in the JetBrains releases API payload
+    private def download_key_for(platform : String, arch : String?) : String
+      cpu = arch || autodetect_arch
+      case platform
+      when "mac"
+        cpu == "arm" ? "macM1" : "mac"
+      when "linux"
+        cpu == "arm" ? "linuxARM64" : "linux"
+      else
+        "windows"
+      end
     end
 
     # Detects the CPU architecture by running `uname -m`.
@@ -104,16 +136,12 @@ module JBUpdater
 
     # Maps a product name to its JetBrains product code.
     #
-    # @param product [String] Product name (e.g. `"RubyMine2025.2"`)
-    # @return [String] Product code (e.g. `"RM"`)
+    # Delegates to {JBUpdater.Utils.product_code} (case-insensitive).
+    #
+    # @param product [String] Product name (e.g. `"PhpStorm2025.1"` or `"phpstorm"`)
+    # @return [String] Product code (e.g. `"PS"`)
     private def infer_product_code(product : String) : String
-      {
-        "RubyMine" => "RM",
-        "WebStorm" => "WS",
-        "PyCharm"  => "PY",
-        "CLion"    => "CL",
-        "GoLand"   => "GO",
-      }[product.gsub(/\d+.*/, "")] || product[0, 2].upcase
+      Utils.product_code(product)
     end
 
     # ------------------------------------------------------------------------
@@ -126,7 +154,12 @@ module JBUpdater
     # @param product [String] Product name (for logging)
     # @param uri [URI] Download URL (with CDN override already applied)
     private def upgrade_direct(product : String, uri : URI) : Nil
-      dmg_path = File.join(Dir.tempdir, "upgrade-#{product}-#{Time.utc.to_unix}.dmg")
+      ext = case platform
+            when "mac"     then ".dmg"
+            when "windows" then ".exe"
+            else                ".tar.gz"
+            end
+      dmg_path = File.join(Dir.tempdir, "upgrade-#{product}-#{Time.utc.to_unix}#{ext}")
 
       cdn_uri = uri
 

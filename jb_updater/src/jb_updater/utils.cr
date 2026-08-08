@@ -119,6 +119,31 @@ module JBUpdater
       (s <= b) && (b <= u)
     end
 
+    # Maps a product name to its JetBrains product code.
+    #
+    # Strips trailing version numbers and spaces, matches the base
+    # name case-insensitively, and returns the short code
+    # (e.g. `"RubyMine2025.2"` -> `"RM"`, `"phpstorm"` -> `"PS"`).
+    # Unknown names fall back to the first two uppercase characters.
+    #
+    # @param name [String] Product name (e.g. `"RubyMine2025.2"` or `"phpstorm"`)
+    # @return [String] Product code (e.g. `"RM"`)
+    def self.product_code(name : String) : String
+      mapping = {
+        "rubymine" => "RM",
+        "webstorm" => "WS",
+        "pycharm"  => "PY",
+        "clion"    => "CL",
+        "goland"   => "GO",
+        "intellij" => "IU",
+        "phpstorm" => "PS",
+        "rider"    => "RD",
+      }
+
+      key = name.gsub(/[\d ].*/, "").downcase
+      mapping[key]? || name[0, 2].upcase
+    end
+
     # URL-encodes a path segment, replacing `%20` with `+`.
     #
     # @param str [String] Raw path segment
