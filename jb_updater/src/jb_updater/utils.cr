@@ -85,7 +85,7 @@ module JBUpdater
     # archives with invalid timestamp fields (common on JetBrains
     # marketplace) are still readable.
     private def self.zip_file_entries(zip_path : String) : Array(Tuple(String, UInt16, UInt32, UInt32))
-      file_bytes = File.open(zip_path, "rb") { |file| file.gets_to_end.to_slice }
+      file_bytes = File.open(zip_path, "rb", &.gets_to_end.to_slice)
       io = IO::Memory.new(file_bytes)
       le = IO::ByteFormat::LittleEndian
 
@@ -157,7 +157,7 @@ module JBUpdater
 
     # Yields a deflate/stored entry's decompressed bytes stream.
     private def self.zip_entry_bytes(zip_path : String, method : UInt16, comp_size : UInt32, offset : UInt32, & : IO ->)
-      file_bytes = File.open(zip_path, "rb") { |file| file.gets_to_end.to_slice }
+      file_bytes = File.open(zip_path, "rb", &.gets_to_end.to_slice)
       io = IO::Memory.new(file_bytes)
       le = IO::ByteFormat::LittleEndian
 
@@ -187,8 +187,8 @@ module JBUpdater
     # timestamp bug).
     def self.read_zip_file(zip_path : String, inner_path : String) : String?
       entry = zip_file_entries(zip_path).find { |(name, _, _, _)| name == inner_path }
-      return nil unless entry
-      name, method, comp_size, offset = entry
+      return unless entry
+      _, method, comp_size, offset = entry
       result = String.build do |str|
         zip_entry_bytes(zip_path, method, comp_size, offset) do |io|
           if method == 0
@@ -361,7 +361,7 @@ module JBUpdater
     # @param name [String] Product name (e.g. `"RubyMine"`)
     # @return [String?] Absolute path of the newest matching dir, or `nil`
     def self.latest_versioned_config_dir(base_dir : String, name : String) : String?
-      return nil unless Dir.exists?(base_dir)
+      return unless Dir.exists?(base_dir)
 
       pattern = /^#{Regex.escape(name)}(\d|$)/i
       matches = [] of {String, Array(Float64)}
@@ -373,7 +373,7 @@ module JBUpdater
         matches << {entry, tail.empty? ? [0.0, 0.0, 0.0] : version_numbers(tail)}
       end
 
-      return nil if matches.empty?
+      return if matches.empty?
 
       best = matches.max_by(&.[1])[0]
       File.join(base_dir, best)

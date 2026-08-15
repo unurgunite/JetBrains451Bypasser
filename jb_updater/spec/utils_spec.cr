@@ -189,7 +189,7 @@ describe Utils do
         zip_path = File.join(dir, "archive.zip")
         File.open(zip_path, "w") do |io|
           Compress::Zip::Writer.open(io) do |zip|
-            zip.add("plugin/file.txt") { |e| e.print "x" }
+            zip.add("plugin/file.txt", &.print("x"))
           end
         end
 
@@ -208,7 +208,7 @@ describe Utils do
         zip_path = File.join(dir, "archive.zip")
         File.open(zip_path, "w") do |io|
           Compress::Zip::Writer.open(io) do |zip|
-            zip.add("plugin1/lib/a.jar") { |e| e.print "jar-bytes" }
+            zip.add("plugin1/lib/a.jar", &.print("jar-bytes"))
           end
         end
 

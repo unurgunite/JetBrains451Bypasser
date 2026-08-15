@@ -775,11 +775,11 @@ debug_btn : UIng::Button? = nil
 actions_row : UIng::Box? = nil
 if dev_mode
   actions_row = UIng::Box.new(:horizontal)
-  actions_row.not_nil!.padded = true
+  actions_row.padded = true
   btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
   debug_btn = UIng::Button.new("Debug: Re-enable UI")
-  actions_row.not_nil!.append(btn_remove_cache.not_nil!, false)
-  actions_row.not_nil!.append(debug_btn.not_nil!, false)
+  actions_row.append(btn_remove_cache, false)
+  actions_row.append(debug_btn, false)
 end
 root.append(actions_row, false) if actions_row
 
@@ -813,8 +813,8 @@ JBUpdater::Log.listener = ->(msg : String) {
   App.push_log(msg)
 }
 
-if dev_mode
-  debug_btn.not_nil!.on_clicked do
+if debug_btn
+  debug_btn.on_clicked do
     UIng.queue_main do
       App.debug_reenable
       status_label.text = "UI re-enabled"
@@ -1334,45 +1334,45 @@ end
 log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 status_label.text = "Ready"
 
-if dev_mode
-  btn_remove_cache.not_nil!.on_clicked do
+if btn_remove_cache
+  btn_remove_cache.on_clicked do
     UIng.queue_main do
-    raw = e_plugins_dir.text
-    if raw.nil? || raw.empty?
-      log.append("ERROR: Plugins dir is required for Remove cache.\n")
-      status_label.text = "Error: missing plugins dir"
-    else
-      plugins_dir = expand_tilde(raw) || raw
-      if !Dir.exists?(plugins_dir)
-        log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
-        status_label.text = "Error: dir not found"
+      raw = e_plugins_dir.text
+      if raw.nil? || raw.empty?
+        log.append("ERROR: Plugins dir is required for Remove cache.\n")
+        status_label.text = "Error: missing plugins dir"
       else
-        begin
-          removed = 0
-          Dir.each_child(plugins_dir) do |entry|
-            if entry.includes?(".bak")
-              path = File.join(plugins_dir, entry)
-              FileUtils.rm_rf(path)
-              removed += 1
-              log.append("Removed backup: #{path}\n")
+        plugins_dir = expand_tilde(raw) || raw
+        if !Dir.exists?(plugins_dir)
+          log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
+          status_label.text = "Error: dir not found"
+        else
+          begin
+            removed = 0
+            Dir.each_child(plugins_dir) do |entry|
+              if entry.includes?(".bak")
+                path = File.join(plugins_dir, entry)
+                FileUtils.rm_rf(path)
+                removed += 1
+                log.append("Removed backup: #{path}\n")
+              end
             end
-          end
 
-          if removed == 0
-            log.append("No *.bak* backup entries found under #{plugins_dir}\n")
-            status_label.text = "No backups found"
-          else
-            log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
-            status_label.text = "Removed #{removed} backup(s)"
+            if removed == 0
+              log.append("No *.bak* backup entries found under #{plugins_dir}\n")
+              status_label.text = "No backups found"
+            else
+              log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
+              status_label.text = "Removed #{removed} backup(s)"
+            end
+          rescue ex
+            log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
+            status_label.text = "Error during cache removal"
           end
-        rescue ex
-          log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
-          status_label.text = "Error during cache removal"
         end
       end
     end
   end
-end
 end
 
 btn_list.on_clicked do
