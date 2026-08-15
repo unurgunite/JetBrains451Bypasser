@@ -66,7 +66,10 @@ module JBUpdater
       body = res.body || raise "empty response body"
       data = JSON.parse(body)
       arr = data[product_code]?.try &.as_a?
-      raise "IDEReleases: unexpected JSON for #{product_code}" if arr.nil? || arr.empty?
+      if arr.nil? || arr.empty?
+        raise "IDEReleases: no releases found for product code '#{product_code}' " \
+              "(check the --product value or configured product code)"
+      end
 
       releases = [] of IDERelease
 

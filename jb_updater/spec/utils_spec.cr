@@ -46,8 +46,48 @@ describe Utils do
       Utils.product_code("intellij").should eq "IU"
     end
 
+    it "maps short and alternate names" do
+      Utils.product_code("ruby").should eq "RM"
+      Utils.product_code("idea").should eq "IU"
+      Utils.product_code("rm").should eq "RM"
+      Utils.product_code("ws").should eq "WS"
+      Utils.product_code("py").should eq "PY"
+    end
+
     it "falls back to first two uppercase characters for unknown names" do
       Utils.product_code("MyCustomIDE").should eq "MY"
+    end
+  end
+
+  describe ".version_numbers" do
+    it "parses plain version suffix" do
+      Utils.version_numbers("2025.2").should eq [2025.0, 2.0, 0.0]
+    end
+
+    it "does not raise on backup suffix" do
+      Utils.version_numbers("2025.2-backup").should eq [2025.0, 2.0, 0.0]
+    end
+
+    it "does not raise on alpha fragment" do
+      Utils.version_numbers("2025.2-eap").should eq [2025.0, 2.0, 0.0]
+    end
+
+    it "parses full three-part version" do
+      Utils.version_numbers("2025.2.1").should eq [2025.0, 2.0, 1.0]
+    end
+  end
+
+  describe ".backup_folder?" do
+    it "detects .bak timestamps" do
+      Utils.backup_folder?("WebStorm2025.2.bak.1700000000").should be_true
+    end
+
+    it "detects -backup suffix" do
+      Utils.backup_folder?("WebStorm2025.2-backup").should be_true
+    end
+
+    it "accepts regular folders" do
+      Utils.backup_folder?("WebStorm2025.2").should be_false
     end
   end
 end

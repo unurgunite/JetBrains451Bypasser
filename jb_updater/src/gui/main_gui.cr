@@ -2,6 +2,7 @@ require "../jb_updater"
 require "../jb_updater/detect_products"
 require "../jb_updater/plugin_marketplace"
 require "../jb_updater/gui_actions"
+require "../jb_updater/clipboard"
 require "file_utils"
 require "json"
 require "uing"
@@ -50,6 +51,39 @@ module App
   @@op_mutex : Mutex = Mutex.new
   @@log_buffer : Array(String) = [] of String
   @@log_buffer_mutex : Mutex = Mutex.new
+
+  # Status bar label (bottom of the window).
+  @@status_label : UIng::Label? = nil
+
+  # Two-step uninstall confirmation state.
+  @@pending_uninstall : String? = nil
+  @@pending_uninstall_at : Time::Instant = Time.instant
+
+  def self.status_label : UIng::Label
+    @@status_label || raise "status label not initialized"
+  end
+
+  def self.status_label=(label : UIng::Label)
+    @@status_label = label
+  end
+
+  # Arms a two-step uninstall confirmation for a plugin ID.
+  def self.arm_uninstall(id : String)
+    @@pending_uninstall = id
+    @@pending_uninstall_at = Time.instant
+  end
+
+  # Consumes the confirmation if it matches and is still recent.
+  def self.confirm_uninstall?(id : String) : Bool
+    armed = @@pending_uninstall == id
+    recent = @@pending_uninstall_at.elapsed < 10.seconds
+    @@pending_uninstall = nil
+    armed && recent
+  end
+
+  def self.cancel_uninstall
+    @@pending_uninstall = nil
+  end
 
   # Download progress (set from background thread, read from UI timer)
   @@download_progress : Int32 = 0
@@ -426,7 +460,10 @@ private def run_cli(args : Array(String)) : Nil
     UIng.queue_main do
       next if App.shutting_down?
       App.log.append("[CLI] exit code: #{status.exit_code}\n")
-      App.plugin_progress.value = 100 if status.success?
+      if status.success?
+        App.plugin_progress.value = 100
+      end
+      App.status_label.text = status.success? ? "Done (exit #{status.exit_code})" : "Failed (exit #{status.exit_code})"
       App.busy = false
       App.debug_reenable
     end
@@ -434,6 +471,7 @@ private def run_cli(args : Array(String)) : Nil
     UIng.queue_main do
       next if App.shutting_down?
       App.log.append("[CLI] ERROR: #{ex.message}\n")
+      App.status_label.text = "Error: #{ex.message}"
       App.busy = false
       App.debug_reenable
     end
@@ -682,6 +720,7 @@ JBUpdater::Log.listener = ->(msg : String) {
 {% end %}
 
 status_label = UIng::Label.new("Ready")
+App.status_label = status_label
 status_box = UIng::Box.new(:horizontal)
 status_box.padded = true
 status_box.append(status_label, true)
@@ -903,6 +942,26 @@ browse_status_box.padded = true
 browse_status_box.append(browse_status, true)
 browse_left.append(browse_status_box, false)
 
+# Diff-updates the browse table and status after a fetch completes.
+# Must run on the UI thread (called from UIng.queue_main).
+browse_update = ->(plugins : Array(JBUpdater::PluginInfo), status : String) {
+  if model = App.browse_table_model
+    old_count = App.browse_plugins.size
+    App.browse_plugins = plugins
+    if old_count == 0
+      plugins.each_with_index { |_, i| model.row_inserted(i) }
+    elsif plugins.size >= old_count
+      (0...old_count).each { |i| model.row_changed(i) }
+      (old_count...plugins.size).each { |i| model.row_inserted(i) }
+    else
+      (0...plugins.size).each { |i| model.row_changed(i) }
+      (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+    end
+  end
+  browse_status.text = status
+  App.log.append("[Browse] #{status}\n")
+}
+
 browse_detail_box = UIng::Box.new(:vertical)
 browse_detail_box.padded = true
 detail_label = UIng::Label.new("Plugin Details")
@@ -994,6 +1053,7 @@ btn_scan_installed.on_clicked do
 end
 
 installed_table.on_selection_changed do |selection|
+  App.cancel_uninstall
   if selection.num_rows > 0
     btn_uninstall.enable
   else
@@ -1008,6 +1068,12 @@ btn_uninstall.on_clicked do
       row = sel.rows[0]
       plugin = App.installed_plugins_arr[row]?
       if plugin
+        # Two-step confirmation guards against accidental deletion.
+        unless App.confirm_uninstall?(plugin.id)
+          App.arm_uninstall(plugin.id)
+          installed_status.text = "Click Uninstall again to confirm deleting #{plugin.id}"
+          next
+        end
         FileUtils.rm_rf(plugin.path)
         scanned = JBUpdater::PluginMeta.scan_dir(File.dirname(plugin.path)) rescue nil
         old_count = App.installed_plugins_arr.size
@@ -1070,6 +1136,7 @@ combo_products.on_selected do
         e_plugins_dir.text = dir
       end
       e_product.text = prod.name
+      e_build.text = prod.build
       e_ide_product.text = prod.build
       if path = prod.ide_path
         e_ide_path.text = path
@@ -1261,113 +1328,129 @@ if inst && inst.size > 0
   App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
 end
 
-# Warm marketplace cache after UI is visible (1s delay)
+# Warm marketplace cache after UI is visible (1s delay).
+# Heavy HTTP + XML parsing runs on a background thread to avoid
+# crashes inside the AppKit timer callback (bug CB1).
 UIng.timer(1_000) do
   build = resolve_build.call
-  JBUpdater::PluginMarketplace.list_by_build(build)
-  log.append("[Browse] Marketplace cache warmed: #{build}\n")
+  Thread.new do
+    JBUpdater::PluginMarketplace.list_by_build(build)
+    UIng.queue_main do
+      next if App.shutting_down?
+      log.append("[Browse] Marketplace cache warmed: #{build}\n")
+    end
+  rescue ex
+    UIng.queue_main do
+      next if App.shutting_down?
+      log.append("[Browse] Cache warm failed: #{ex.class}: #{ex.message}\n")
+    end
+  end
   0
 end
 
 search_entry.on_changed do |text|
   query = text || ""
+  App.search_id += 1
+  my_id = App.search_id
+
   if query.empty?
-    model = App.browse_table_model
-    if model
+    if model = App.browse_table_model
       old_count = App.browse_plugins.size
       App.browse_plugins = [] of JBUpdater::PluginInfo
       (0...old_count).each { |i| model.row_deleted(0) }
     end
     App.selected_xml_id = nil
     browse_status.text = "Type to search plugins..."
-    next
-  end
-
-  build = resolve_build.call
-  plugins = JBUpdater::PluginMarketplace.search(query, build)
-
-  model = App.browse_table_model
-  next unless model
-
-  old_count = App.browse_plugins.size
-  App.browse_plugins = plugins
-  if old_count == 0
-    plugins.each_with_index { |_, i| model.row_inserted(i) }
-  elsif plugins.size >= old_count
-    (0...old_count).each { |i| model.row_changed(i) }
-    (old_count...plugins.size).each { |i| model.row_inserted(i) }
   else
-    (0...plugins.size).each { |i| model.row_changed(i) }
-    (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+    build = resolve_build.call
+    browse_status.text = "Searching..."
+    # Filtering runs on a background thread and is debounced so rapid
+    # keystrokes only trigger the final query (bug CB2).
+    Thread.new do
+      sleep 250.milliseconds
+      if my_id == App.search_id
+        begin
+          plugins = JBUpdater::PluginMarketplace.search(query, build)
+          UIng.queue_main do
+            next if App.shutting_down?
+            if my_id == App.search_id
+              browse_update.call(plugins, "Found #{plugins.size} results")
+            end
+          end
+        rescue ex
+          UIng.queue_main do
+            next if App.shutting_down?
+            if my_id == App.search_id
+              App.log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
+              browse_status.text = "Search error: #{ex.message}"
+            end
+          end
+        end
+      end
+    end
   end
-  browse_status.text = "Found #{plugins.size} results"
 rescue ex
-  log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
-  browse_status.text = "Search error: #{ex.class} #{ex.message}"
+  App.log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
+  browse_status.text = "Search error: #{ex.message}"
 end
 
 btn_top.on_clicked do
   build = resolve_build.call
-  browse_status.text = "Fetching top plugins (may lag)..."
+  App.search_id += 1
+  browse_status.text = "Fetching top plugins..."
   log.append("[Browse] Fetching top downloaded for build #{build}...\n")
-  plugins = JBUpdater::PluginMarketplace.top_downloaded(build, 100)
-  log.append("[Browse] Got #{plugins.size} plugins, updating table...\n")
-  plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
-
-  model = App.browse_table_model
-  next unless model
-
-  old_count = App.browse_plugins.size
-  App.browse_plugins = plugins
-  if old_count == 0
-    plugins.each_with_index { |_, i| model.row_inserted(i) }
-  elsif plugins.size >= old_count
-    (0...old_count).each { |i| model.row_changed(i) }
-    (old_count...plugins.size).each { |i| model.row_inserted(i) }
-  else
-    (0...plugins.size).each { |i| model.row_changed(i) }
-    (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+  Thread.new do
+    plugins = JBUpdater::PluginMarketplace.top_downloaded(build, 100)
+    UIng.queue_main do
+      next if App.shutting_down?
+      plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
+      browse_update.call(plugins, "Loaded #{plugins.size} plugins (top downloads)")
+    end
+  rescue ex
+    UIng.queue_main do
+      next if App.shutting_down?
+      log.append("[Browse] Top downloads error: #{ex.class}: #{ex.message}\n")
+      browse_status.text = "Error: #{ex.message}"
+    end
   end
-  browse_status.text = "Loaded #{plugins.size} plugins (top downloads)"
 end
 
 btn_newest.on_clicked do
   build = resolve_build.call
+  App.search_id += 1
   browse_status.text = "Fetching latest plugins..."
   log.append("[Browse] Fetching newest for build #{build}...\n")
-  plugins = JBUpdater::PluginMarketplace.newest(build, 100)
-  log.append("[Browse] Got #{plugins.size} plugins, updating table...\n")
-  plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
-
-  model = App.browse_table_model
-  next unless model
-
-  old_count = App.browse_plugins.size
-  App.browse_plugins = plugins
-  if old_count == 0
-    plugins.each_with_index { |_, i| model.row_inserted(i) }
-  elsif plugins.size >= old_count
-    (0...old_count).each { |i| model.row_changed(i) }
-    (old_count...plugins.size).each { |i| model.row_inserted(i) }
-  else
-    (0...plugins.size).each { |i| model.row_changed(i) }
-    (plugins.size...old_count).each { |i| model.row_deleted(i) }
+  Thread.new do
+    plugins = JBUpdater::PluginMarketplace.newest(build, 100)
+    UIng.queue_main do
+      next if App.shutting_down?
+      plugins.first(3).each { |plugin| log.append("  #{plugin.name} (#{plugin.downloads} dl)\n") }
+      browse_update.call(plugins, "Loaded #{plugins.size} plugins (latest)")
+    end
+  rescue ex
+    UIng.queue_main do
+      next if App.shutting_down?
+      log.append("[Browse] Newest error: #{ex.class}: #{ex.message}\n")
+      browse_status.text = "Error: #{ex.message}"
+    end
   end
-  browse_status.text = "Loaded #{plugins.size} plugins (latest)"
 end
 
 btn_refresh.on_clicked do
   UIng.queue_main do
+    App.search_id += 1
     App.installed_plugins = nil
-    model = App.browse_table_model
-    if model
+    App.selected_xml_id = nil
+    JBUpdater::PluginMarketplace.clear_cache
+    if model = App.browse_table_model
       old_count = App.browse_plugins.size
       (0...old_count).each { |i| model.row_deleted(i) }
       App.browse_plugins = [] of JBUpdater::PluginInfo
-      App.selected_xml_id = nil
-      JBUpdater::PluginMarketplace.clear_cache
-      browse_status.text = "Cache cleared. Click Top/Refresh to reload."
     end
+    browse_status.text = "Cache cleared. Click Top/Refresh to reload."
+  rescue ex
+    log.append("[Browse] Refresh error: #{ex.class}: #{ex.message}\n")
+    browse_status.text = "Refresh error: #{ex.message}"
   end
 end
 
@@ -1411,8 +1494,9 @@ btn_copy_id.on_clicked do
   if xml_id.nil? || xml_id.empty?
     browse_status.text = "Please select a plugin first"
   else
-    log.append("[Browse] Copied XML ID: #{xml_id}\n")
-    browse_status.text = "Copied to clipboard: #{xml_id}"
+    copied = JBUpdater::Clipboard.copy(xml_id)
+    log.append("[Browse] Copied XML ID: #{xml_id} (#{copied ? "ok" : "failed"})\n")
+    browse_status.text = copied ? "Copied to clipboard: #{xml_id}" : "Copy to clipboard failed: #{xml_id}"
   end
 end
 

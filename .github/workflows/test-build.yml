@@ -42,7 +42,7 @@ jobs:
 
       - name: Build GUI
         working-directory: ./jb_updater
-        run: crystal build src/gui/main_gui.cr --release -o jb_updater_gui
+        run: crystal build src/gui/main_gui.cr --release -Dpreview_mt -o jb_updater_gui
 
       - name: Run CLI --help
         working-directory: ./jb_updater

@@ -57,6 +57,61 @@ describe Utils do
       end
     end
 
+    it "ignores backup folders when resolving the latest version" do
+      tmp = File.join(Dir.tempdir, "jb-test-#{Random::Secure.hex(4)}")
+      base = ""
+
+      {% if flag?(:darwin) %}
+        base = File.join(tmp, "Library/Application Support/JetBrains")
+        ENV["HOME"] = tmp
+      {% elsif flag?(:linux) %}
+        base = File.join(tmp, ".local/share/JetBrains")
+        ENV["HOME"] = tmp
+      {% elsif flag?(:win32) %}
+        base = File.join(tmp, "AppData", "Roaming", "JetBrains")
+        FileUtils.mkdir_p(File.dirname(base))
+        ENV["APPDATA"] = File.join(tmp, "AppData", "Roaming")
+      {% end %}
+
+      FileUtils.mkdir_p(File.join(base, "WebStorm2025.2"))
+      FileUtils.mkdir_p(File.join(base, "WebStorm2025.2-backup"))
+      FileUtils.mkdir_p(File.join(base, "WebStorm2024.1.bak.1700000000"))
+
+      begin
+        latest = Utils.resolve_product_folder("WebStorm")
+        latest.should eq "WebStorm2025.2"
+      ensure
+        FileUtils.rm_rf(tmp)
+      end
+    end
+
+    it "raises when only a backup-style folder matches" do
+      tmp = File.join(Dir.tempdir, "jb-test-#{Random::Secure.hex(4)}")
+      base = ""
+
+      {% if flag?(:darwin) %}
+        base = File.join(tmp, "Library/Application Support/JetBrains")
+        ENV["HOME"] = tmp
+      {% elsif flag?(:linux) %}
+        base = File.join(tmp, ".local/share/JetBrains")
+        ENV["HOME"] = tmp
+      {% elsif flag?(:win32) %}
+        base = File.join(tmp, "AppData", "Roaming", "JetBrains")
+        FileUtils.mkdir_p(File.dirname(base))
+        ENV["APPDATA"] = File.join(tmp, "AppData", "Roaming")
+      {% end %}
+
+      FileUtils.mkdir_p(File.join(base, "FooIDE2025.2-backup"))
+
+      begin
+        expect_raises(Exception, /No config folder/) do
+          Utils.resolve_product_folder("FooIDE")
+        end
+      ensure
+        FileUtils.rm_rf(tmp)
+      end
+    end
+
     it "raises if no matching folder found" do
       tmp = File.join(Dir.tempdir, "jb-test-#{Random::Secure.hex(4)}")
       base = ""

@@ -123,21 +123,37 @@ module JBUpdater
     #
     # Strips trailing version numbers and spaces, matches the base
     # name case-insensitively, and returns the short code
-    # (e.g. `"RubyMine2025.2"` -> `"RM"`, `"phpstorm"` -> `"PS"`).
+    # (e.g. `"RubyMine2025.2"` -> `"RM"`, `"ruby"` -> `"RM"`).
     # Unknown names fall back to the first two uppercase characters.
     #
     # @param name [String] Product name (e.g. `"RubyMine2025.2"` or `"phpstorm"`)
     # @return [String] Product code (e.g. `"RM"`)
     def self.product_code(name : String) : String
       mapping = {
-        "rubymine" => "RM",
-        "webstorm" => "WS",
-        "pycharm"  => "PY",
-        "clion"    => "CL",
-        "goland"   => "GO",
-        "intellij" => "IU",
-        "phpstorm" => "PS",
-        "rider"    => "RD",
+        "ruby"      => "RM",
+        "rubymine"  => "RM",
+        "rm"        => "RM",
+        "webstorm"  => "WS",
+        "ws"        => "WS",
+        "pycharm"   => "PY",
+        "py"        => "PY",
+        "clion"     => "CL",
+        "cl"        => "CL",
+        "goland"    => "GO",
+        "go"        => "GO",
+        "intellij"  => "IU",
+        "idea"      => "IU",
+        "iu"        => "IU",
+        "phpstorm"  => "PS",
+        "ps"        => "PS",
+        "rider"     => "RD",
+        "rd"        => "RD",
+        "datagrip"  => "DG",
+        "dg"        => "DG",
+        "dataspell" => "DS",
+        "ds"        => "DS",
+        "aqua"      => "QA",
+        "appcode"   => "AC",
       }
 
       key = name.gsub(/[\d ].*/, "").downcase
@@ -197,10 +213,10 @@ module JBUpdater
       begin
         Dir.each_child(base_dir) do |entry|
           next unless pattern.matches?(entry)
+          next if backup_folder?(entry)
           tail = entry.sub(/^#{short}/i, "")
           next if tail.empty?
-          parts = tail.split('.', 3)
-          numbers = parts.map(&.to_f).fill(0.0, parts.size...3)
+          numbers = version_numbers(tail)
           matches << {entry, numbers}
         end
       rescue File::NotFoundError
@@ -210,6 +226,32 @@ module JBUpdater
       raise "No config folder found for product '#{short}' under #{base_dir}" if matches.empty?
 
       matches.max_by(&.[1])[0]
+    end
+
+    # Extracts up to three version numbers from a product folder suffix.
+    #
+    # Tolerates non-numeric fragments (e.g. `"2025.2-backup"` → `[2025.0, 2.0]`)
+    # instead of raising on `String#to_f`.
+    #
+    # @param tail [String] Folder name suffix after the product name
+    # @return [Array(Float64)] Three-element version array
+    def self.version_numbers(tail : String) : Array(Float64)
+      parts = tail.split('.', 3)
+      numbers = parts.map do |part|
+        match = part.match(/\A[^0-9]*(\d+(?:\.\d+)?)/)
+        match ? match[1].to_f : 0.0
+      end
+      numbers.push(0.0, 0.0, 0.0)[0, 3]
+    end
+
+    # Detects backup-style folder names produced by updater backups.
+    #
+    # Matches `.bak`, `.bak.<timestamp>`, `-backup`, and `_backup` suffixes.
+    #
+    # @param entry [String] Folder name
+    # @return [Bool] `true` if the name looks like a backup folder
+    def self.backup_folder?(entry : String) : Bool
+      entry.matches?(/(\.bak|[-_]?backup)/i)
     end
 
     # Returns the `plugins` subdirectory for a JetBrains product, creating it if needed.

@@ -86,53 +86,60 @@ module JBUpdater
       begin
         doc = XML.parse(cleaned)
         doc.xpath_nodes("//idea-plugin").each do |plugin_node|
-          next unless plugin_node
-
-          xml_id = ""
-          name = ""
-          description = ""
-          vendor = ""
-
-          if id_node = plugin_node.xpath_node("id")
-            xml_id = id_node.content
+          if plugin = parse_plugin_node(plugin_node)
+            result << plugin
           end
-          if name_node = plugin_node.xpath_node("name")
-            name = name_node.content
-          end
-          if desc_node = plugin_node.xpath_node("description")
-            description = desc_node.content
-          end
-          if vendor_node = plugin_node.xpath_node("vendor")
-            vendor = vendor_node.content
-          end
-
-          downloads = 0_i64
-          if dm = plugin_node["downloads"]?
-            downloads = dm.to_i64 rescue 0_i64
-          end
-
-          categories = [] of String
-          if tag_node = plugin_node.xpath_node("tags")
-            tag_node.content.split(",").each do |tag|
-              t = tag.strip
-              categories << t unless t.empty? || categories.includes?(t)
-            end
-          end
-
-          result << PluginInfo.new(
-            id: 0_i64,
-            xml_id: xml_id,
-            name: name,
-            description: JBUpdater.html_strip(description).gsub(/\s+/, " ").strip,
-            categories: categories,
-            downloads: downloads,
-            vendor: vendor,
-          )
         end
       rescue
       end
 
       result
+    end
+
+    # Extracts a single `PluginInfo` from an `<idea-plugin>` XML node.
+    #
+    # Missing optional fields (rating, downloads, tags) default safely.
+    #
+    # @param plugin_node [XML::Node] The `<idea-plugin>` element
+    # @return [PluginInfo?] Parsed plugin, or `nil` for empty nodes
+    private def self.parse_plugin_node(plugin_node : XML::Node) : PluginInfo?
+      xml_id = node_text(plugin_node, "id")
+      return if xml_id.empty?
+
+      description = node_text(plugin_node, "description")
+      downloads = 0_i64
+      if dm = plugin_node["downloads"]?
+        downloads = dm.to_i64 rescue 0_i64
+      end
+      rating = node_text(plugin_node, "rating").to_f rescue 0.0
+
+      categories = [] of String
+      if tag_node = plugin_node.xpath_node("tags")
+        tag_node.content.split(",").each do |tag|
+          t = tag.strip
+          categories << t unless t.empty? || categories.includes?(t)
+        end
+      end
+
+      PluginInfo.new(
+        id: 0_i64,
+        xml_id: xml_id,
+        name: node_text(plugin_node, "name"),
+        description: JBUpdater.html_strip(description).gsub(/\s+/, " ").strip,
+        categories: categories,
+        downloads: downloads,
+        rating: rating,
+        vendor: node_text(plugin_node, "vendor"),
+      )
+    end
+
+    # Reads the text content of a direct child element, or `""`.
+    #
+    # @param node [XML::Node] Parent element
+    # @param element [String] Child element name
+    # @return [String] Element content or empty string
+    private def self.node_text(node : XML::Node, element : String) : String
+      node.xpath_node(element).try(&.content) || ""
     end
 
     # Returns the direct file download URL for this plugin.
@@ -170,13 +177,15 @@ module JBUpdater
       end
     end
 
-    # Placeholder star rating display.
+    # Renders the plugin's average rating as filled/empty stars.
     #
-    # Currently always returns five stars.
+    # Returns an em-dash for unrated plugins.
     #
-    # @return [String] `"⭐⭐⭐⭐⭐"`
+    # @return [String] e.g. `"★★★★☆"` or `"—"`
     def star_rating : String
-      "⭐" * 5
+      return "—" if rating <= 0.0
+      filled = rating.round.to_i.clamp(0, 5)
+      "★" * filled + "☆" * (5 - filled)
     end
   end
 
@@ -187,10 +196,11 @@ module JBUpdater
   # build string to avoid redundant requests.
   class PluginMarketplace
     @@cache = {} of String => Array(PluginInfo)
+    @@cache_mutex = Mutex.new
 
     # Clears the in-memory plugin list cache.
     def self.clear_cache
-      @@cache.clear
+      @@cache_mutex.synchronize { @@cache.clear }
     end
 
     # Fetches (or returns cached) plugin list for a given IDE build.
@@ -201,7 +211,7 @@ module JBUpdater
     # @param build [String] IDE build string
     # @return [Array(PluginInfo)] List of available plugins
     def self.list_by_build(build : String) : Array(PluginInfo)
-      cached = @@cache[build]?
+      cached = @@cache_mutex.synchronize { @@cache[build]? }
       return cached if cached
 
       params = HTTP::Params{"build" => build}
@@ -209,7 +219,7 @@ module JBUpdater
       xml_str = fetch_raw_with_retry(url)
       return [] of PluginInfo if xml_str.nil? || xml_str.empty?
       plugins = PluginInfo.parse(xml_str)
-      @@cache[build] = plugins
+      @@cache_mutex.synchronize { @@cache[build] = plugins }
       plugins
     end
 
