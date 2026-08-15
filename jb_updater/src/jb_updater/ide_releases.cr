@@ -65,7 +65,9 @@ module JBUpdater
 
       body = res.body || raise "empty response body"
       data = JSON.parse(body)
-      arr = data[product_code]?.try &.as_a?
+
+      arr = extract_releases_arr(data, product_code)
+
       if arr.nil? || arr.empty?
         raise "IDEReleases: no releases found for product code '#{product_code}' " \
               "(check the --product value or configured product code)"
@@ -135,6 +137,24 @@ module JBUpdater
       end
     rescue
       "intel"
+    end
+
+    # Extracts the releases array from the JetBrains Releases API response.
+    #
+    # The API normally maps the requested product code to an array, but
+    # occasionally returns the array under a *variant* key (for example
+    # `"IIU"` for code `"IU"`). The exact code key wins; otherwise the
+    # first array-valued entry of the response is used.
+    #
+    # @param data [JSON::Any] Parsed API response object
+    # @param product_code [String] Requested product code (e.g. `"IU"`)
+    # @return [Array(JSON::Any)?] Releases array, or `nil` when absent
+    def extract_releases_arr(data : JSON::Any, product_code : String) : Array(JSON::Any)?
+      if exact = data[product_code]?
+        exact.as_a?
+      else
+        data.as_h.values.compact_map(&.as_a?).first?
+      end
     end
   end
 end
