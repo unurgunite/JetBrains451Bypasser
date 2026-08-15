@@ -44,6 +44,10 @@ module App
   @@installed_plugins_arr : Array(JBUpdater::PluginMeta) = [] of JBUpdater::PluginMeta
   @@installed_table : UIng::Table? = nil
   @@installed_model : UIng::Table::Model? = nil
+  @@ide_releases : Array(JBUpdater::IDERelease) = [] of JBUpdater::IDERelease
+  @@ide_selected_row : Int32 = -1
+  @@ide_release_table : UIng::Table? = nil
+  @@ide_release_model : UIng::Table::Model? = nil
 
   # Background operation state
   @@op_status : String = ""
@@ -232,6 +236,38 @@ module App
     @@installed_model = model
   end
 
+  def self.ide_releases
+    @@ide_releases
+  end
+
+  def self.ide_releases=(releases : Array(JBUpdater::IDERelease))
+    @@ide_releases = releases
+  end
+
+  def self.ide_selected_row
+    @@ide_selected_row
+  end
+
+  def self.ide_selected_row=(row : Int32)
+    @@ide_selected_row = row
+  end
+
+  def self.ide_release_table
+    @@ide_release_table
+  end
+
+  def self.ide_release_table=(table : UIng::Table?)
+    @@ide_release_table = table
+  end
+
+  def self.ide_release_model
+    @@ide_release_model
+  end
+
+  def self.ide_release_model=(model : UIng::Table::Model?)
+    @@ide_release_model = model
+  end
+
   def self.browse_detail
     @@browse_detail
   end
@@ -412,58 +448,68 @@ private def build_args(
   args
 end
 
-# Locates the `jb_updater` executable (for subprocess invocation).
+# Cached CPU architecture, detected once on the main context at startup.
 #
-# Checks `Process.executable_path`, then CWD, then `JB_UPDATER` env var.
-#
-# @return [String] Path to the executable
-private def jb_exe_path : String
-  exe_path = Process.executable_path
-  if exe_path.nil?
-    App.log.append("[GUI] WARN: Process.executable_path is nil, trying CWD\n")
-    return "./jb_updater" if File::Info.executable?("./jb_updater")
-    return ENV["JB_UPDATER"]? || "jb_updater"
+# `uname -m` runs through `Process.run`, which only works on the main
+# execution context; caching keeps it out of background threads.
+ARCH = begin
+  io = IO::Memory.new
+  status = Process.run("uname", args: ["-m"], output: io)
+  machine = io.to_s.strip
+  if status.success? && (machine == "arm64" || machine == "aarch64")
+    "arm"
+  else
+    "intel"
   end
-
-  here = File.dirname(exe_path)
-  cand = File.expand_path(File.join(here, "jb_updater"))
-
-  return cand if File::Info.executable?(cand)
-  return "./jb_updater" if File::Info.executable?("./jb_updater")
-  ENV["JB_UPDATER"]? || "jb_updater"
+rescue
+  "intel"
 end
 
-# Runs `jb_updater` as a subprocess, streaming output to the log.
+# Runs `jb_updater` logic in-process, mirroring {CLI} argument dispatch.
+#
+# Everything runs on a background thread exactly like the legacy
+# subprocess path, but avoids `Process.run` from a spawned thread,
+# which deadlocks under Crystal 1.21 (spawning is main-context only).
+# `Log.*` output and HTTP progress already route to the GUI console
+# and progress bars via the listeners installed at startup.
 #
 # @param args [Array(String)] CLI arguments
 private def run_cli(args : Array(String)) : Nil
   return if App.busy?
 
   App.busy = true
-  exe = jb_exe_path
   App.log.append("[CLI] jb_updater #{args.join(" ")}\n")
 
   Thread.new do
-    output = IO::Memory.new
-    status = Process.run(exe, args: args, output: output, error: output)
+    opts = JBUpdater.parse_cli(args)
 
-    result = output.to_s
-    unless result.empty?
-      result.each_line do |line|
-        UIng.queue_main do
-          next if App.shutting_down?
-          App.log.append("[subprocess] #{line}\n")
-        end
+    if opts.list_ide_releases?
+      product = JBUpdater::Utils.product_code(opts.product || raise "missing --product")
+      arch = opts.arch || ARCH
+      releases = JBUpdater::IDEReleases.fetch(
+        product,
+        channel: "release",
+        downloads_host: opts.ide_downloads_host,
+        arch: arch,
+        latest: false,
+      )
+      JBUpdater::Log.info("Available releases for #{product}:")
+      releases.each do |rel|
+        JBUpdater::Log.info("- #{rel.version} (#{rel.channel}) #{rel.date}  -> #{rel.link}")
       end
+    elsif opts.upgrade_ide?
+      JBUpdater::IDEUpdater.new(opts).run
+    elsif pd = opts.plugins_dir
+      opts.plugins_dir = JBUpdater::Utils.expand_tilde(pd)
+      JBUpdater::Updater.new(opts).run
+    else
+      raise "no operation requested (missing --product, --plugins-dir, or --upgrade-ide)"
     end
 
     UIng.queue_main do
       next if App.shutting_down?
-      App.log.append("[CLI] exit code: #{status.exit_code}\n")
-      if status.success?
-        App.plugin_progress.value = 100
-      end
-      App.status_label.text = status.success? ? "Done (exit #{status.exit_code})" : "Failed (exit #{status.exit_code})"
+      App.log.append("[CLI] finished\n")
+      App.status_label.text = "Done (exit 0)"
       App.busy = false
       App.debug_reenable
     end
@@ -648,7 +694,7 @@ UIng.init
   do_setup_icon_and_keys
 {% end %}
 
-window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1100, 660)
+window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1180, 780)
 
 window.on_closing do
   App.mark_shutting_down
@@ -700,24 +746,18 @@ JBUpdater::Log.listener = ->(msg : String) {
   App.push_log(msg)
 }
 
-{% if flag?(:gui_log) %}
-  sep2 = UIng::Separator.new("horizontal")
-  root.append(sep2, false)
+sep2 = UIng::Separator.new("horizontal")
+root.append(sep2, false)
 
-  actions_row = UIng::Box.new(:horizontal)
-  actions_row.padded = true
+actions_row = UIng::Box.new(:horizontal)
+actions_row.padded = true
 
-  btn_clear_log = UIng::Button.new("Clear console")
-  btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
-  debug_btn = UIng::Button.new("Debug: Re-enable UI")
+btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
+debug_btn = UIng::Button.new("Debug: Re-enable UI")
 
-  actions_row.append(btn_clear_log, false)
-  actions_row.append(btn_remove_cache, false)
-  actions_row.append(debug_btn, false)
-  root.append(actions_row, false)
-
-  root.append(log, true)
-{% end %}
+actions_row.append(btn_remove_cache, false)
+actions_row.append(debug_btn, false)
+root.append(actions_row, false)
 
 status_label = UIng::Label.new("Ready")
 App.status_label = status_label
@@ -726,22 +766,12 @@ status_box.padded = true
 status_box.append(status_label, true)
 root.append(status_box, false)
 
-{% if flag?(:gui_log) %}
-  btn_clear_log.on_clicked do
-    UIng.queue_main do
-      log.text = ""
-      log.append("Console cleared at #{Time.local}\n")
-      status_label.text = "Console cleared"
-    end
+debug_btn.on_clicked do
+  UIng.queue_main do
+    App.debug_reenable
+    status_label.text = "UI re-enabled"
   end
-
-  debug_btn.on_clicked do
-    UIng.queue_main do
-      App.debug_reenable
-      status_label.text = "UI re-enabled"
-    end
-  end
-{% end %}
+end
 
 # --- Plugins tab ----------------------------------------------------
 plugins_tab = UIng::Box.new(:vertical)
@@ -1114,15 +1144,54 @@ ide_tab.append(ide_group, false)
 chk_brew = UIng::Checkbox.new("Patch Homebrew cask (macOS)")
 ide_tab.append(chk_brew, false)
 
-ide_actions = UIng::Box.new(:vertical)
-ide_actions.padded = true
-
 btn_list_releases = UIng::Button.new("List releases")
+btn_download_release = UIng::Button.new("Download selected")
 btn_upgrade = UIng::Button.new("Upgrade IDE")
 
+ide_actions = UIng::Box.new(:horizontal)
+ide_actions.padded = true
+
 ide_actions.append(btn_list_releases, false)
+ide_actions.append(btn_download_release, false)
 ide_actions.append(btn_upgrade, false)
 ide_tab.append(ide_actions, false)
+ide_tab.append(UIng::Separator.new("horizontal"), false)
+
+release_title = UIng::Label.new("Releases")
+ide_releases_box = UIng::Box.new(:vertical)
+ide_releases_box.padded = true
+ide_releases_box.append(release_title, false)
+
+ide_release_handler = UIng::Table::Model::Handler.new do
+  num_columns { 4 }
+  column_type { |_col| UIng::Table::Value::Type::String }
+  num_rows { App.ide_releases.size }
+  cell_value do |row, col|
+    rel = App.ide_releases[row]?
+    next UIng::Table::Value.new("") unless rel
+    case col
+    when 0 then UIng::Table::Value.new(rel.version)
+    when 1 then UIng::Table::Value.new(rel.channel)
+    when 2 then UIng::Table::Value.new(rel.date)
+    else        UIng::Table::Value.new(rel.link.to_s)
+    end
+  end
+end
+App.ide_release_model = ide_release_model = UIng::Table::Model.new(ide_release_handler)
+App.ide_release_table = ide_release_table = UIng::Table.new(ide_release_model)
+ide_release_table.header_visible = true
+ide_release_table.selection_mode = :one
+ide_release_table.append_text_column("Version", 0, 110)
+ide_release_table.append_text_column("Channel", 1, 90)
+ide_release_table.append_text_column("Date", 2, 120)
+ide_release_table.append_text_column("Download URL", 3, -1)
+ide_releases_box.append(ide_release_table, true)
+ide_tab.append(ide_releases_box, true)
+
+ide_release_table.on_selection_changed do |selection|
+  App.ide_selected_row = selection.num_rows > 0 ? selection.rows[0] : -1
+end
+
 tabs.append("IDE", ide_tab)
 
 combo_products.on_selected do
@@ -1157,8 +1226,14 @@ App.set_widgets(log, overall_bar, plugin_bar, all_buttons)
 
 # Global timer: drain buffered log messages and update progress bars
 UIng.timer(150) do
-  App.drain_log_buffer.each do |msg|
-    App.log.append(msg + "\n")
+  msgs = App.drain_log_buffer
+  if !msgs.empty?
+    if (App.log.text.try(&.size) || 0) > 60_000
+      App.log.text = "… (older log trimmed)\n"
+    end
+    msgs.each do |msg|
+      App.log.append(msg + "\n")
+    end
   end
   pct = App.read_progress
   App.plugin_progress.value = pct if pct > 0
@@ -1178,46 +1253,44 @@ end
 log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 status_label.text = "Ready"
 
-{% if flag?(:gui_log) %}
-  btn_remove_cache.on_clicked do
-    UIng.queue_main do
-      raw = e_plugins_dir.text
-      if raw.nil? || raw.empty?
-        log.append("ERROR: Plugins dir is required for Remove cache.\n")
-        status_label.text = "Error: missing plugins dir"
+btn_remove_cache.on_clicked do
+  UIng.queue_main do
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
+      log.append("ERROR: Plugins dir is required for Remove cache.\n")
+      status_label.text = "Error: missing plugins dir"
+    else
+      plugins_dir = expand_tilde(raw) || raw
+      if !Dir.exists?(plugins_dir)
+        log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
+        status_label.text = "Error: dir not found"
       else
-        plugins_dir = expand_tilde(raw) || raw
-        if !Dir.exists?(plugins_dir)
-          log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
-          status_label.text = "Error: dir not found"
-        else
-          begin
-            removed = 0
-            Dir.each_child(plugins_dir) do |entry|
-              if entry.includes?(".bak")
-                path = File.join(plugins_dir, entry)
-                FileUtils.rm_rf(path)
-                removed += 1
-                log.append("Removed backup: #{path}\n")
-              end
+        begin
+          removed = 0
+          Dir.each_child(plugins_dir) do |entry|
+            if entry.includes?(".bak")
+              path = File.join(plugins_dir, entry)
+              FileUtils.rm_rf(path)
+              removed += 1
+              log.append("Removed backup: #{path}\n")
             end
-
-            if removed == 0
-              log.append("No *.bak* backup entries found under #{plugins_dir}\n")
-              status_label.text = "No backups found"
-            else
-              log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
-              status_label.text = "Removed #{removed} backup(s)"
-            end
-          rescue ex
-            log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
-            status_label.text = "Error during cache removal"
           end
+
+          if removed == 0
+            log.append("No *.bak* backup entries found under #{plugins_dir}\n")
+            status_label.text = "No backups found"
+          else
+            log.append("Removed #{removed} backup entr#{removed == 1 ? "y" : "ies"} under #{plugins_dir}\n")
+            status_label.text = "Removed #{removed} backup(s)"
+          end
+        rescue ex
+          log.append("ERROR while removing cache: #{ex.class}: #{ex.message}\n")
+          status_label.text = "Error during cache removal"
         end
       end
     end
   end
-{% end %}
+end
 
 btn_list.on_clicked do
   UIng.queue_main do
@@ -1277,10 +1350,91 @@ btn_list_releases.on_clicked do
       log.append("ERROR: IDE code is required for List releases (e.g., WS, RM).\n")
       status_label.text = "Error: missing IDE code"
     else
-      args = ["--list-ide-releases", "--product", product]
-      new_run_header("List IDE releases", args)
-      run_cli(args)
+      code = JBUpdater::Utils.product_code(product)
+      new_run_header("List IDE releases", ["--list-ide-releases", "--product", product])
+
+      App.busy = true
+      Thread.new do
+        releases = JBUpdater::IDEReleases.fetch(
+          code,
+          channel: "release",
+          arch: ARCH,
+          latest: false,
+        )
+        UIng.queue_main do
+          next if App.shutting_down?
+          old = App.ide_releases.size
+          App.ide_releases = releases
+          model = App.ide_release_model
+          if model
+            if old == 0
+              releases.each_with_index { |_, i| model.row_inserted(i) }
+            elsif releases.size >= old
+              (0...old).each { |i| model.row_changed(i) }
+              (old...releases.size).each { |i| model.row_inserted(i) }
+            else
+              (0...releases.size).each { |i| model.row_changed(i) }
+              (releases.size...old).reverse_each { |i| model.row_deleted(i) }
+            end
+          end
+          status_label.text = "Found #{releases.size} release(s) for #{code}"
+          log.append("[IDE] #{releases.size} release(s) for #{code}\n")
+        end
+      rescue ex
+        UIng.queue_main do
+          next if App.shutting_down?
+          log.append("[CLI] ERROR: #{ex.message}\n")
+          status_label.text = "Error: #{ex.message}"
+        end
+      ensure
+        UIng.queue_main do
+          next if App.shutting_down?
+          App.busy = false
+          App.debug_reenable
+        end
+      end
+
       save_ide_settings(e_ide_product, e_ide_path, chk_brew)
+    end
+  end
+end
+
+btn_download_release.on_clicked do
+  UIng.queue_main do
+    row = App.ide_selected_row
+    rel = row >= 0 ? App.ide_releases[row]? : nil
+    if rel.nil?
+      status_label.text = "Select a release first"
+      next
+    end
+
+    new_run_header("Download #{rel.version}", [rel.link.to_s])
+
+    dest_dir = File.join(ENV["HOME"]? || Dir.tempdir, "Downloads")
+    Dir.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
+    dest = File.join(dest_dir, File.basename(rel.link.path.to_s))
+
+    App.busy = true
+    JBUpdater::HTTPClient.no_tty_progress_bar = true
+    Thread.new do
+      JBUpdater::HTTPClient.download(rel.link, dest)
+      UIng.queue_main do
+        next if App.shutting_down?
+        status_label.text = "Downloaded to #{dest}"
+        log.append("[IDE] Downloaded #{rel.version} → #{dest}\n")
+      end
+    rescue ex
+      UIng.queue_main do
+        next if App.shutting_down?
+        log.append("[IDE] Download failed: #{ex.class}: #{ex.message}\n")
+        status_label.text = "Download failed: #{ex.message}"
+      end
+    ensure
+      UIng.queue_main do
+        next if App.shutting_down?
+        App.busy = false
+        App.debug_reenable
+      end
     end
   end
 end
