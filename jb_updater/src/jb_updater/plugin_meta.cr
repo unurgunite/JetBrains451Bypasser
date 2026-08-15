@@ -1,4 +1,5 @@
 require "xml"
+require "compress/zip"
 require "./utils"
 
 module JBUpdater
@@ -111,13 +112,13 @@ module JBUpdater
       nil
     end
 
-    # Reads a file from inside a JAR using `unzip -p`.
+    # Reads a file from inside a JAR using a byte-level reader.
+    #
+    # Unlike `Compress::Zip`, this never parses DOS timestamps and never
+    # spawns a subprocess, so it is safe from background threads and
+    # immune to `Invalid time` failures on JetBrains archives.
     def self.read_text_from_jar(jar_path : String, inner_path : String) : String?
-      io = IO::Memory.new
-      status = Process.run("unzip", {"-p", jar_path, inner_path}, output: io, error: :close)
-      status.success? ? io.to_s : nil
-    rescue
-      nil
+      Utils.read_zip_file(jar_path, inner_path)
     end
   end
 end

@@ -1,4 +1,6 @@
 require "file_utils"
+require "compress/zip"
+require "compress/deflate"
 
 module JBUpdater
   # Shared utility methods used across the codebase.
@@ -35,18 +37,11 @@ module JBUpdater
       str.gsub(/[^A-Za-z0-9_.-]/, "_")
     end
 
-    # Checks whether the `unzip` tool is available on `$PATH`.
+    # Extracts a ZIP archive into a target directory using the pure-Crystal
+    # `Compress::Zip` stdlib reader (no external `unzip` binary).
     #
-    # @return [Bool] `true` if `which unzip` succeeds
-    def self.unzip_available? : Bool
-      status = Process.run("which",
-        args: ["unzip"],
-        output: Process::Redirect::Close,
-        error: Process::Redirect::Close)
-      status.success?
-    end
-
-    # Extracts a ZIP archive into a target directory.
+    # Runs safely from background threads — unlike `Process.run` which
+    # deadlocks in spawned threads on some Crystal versions.
     #
     # If the archive contains a single root directory its contents are
     # flattened into `dest_dir`. Existing directories are backed up
@@ -54,16 +49,14 @@ module JBUpdater
     #
     # @param zip_path [String] Path to the ZIP file
     # @param dest_dir [String] Target installation directory
-    # @raise [RuntimeError] If `unzip` is not found or the command fails
+    # @raise [RuntimeError] If the archive cannot be read or extracted
     def self.extract_zip(zip_path : String, dest_dir : String) : Nil
-      raise "'unzip' not found" unless unzip_available?
       tmp_root = File.join(Dir.tempdir,
         "jb-plg-#{Time.utc.to_unix}-#{Random::Secure.hex(4)}")
       FileUtils.mkdir_p(tmp_root)
 
       begin
-        status = Process.run("unzip", args: ["-qq", "-o", zip_path, "-d", tmp_root])
-        raise "unzip failed for #{zip_path}" unless status.success?
+        extract_zip_entries(zip_path, tmp_root)
 
         entries = Dir.children(tmp_root).reject(&.==("__MACOSX"))
         root = if entries.size == 1 && File.directory?(File.join(tmp_root, entries.first))
@@ -83,6 +76,151 @@ module JBUpdater
       ensure
         FileUtils.rm_rf(tmp_root)
       end
+    end
+
+    # Parses the central directory of a zip and returns file entries
+    # (name, method, compressed size, local header offset).
+    #
+    # Unlike `Compress::Zip`, this never touches DOS timestamps, so
+    # archives with invalid timestamp fields (common on JetBrains
+    # marketplace) are still readable.
+    private def self.zip_file_entries(zip_path : String) : Array(Tuple(String, UInt16, UInt32, UInt32))
+      file_bytes = File.open(zip_path, "rb") { |file| file.gets_to_end.to_slice }
+      io = IO::Memory.new(file_bytes)
+      le = IO::ByteFormat::LittleEndian
+
+      eocd = -1
+      search_from = [file_bytes.size - 65_557, 0].max
+      i = file_bytes.size - 4
+      while i >= search_from
+        if file_bytes[i] == 0x50 && file_bytes[i + 1] == 0x4B &&
+           file_bytes[i + 2] == 0x05 && file_bytes[i + 3] == 0x06
+          eocd = i
+          break
+        end
+        i -= 1
+      end
+      raise "Invalid zip: end of central directory not found" if eocd < 0
+
+      io.pos = eocd + 10
+      total = io.read_bytes(UInt16, le)
+      io.pos = eocd + 16
+      cd_offset = io.read_bytes(UInt32, le)
+      raise "Invalid zip: bad central directory offset" if cd_offset >= file_bytes.size
+
+      entries = Array(Tuple(String, UInt16, UInt32, UInt32)).new(total)
+
+      io.pos = cd_offset.to_i
+      total.times do
+        sig = io.read_bytes(UInt32, le)
+        raise "Invalid zip: bad central directory entry" unless sig == 0x02014B50
+        io.pos += 2 + 2 + 2 # version made / needed / flags
+        method = io.read_bytes(UInt16, le)
+        io.pos += 2 + 2 + 4 # mod time / date / crc
+        comp_size = io.read_bytes(UInt32, le)
+        io.pos += 4 # uncomp size
+        name_len = io.read_bytes(UInt16, le)
+        extra_len = io.read_bytes(UInt16, le)
+        comment_len = io.read_bytes(UInt16, le)
+        io.pos += 2 + 2 + 4 # disk start / internal / external attrs
+        offset = io.read_bytes(UInt32, le)
+        name_bytes = Bytes.new(name_len)
+        io.read_fully(name_bytes)
+        io.pos += extra_len + comment_len
+        name = String.new(name_bytes)
+        next if name.ends_with?('/') || name.starts_with?("__MACOSX/") || name.includes?("..")
+        entries << {name, method, comp_size, offset}
+      end
+
+      entries
+    end
+
+    private def self.extract_zip_entries(zip_path : String, dest_dir : String) : Nil
+      entries = zip_file_entries(zip_path)
+
+      entries.each do |name, method, comp_size, offset|
+        target = File.join(dest_dir, name)
+        FileUtils.mkdir_p(File.dirname(target))
+        File.open(target, "w") do |out_file|
+          zip_entry_bytes(zip_path, method, comp_size, offset) do |io|
+            if method == 0
+              IO.copy(io, out_file, comp_size)
+            else
+              reader = Compress::Deflate::Reader.new(io)
+              IO.copy(reader, out_file)
+            end
+          end
+        end
+      end
+    end
+
+    # Extracts a zip archive to a directory using a byte-level reader.
+    private def self.extract_zip_entries(zip_path : String, dest_dir : String) : Nil
+      entries = zip_file_entries(zip_path)
+
+      entries.each do |name, method, comp_size, offset|
+        target = File.join(dest_dir, name)
+        FileUtils.mkdir_p(File.dirname(target))
+        File.open(target, "w") do |out_file|
+          zip_entry_bytes(zip_path, method, comp_size, offset) do |io|
+            if method == 0
+              IO.copy(io, out_file, comp_size)
+            else
+              reader = Compress::Deflate::Reader.new(io)
+              IO.copy(reader, out_file)
+            end
+          end
+        end
+      end
+    end
+
+    # Yields a deflate/stored entry's decompressed bytes stream.
+    private def self.zip_entry_bytes(zip_path : String, method : UInt16, comp_size : UInt32, offset : UInt32, & : IO ->)
+      file_bytes = File.open(zip_path, "rb") { |file| file.gets_to_end.to_slice }
+      io = IO::Memory.new(file_bytes)
+      le = IO::ByteFormat::LittleEndian
+
+      io.pos = offset.to_i
+      sig = io.read_bytes(UInt32, le)
+      raise "Invalid zip: bad local header" unless sig == 0x04034B50
+      io.pos += 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 # version/flag/method/time/date/crc/sizes
+      name_len = io.read_bytes(UInt16, le)
+      extra_len = io.read_bytes(UInt16, le)
+      io.pos += name_len + extra_len
+
+      if method == 0
+        yield io
+      elsif method == 8
+        comp_data = Bytes.new(comp_size)
+        io.read_fully(comp_data)
+        yield IO::Memory.new(comp_data)
+      else
+        raise "Invalid zip: unsupported compression method #{method}"
+      end
+    end
+
+    # Reads a single file out of a zip archive as a String.
+    #
+    # Returns `nil` if the entry is missing or cannot be decoded. Safe to
+    # call from background threads (no `Process.run`, no `Compress::Zip`
+    # timestamp bug).
+    def self.read_zip_file(zip_path : String, inner_path : String) : String?
+      entry = zip_file_entries(zip_path).find { |(name, _, _, _)| name == inner_path }
+      return nil unless entry
+      name, method, comp_size, offset = entry
+      result = String.build do |str|
+        zip_entry_bytes(zip_path, method, comp_size, offset) do |io|
+          if method == 0
+            IO.copy(io, str, comp_size)
+          else
+            reader = Compress::Deflate::Reader.new(io)
+            IO.copy(reader, str)
+          end
+        end
+      end
+      result
+    rescue
+      nil
     end
 
     # --------------------------------------------------------------------------

@@ -433,13 +433,14 @@ private def build_args(
   combo_arch : UIng::Combobox,
   chk_dry : UIng::Checkbox,
   chk_list : UIng::Checkbox,
+  include_install : Bool = true,
 ) : Array(String)
   args = [] of String
 
   add_opt(args, "--plugins-dir", expand_tilde(e_plugins_dir.text))
   add_opt(args, "--build", e_build.text)
   add_opt(args, "--product", e_product.text)
-  add_opt(args, "--install-plugin", e_install_ids.text)
+  add_opt(args, "--install-plugin", e_install_ids.text) if include_install
 
   args.concat(arch_args(combo_arch))
 
@@ -482,6 +483,7 @@ private def run_cli(args : Array(String)) : Nil
 
   Thread.new do
     opts = JBUpdater.parse_cli(args)
+    opts.arch ||= ARCH
 
     if opts.list_ide_releases?
       product = JBUpdater::Utils.product_code(opts.product || raise "missing --product")
@@ -584,10 +586,22 @@ private def queue_install(xml_id : String, plugins_dir : String, build : String)
 
     JBUpdater::GUI::Actions.processing = false
     UIng.queue_main do
+      next if App.shutting_down?
       App.plugin_progress.value = 100
       App.overall_progress.value = 100
       App.busy = false
       App.debug_reenable
+
+      # Push installation results into the Installed tab and Browse
+      # "Installed" column so the user sees the plugin right away.
+      scanned = JBUpdater::PluginMeta.scan_dir(plugins_dir) rescue nil
+      if scanned
+        apply_installed_scan(scanned)
+        App.status_label.text = "Installed. Found #{scanned.size} installed plugins"
+      end
+      if model = App.browse_table_model
+        (0...App.browse_plugins.size).each { |i| model.row_changed(i) }
+      end
     end
   end
 end
@@ -694,7 +708,7 @@ UIng.init
   do_setup_icon_and_keys
 {% end %}
 
-window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1180, 780)
+window = UIng::Window.new("JB Updater — JetBrains IDE & Plugin Manager", 1180, 840)
 
 window.on_closing do
   App.mark_shutting_down
@@ -730,6 +744,26 @@ root.append(pb_group, false)
 sep1 = UIng::Separator.new("horizontal")
 root.append(sep1, false)
 
+actions_row = UIng::Box.new(:horizontal)
+actions_row.padded = true
+
+btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
+debug_btn = UIng::Button.new("Debug: Re-enable UI")
+
+actions_row.append(btn_remove_cache, false)
+actions_row.append(debug_btn, false)
+root.append(actions_row, false)
+
+status_label = UIng::Label.new("Ready")
+App.status_label = status_label
+status_box = UIng::Box.new(:horizontal)
+status_box.padded = true
+status_box.append(status_label, false)
+root.append(status_box, false)
+
+sep2 = UIng::Separator.new("horizontal")
+root.append(sep2, false)
+
 tabs = UIng::Tab.new
 root.append(tabs, true)
 
@@ -745,26 +779,6 @@ JBUpdater::HTTPClient.on_progress = ->(downloaded : Int64, total : Int64) {
 JBUpdater::Log.listener = ->(msg : String) {
   App.push_log(msg)
 }
-
-sep2 = UIng::Separator.new("horizontal")
-root.append(sep2, false)
-
-actions_row = UIng::Box.new(:horizontal)
-actions_row.padded = true
-
-btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
-debug_btn = UIng::Button.new("Debug: Re-enable UI")
-
-actions_row.append(btn_remove_cache, false)
-actions_row.append(debug_btn, false)
-root.append(actions_row, false)
-
-status_label = UIng::Label.new("Ready")
-App.status_label = status_label
-status_box = UIng::Box.new(:horizontal)
-status_box.padded = true
-status_box.append(status_label, true)
-root.append(status_box, false)
 
 debug_btn.on_clicked do
   UIng.queue_main do
@@ -827,6 +841,10 @@ btn_group.padded = true
 btn_detect = UIng::Button.new("Detect from Product")
 btn_detect.on_clicked do
   UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
     product = e_product.text
     if product.nil? || product.empty?
       log.append("ERROR: Enter Product (e.g., RubyMine2025.2) before Detect.\n")
@@ -864,6 +882,7 @@ main_actions.append(btn_update, false)
 btn_group.append(main_actions, false)
 
 plugins_tab.append(btn_group, false)
+plugins_tab.append(UIng::Box.new(:vertical), true)
 tabs.append("Plugins", plugins_tab)
 
 # --- Browse tab -----------------------------------------------------
@@ -1056,6 +1075,24 @@ installed_tab.append(installed_status, false)
 
 tabs.append("Installed", installed_tab)
 
+# Applies a fresh PluginMeta scan to the Installed tab table (UI thread).
+private def apply_installed_scan(scanned : Hash(String, JBUpdater::PluginMeta)) : Nil
+  old_count = App.installed_plugins_arr.size
+  App.installed_plugins = scanned
+  model = App.installed_model
+  return unless model
+  if old_count == 0
+    App.installed_plugins_arr.each_with_index { |_, i| model.row_inserted(i) }
+  else
+    (0...[App.installed_plugins_arr.size, old_count].min).each { |i| model.row_changed(i) }
+    if App.installed_plugins_arr.size > old_count
+      (old_count...App.installed_plugins_arr.size).each { |i| model.row_inserted(i) }
+    elsif App.installed_plugins_arr.size < old_count
+      (App.installed_plugins_arr.size...old_count).reverse_each { |i| model.row_deleted(i) }
+    end
+  end
+end
+
 btn_scan_installed.on_clicked do
   dir = expand_tilde(e_plugins_dir.text) || e_plugins_dir.text || ""
   if dir.empty?
@@ -1064,21 +1101,13 @@ btn_scan_installed.on_clicked do
   end
   scanned = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
   if scanned
-    old_count = App.installed_plugins_arr.size
-    App.installed_plugins = scanned
-    if old_count == 0
-      App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
-    else
-      (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
-      if App.installed_plugins_arr.size > old_count
-        (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
-      elsif App.installed_plugins_arr.size < old_count
-        (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
-      end
-    end
-    installed_status.text = "Found #{scanned.size} installed plugins"
+    apply_installed_scan(scanned)
+    msg = "Found #{scanned.size} installed plugins"
+    installed_status.text = msg
+    status_label.text = msg
   else
     installed_status.text = "Error scanning plugins directory"
+    status_label.text = "Error scanning plugins directory"
   end
 end
 
@@ -1294,57 +1323,95 @@ end
 
 btn_list.on_clicked do
   UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
       log.append("ERROR: Plugins dir is required for List installed plugins.\n")
       status_label.text = "Error: missing plugins dir"
-    else
-      plugins_dir = expand_tilde(raw)
-      e_plugins_dir.text = plugins_dir if plugins_dir
-      args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new("")) + ["--list"]
-      new_run_header("List installed plugins", args)
-      run_cli(args)
-      save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
+      next
     end
+    plugins_dir = expand_tilde(raw) || raw
+    e_plugins_dir.text = plugins_dir
+    new_run_header("List installed plugins", ["--list", "--plugins-dir", plugins_dir])
+    App.busy = true
+    Thread.new do
+      scanned = JBUpdater::PluginMeta.scan_dir(plugins_dir)
+      UIng.queue_main do
+        next if App.shutting_down?
+        apply_installed_scan(scanned)
+        msg = "Found #{scanned.size} installed plugins"
+        installed_status.text = msg
+        status_label.text = msg
+        log.append("[CLI] #{msg}\n")
+        tabs.selected = 2
+        App.busy = false
+        App.debug_reenable
+      end
+    rescue ex
+      UIng.queue_main do
+        next if App.shutting_down?
+        log.append("[CLI] ERROR: #{ex.message}\n")
+        status_label.text = "Error: #{ex.message}"
+        installed_status.text = "Error: #{ex.message}"
+        App.busy = false
+        App.debug_reenable
+      end
+    end
+    save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
   end
 end
 
 btn_install.on_clicked do
   UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
       log.append("ERROR: Plugins dir is required for Install plugins.\n")
       status_label.text = "Error: missing plugins dir"
-    else
-      plugins_dir = expand_tilde(raw)
-      e_plugins_dir.text = plugins_dir if plugins_dir
-      args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
-      new_run_header("Install plugins", args)
-      run_cli(args)
-      save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
+      next
     end
+    plugins_dir = expand_tilde(raw)
+    e_plugins_dir.text = plugins_dir if plugins_dir
+    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
+    new_run_header("Install plugins", args)
+    run_cli(args)
+    save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
   end
 end
 
 btn_update.on_clicked do
   UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
       log.append("ERROR: Plugins dir is required for Update plugins.\n")
       status_label.text = "Error: missing plugins dir"
-    else
-      plugins_dir = expand_tilde(raw)
-      e_plugins_dir.text = plugins_dir if plugins_dir
-      args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
-      new_run_header("Update plugins", args)
-      run_cli(args)
-      save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
+      next
     end
+    plugins_dir = expand_tilde(raw)
+    e_plugins_dir.text = plugins_dir if plugins_dir
+    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""), include_install: false)
+    new_run_header("Update plugins", args)
+    run_cli(args)
+    save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
   end
 end
 
 btn_list_releases.on_clicked do
   UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
     product = e_ide_product.text
     if product.nil? || product.empty?
       log.append("ERROR: IDE code is required for List releases (e.g., WS, RM).\n")
@@ -1401,6 +1468,10 @@ end
 
 btn_download_release.on_clicked do
   UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
     row = App.ide_selected_row
     rel = row >= 0 ? App.ide_releases[row]? : nil
     if rel.nil?
@@ -1441,6 +1512,10 @@ end
 
 btn_upgrade.on_clicked do
   UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
     args = ["--upgrade-ide"]
 
     ide_product = e_ide_product.text
