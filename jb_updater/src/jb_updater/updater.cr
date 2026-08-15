@@ -75,7 +75,7 @@ module JBUpdater
     # @return [String?] Detected build string or `nil`
     private def detect_build_info : String?
       plugins_dir = @opts.plugins_dir
-      return nil unless plugins_dir
+      return unless plugins_dir
       base_name = File.basename(File.dirname(plugins_dir)).gsub(/\d.*$/, "")
       info_json = ""
       build_txt = ""
@@ -227,7 +227,7 @@ module JBUpdater
       Log.header("Installing #{ids.size} plugin#{ids.size > 1 ? "s" : ""} for build #{@build}")
 
       ids.each_with_index do |xml_id, idx|
-        tmp_zip : String? = nil
+        tmp_zip : String?
         begin
           plugin_num = "[#{idx + 1}/#{ids.size}]"
           uri = final_uri(xml_id)
@@ -270,12 +270,10 @@ module JBUpdater
       Log.header("Checking #{plugins.size} plugin#{plugins.size > 1 ? "s" : ""} for updates (build #{@build})")
 
       plugins.each_with_index do |(id, meta), idx|
-        begin
-          Log.info "[#{idx + 1}/#{plugins.size}] #{meta.id} current=#{meta.version}"
-          update_plugin(meta)
-        rescue ex
-          Log.fail "[#{meta.id}] update failed: #{ex.message}"
-        end
+        Log.info "[#{idx + 1}/#{plugins.size}] #{meta.id} current=#{meta.version}"
+        update_plugin(meta)
+      rescue ex
+        Log.fail "[#{meta.id}] update failed: #{ex.message}"
       end
 
       puts
@@ -290,7 +288,7 @@ module JBUpdater
     private def update_plugin(meta : PluginMeta) : Nil
       xml_id = meta.id
       target_dir = meta.path
-      tmp_zip : String? = nil
+      tmp_zip : String?
 
       begin
         uri = final_uri(xml_id)

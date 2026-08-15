@@ -129,7 +129,7 @@ module JBUpdater
             vendor: vendor,
           )
         end
-      rescue ex
+      rescue
       end
 
       result
@@ -343,18 +343,16 @@ module JBUpdater
     # @return [String?] Response body or `nil` on persistent failure
     private def self.fetch_raw_with_retry(url : String, max_retries : Int32 = 3) : String?
       max_retries.times do |attempt|
-        begin
-          return fetch_raw(url)
-        rescue ex : IO::Error
-          Log.warn "Plugin marketplace request failed (attempt #{attempt + 1}/#{max_retries}): #{ex.message}"
-          sleep((attempt + 1).seconds)
-        rescue ex : RuntimeError
-          if ex.message.try(&.starts_with?("HTTP 429"))
-            Log.warn "Rate limited by plugin marketplace (attempt #{attempt + 1}/#{max_retries}), retrying..."
-            sleep((5 * (attempt + 1)).seconds)
-          else
-            raise ex
-          end
+        return fetch_raw(url)
+      rescue ex : IO::Error
+        Log.warn "Plugin marketplace request failed (attempt #{attempt + 1}/#{max_retries}): #{ex.message}"
+        sleep((attempt + 1).seconds)
+      rescue ex : RuntimeError
+        if ex.message.try(&.starts_with?("HTTP 429"))
+          Log.warn "Rate limited by plugin marketplace (attempt #{attempt + 1}/#{max_retries}), retrying..."
+          sleep((5 * (attempt + 1)).seconds)
+        else
+          raise ex
         end
       end
       raise "API request failed after #{max_retries} retries"

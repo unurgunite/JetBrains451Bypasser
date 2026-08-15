@@ -73,37 +73,46 @@ module JBUpdater
       arch_to_use = (arch || autodetect_arch)
 
       arr.each do |release|
-        ver = release["version"].as_s
-        ch = release["channel"]?.try(&.as_s) || channel
-        dt = release["date"]?.try(&.as_s) || ""
-
-        downloads_any = release["downloads"]?
-        next unless downloads_any.is_a?(JSON::Any)
-
-        downloads = downloads_any.as_h
-
-        platform_key =
-          if arch_to_use == "arm" && downloads["macM1"]?
-            "macM1"
-          elsif downloads["mac"]?
-            "mac"
-          else
-            next
-          end
-
-        platform = downloads[platform_key].as_h
-        link_any = platform["link"]?
-        next unless link_any
-
-        link_s = link_any.as_s
-        uri = URI.parse(link_s)
-
-        uri = HTTPClient.override_ide_repo_host(uri, downloads_host)
-
-        releases << IDERelease.new(version: ver, channel: ch, date: dt, link: uri)
+        parsed = parse_release(release, arch_to_use, channel, downloads_host)
+        releases << parsed if parsed
       end
 
       releases
+    end
+
+    # Parses a single release entry from the JetBrains Releases API JSON.
+    private def parse_release(
+      release : JSON::Any,
+      arch_to_use : String,
+      channel : String,
+      downloads_host : String?,
+    ) : IDERelease?
+      ver = release["version"].as_s
+      ch = release["channel"]?.try(&.as_s) || channel
+      dt = release["date"]?.try(&.as_s) || ""
+
+      downloads_any = release["downloads"]?
+      return unless downloads_any.is_a?(JSON::Any)
+
+      downloads = downloads_any.as_h
+
+      platform_key =
+        if arch_to_use == "arm" && downloads["macM1"]?
+          "macM1"
+        elsif downloads["mac"]?
+          "mac"
+        else
+          return
+        end
+
+      platform = downloads[platform_key].as_h
+      link_any = platform["link"]?
+      return unless link_any
+
+      uri = URI.parse(link_any.as_s)
+      uri = HTTPClient.override_ide_repo_host(uri, downloads_host)
+
+      IDERelease.new(version: ver, channel: ch, date: dt, link: uri)
     end
 
     # Detects the CPU architecture by running `uname -m`.

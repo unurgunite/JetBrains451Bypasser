@@ -20,7 +20,7 @@ jobs:
 
       - uses: crystal-lang/install-crystal@v1
         with:
-          crystal: 1.17.1
+          crystal: 1.21.0
 
       - name: Install GTK3 (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'

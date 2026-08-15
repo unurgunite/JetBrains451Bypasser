@@ -43,7 +43,7 @@ describe PluginInfo do
             <tags>web, integration,</tags>
           </idea-plugin>
         </plugin-list>
-      XML
+        XML
       plugins = PluginInfo.parse(xml)
       plugins.size.should eq 1
       plugins[0].xml_id.should eq "com.example.plugin"
@@ -65,7 +65,7 @@ describe PluginInfo do
             <description>&lt;b&gt;Bold text&lt;/b&gt; description</description>
           </idea-plugin>
         </plugin-list>
-      XML
+        XML
       plugins = PluginInfo.parse(xml)
       plugins.size.should eq 1
       # The Crystal XML parser may or may not decode entities before passing
@@ -92,7 +92,7 @@ describe PluginInfo do
             <description><ff>bad</ff>desc</description>
           </idea-plugin>
         </plugin-list>
-      XML
+        XML
       PluginInfo.parse(xml).size.should eq 1
     end
   end

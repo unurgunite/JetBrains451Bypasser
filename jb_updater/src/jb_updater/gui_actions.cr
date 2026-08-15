@@ -88,11 +88,11 @@ module JBUpdater
 
       # Clears the queue and resets counters.
       def self.reset_queue
-        @@queue_mutex.synchronize {
+        @@queue_mutex.synchronize do
           @@queue.clear
           @@total = 0
           @@processing = false
-        }
+        end
       end
     end
   end
