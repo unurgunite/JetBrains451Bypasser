@@ -135,25 +135,6 @@ module JBUpdater
       entries
     end
 
-    private def self.extract_zip_entries(zip_path : String, dest_dir : String) : Nil
-      entries = zip_file_entries(zip_path)
-
-      entries.each do |name, method, comp_size, offset|
-        target = File.join(dest_dir, name)
-        FileUtils.mkdir_p(File.dirname(target))
-        File.open(target, "w") do |out_file|
-          zip_entry_bytes(zip_path, method, comp_size, offset) do |io|
-            if method == 0
-              IO.copy(io, out_file, comp_size)
-            else
-              reader = Compress::Deflate::Reader.new(io)
-              IO.copy(reader, out_file)
-            end
-          end
-        end
-      end
-    end
-
     # Extracts a zip archive to a directory using a byte-level reader.
     private def self.extract_zip_entries(zip_path : String, dest_dir : String) : Nil
       entries = zip_file_entries(zip_path)

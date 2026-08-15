@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "compress/zip"
 include JBUpdater
 
 describe Utils do
@@ -88,6 +89,59 @@ describe Utils do
 
     it "accepts regular folders" do
       Utils.backup_folder?("WebStorm2025.2").should be_false
+    end
+  end
+
+  describe ".read_zip_file" do
+    it "reads a deflated entry from a zip without Compress::Zip parsing" do
+      with_tmpdir do |dir|
+        zip_path = File.join(dir, "archive.zip")
+        File.open(zip_path, "w") do |io|
+          Compress::Zip::Writer.open(io) do |zip|
+            zip.add("plugin/META-INF/plugin.xml") { |e| e.print "<idea-plugin><id>org.test</id></idea-plugin>" }
+          end
+        end
+
+        content = Utils.read_zip_file(zip_path, "plugin/META-INF/plugin.xml")
+        content.should_not be_nil
+        content.try(&.should contain "org.test")
+      end
+    end
+
+    it "returns nil for a missing entry" do
+      with_tmpdir do |dir|
+        zip_path = File.join(dir, "archive.zip")
+        File.open(zip_path, "w") do |io|
+          Compress::Zip::Writer.open(io) do |zip|
+            zip.add("plugin/file.txt") { |e| e.print "x" }
+          end
+        end
+
+        Utils.read_zip_file(zip_path, "no/such.xml").should be_nil
+      end
+    end
+
+    it "returns nil when the zip file does not exist" do
+      Utils.read_zip_file("/tmp/does-not-exist.zip", "plugin.xml").should be_nil
+    end
+  end
+
+  describe ".extract_zip" do
+    it "extracts a single-root archive into the destination" do
+      with_tmpdir do |dir|
+        zip_path = File.join(dir, "archive.zip")
+        File.open(zip_path, "w") do |io|
+          Compress::Zip::Writer.open(io) do |zip|
+            zip.add("plugin1/lib/a.jar") { |e| e.print "jar-bytes" }
+          end
+        end
+
+        dest = File.join(dir, "dest")
+        Utils.extract_zip(zip_path, dest)
+
+        File.exists?(File.join(dest, "lib", "a.jar")).should be_true
+        File.read(File.join(dest, "lib", "a.jar")).should eq "jar-bytes"
+      end
     end
   end
 end

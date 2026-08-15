@@ -71,6 +71,16 @@ module App
     @@status_label = label
   end
 
+  @@ide_badge : UIng::Label? = nil
+
+  def self.ide_badge : UIng::Label?
+    @@ide_badge
+  end
+
+  def self.ide_badge=(label : UIng::Label)
+    @@ide_badge = label
+  end
+
   # Arms a two-step uninstall confirmation for a plugin ID.
   def self.arm_uninstall(id : String)
     @@pending_uninstall = id
@@ -670,6 +680,20 @@ private def apply_plugins_settings(
   end
 end
 
+# Updates the global "Current IDE" badge shown on every tab.
+private def update_ide_badge(e_product : UIng::Entry, e_build : UIng::Entry) : Nil
+  return unless App.ide_badge
+  product = e_product.text.try(&.strip)
+  build = e_build.text.try(&.strip)
+  if product.nil? || product.empty?
+    App.ide_badge.try(&.text = "")
+  elsif build.nil? || build.empty?
+    App.ide_badge.try(&.text = "Current IDE: #{product}")
+  else
+    App.ide_badge.try(&.text = "Current IDE: #{product} (#{build})")
+  end
+end
+
 # Restores IDE tab field values from saved config.
 private def apply_ide_settings(
   e_ide_product : UIng::Entry,
@@ -744,21 +768,30 @@ root.append(pb_group, false)
 sep1 = UIng::Separator.new("horizontal")
 root.append(sep1, false)
 
-actions_row = UIng::Box.new(:horizontal)
-actions_row.padded = true
-
-btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
-debug_btn = UIng::Button.new("Debug: Re-enable UI")
-
-actions_row.append(btn_remove_cache, false)
-actions_row.append(debug_btn, false)
-root.append(actions_row, false)
+# Dev-only conveniences (hidden unless JB_UPDATER_DEV is set).
+dev_mode = ENV["JB_UPDATER_DEV"]? == "1"
+btn_remove_cache : UIng::Button? = nil
+debug_btn : UIng::Button? = nil
+actions_row : UIng::Box? = nil
+if dev_mode
+  actions_row = UIng::Box.new(:horizontal)
+  actions_row.not_nil!.padded = true
+  btn_remove_cache = UIng::Button.new("Remove *.bak* backups")
+  debug_btn = UIng::Button.new("Debug: Re-enable UI")
+  actions_row.not_nil!.append(btn_remove_cache.not_nil!, false)
+  actions_row.not_nil!.append(debug_btn.not_nil!, false)
+end
+root.append(actions_row, false) if actions_row
 
 status_label = UIng::Label.new("Ready")
 App.status_label = status_label
 status_box = UIng::Box.new(:horizontal)
 status_box.padded = true
 status_box.append(status_label, false)
+ide_badge = UIng::Label.new("")
+App.ide_badge = ide_badge
+status_box.append(UIng::Box.new(:horizontal), true)
+status_box.append(ide_badge, false)
 root.append(status_box, false)
 
 sep2 = UIng::Separator.new("horizontal")
@@ -780,10 +813,12 @@ JBUpdater::Log.listener = ->(msg : String) {
   App.push_log(msg)
 }
 
-debug_btn.on_clicked do
-  UIng.queue_main do
-    App.debug_reenable
-    status_label.text = "UI re-enabled"
+if dev_mode
+  debug_btn.not_nil!.on_clicked do
+    UIng.queue_main do
+      App.debug_reenable
+      status_label.text = "UI re-enabled"
+    end
   end
 end
 
@@ -827,13 +862,19 @@ combo_arch.selected = 0
 config_form.append("Plugins dir", e_plugins_dir, true)
 config_form.append("Build", e_build, false)
 config_form.append("Product", e_product, false)
-config_form.append("Install IDs", e_install_ids, false)
 config_form.append("Arch", combo_arch, false)
 config_group.child = config_form
 plugins_tab.append(config_group, false)
 
 chk_dry = UIng::Checkbox.new("Dry run")
 plugins_tab.append(chk_dry, false)
+
+install_ids_row = UIng::Box.new(:horizontal)
+install_ids_row.padded = true
+ids_label = UIng::Label.new("Install XML IDs")
+install_ids_row.append(ids_label, false)
+install_ids_row.append(e_install_ids, true)
+plugins_tab.append(install_ids_row, false)
 
 btn_group = UIng::Box.new(:vertical)
 btn_group.padded = true
@@ -869,6 +910,7 @@ btn_group.append(btn_detect, false)
 btn_group_sep = UIng::Separator.new("horizontal")
 btn_group.append(btn_group_sep, false)
 
+batch_group = UIng::Group.new("Bulk actions", margined: true)
 main_actions = UIng::Box.new(:horizontal)
 main_actions.padded = true
 
@@ -879,11 +921,11 @@ btn_update = UIng::Button.new("Update all")
 main_actions.append(btn_list, false)
 main_actions.append(btn_install, false)
 main_actions.append(btn_update, false)
-btn_group.append(main_actions, false)
+batch_group.child = main_actions
+btn_group.append(batch_group, false)
 
 plugins_tab.append(btn_group, false)
-plugins_tab.append(UIng::Box.new(:vertical), true)
-tabs.append("Plugins", plugins_tab)
+tabs.append("Main", plugins_tab)
 
 # --- Browse tab -----------------------------------------------------
 browse_tab = UIng::Box.new(:vertical)
@@ -1241,9 +1283,11 @@ combo_products.on_selected do
       end
 
       status_label.text = "Selected: #{prod.name}"
+      update_ide_badge(e_product, e_build)
       save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
     else
       status_label.text = "Product selection: manual/custom"
+      update_ide_badge(e_product, e_build)
     end
   end
 end
@@ -1278,12 +1322,21 @@ if idx > 0 && idx <= detected.size
   e_ide_product.text = prod.build
   log.append("[GUI] Restored product: #{prod.name} (#{prod.build})\n")
 end
+update_ide_badge(e_product, e_build)
+
+e_product.on_changed do |_|
+  UIng.queue_main { update_ide_badge(e_product, e_build) }
+end
+e_build.on_changed do |_|
+  UIng.queue_main { update_ide_badge(e_product, e_build) }
+end
 
 log.append("JB Updater GUI ready. Select a detected IDE or enter paths manually.\n")
 status_label.text = "Ready"
 
-btn_remove_cache.on_clicked do
-  UIng.queue_main do
+if dev_mode
+  btn_remove_cache.not_nil!.on_clicked do
+    UIng.queue_main do
     raw = e_plugins_dir.text
     if raw.nil? || raw.empty?
       log.append("ERROR: Plugins dir is required for Remove cache.\n")
@@ -1319,6 +1372,7 @@ btn_remove_cache.on_clicked do
       end
     end
   end
+end
 end
 
 btn_list.on_clicked do
@@ -1673,10 +1727,10 @@ btn_refresh.on_clicked do
     JBUpdater::PluginMarketplace.clear_cache
     if model = App.browse_table_model
       old_count = App.browse_plugins.size
-      (0...old_count).each { |i| model.row_deleted(i) }
+      (0...old_count).each { |_| model.row_deleted(0) }
       App.browse_plugins = [] of JBUpdater::PluginInfo
     end
-    browse_status.text = "Cache cleared. Click Top/Refresh to reload."
+    browse_status.text = "Cache cleared. Click Top Downloaded or Newest to reload."
   rescue ex
     log.append("[Browse] Refresh error: #{ex.class}: #{ex.message}\n")
     browse_status.text = "Refresh error: #{ex.message}"
@@ -1707,7 +1761,7 @@ btn_install_browse.on_clicked do
 
   plugins_dir = e_plugins_dir.text
   if plugins_dir.nil? || plugins_dir.empty?
-    browse_status.text = "Error: plugins dir not set. Switch to Plugins tab."
+    browse_status.text = "Error: plugins dir not set. Switch to Main tab."
     next
   end
 
