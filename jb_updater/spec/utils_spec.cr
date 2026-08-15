@@ -78,6 +78,82 @@ describe Utils do
     end
   end
 
+  describe ".latest_versioned_config_dir" do
+    it "returns nil when base dir does not exist" do
+      Utils.latest_versioned_config_dir("/tmp/__jb_no_such_dir__", "RubyMine").should be_nil
+    end
+
+    it "returns nil when base dir is empty" do
+      Dir.mkdir_p("/tmp/__jb_empty_base__")
+      begin
+        Utils.latest_versioned_config_dir("/tmp/__jb_empty_base__", "RubyMine").should be_nil
+      ensure
+        FileUtils.rm_rf("/tmp/__jb_empty_base__")
+      end
+    end
+
+    it "returns the newest versioned dir, not an arbitrary glob match" do
+      base = "/tmp/__jb_multi__"
+      FileUtils.mkdir_p(File.join(base, "RubyMine2025.3"))
+      FileUtils.mkdir_p(File.join(base, "RubyMine2026.1"))
+      FileUtils.mkdir_p(File.join(base, "RubyMine2026.2"))
+      begin
+        result = Utils.latest_versioned_config_dir(base, "RubyMine")
+        result.should eq File.join(base, "RubyMine2026.2")
+      ensure
+        FileUtils.rm_rf(base)
+      end
+    end
+
+    it "skips backup folders and names of other products" do
+      base = "/tmp/__jb_mixed__"
+      FileUtils.mkdir_p(File.join(base, "RubyMine2026.2-backup"))
+      FileUtils.mkdir_p(File.join(base, "PhpStorm2026.2"))
+      FileUtils.mkdir_p(File.join(base, "RubyMine2026.1"))
+      begin
+        result = Utils.latest_versioned_config_dir(base, "RubyMine")
+        result.should eq File.join(base, "RubyMine2026.1")
+      ensure
+        FileUtils.rm_rf(base)
+      end
+    end
+
+    it "handles full product folder names with trailing version" do
+      base = "/tmp/__jb_fullname__"
+      FileUtils.mkdir_p(File.join(base, "PyCharm2024.3"))
+      FileUtils.mkdir_p(File.join(base, "PyCharm2025.1"))
+      begin
+        result = Utils.latest_versioned_config_dir(base, "PyCharm")
+        result.should eq File.join(base, "PyCharm2025.1")
+      ensure
+        FileUtils.rm_rf(base)
+      end
+    end
+
+    it "matches an exact folder when the name already includes the version" do
+      base = "/tmp/__jb_exact__"
+      FileUtils.mkdir_p(File.join(base, "RubyMine2026.2"))
+      begin
+        result = Utils.latest_versioned_config_dir(base, "RubyMine2026.2")
+        result.should eq File.join(base, "RubyMine2026.2")
+      ensure
+        FileUtils.rm_rf(base)
+      end
+    end
+
+    it "never matches a longer-name product (RubyMineEAP)" do
+      base = "/tmp/__jb_prefix__"
+      FileUtils.mkdir_p(File.join(base, "RubyMineEAP"))
+      FileUtils.mkdir_p(File.join(base, "RubyMine2026.1"))
+      begin
+        result = Utils.latest_versioned_config_dir(base, "RubyMine")
+        result.should eq File.join(base, "RubyMine2026.1")
+      ensure
+        FileUtils.rm_rf(base)
+      end
+    end
+  end
+
   describe ".backup_folder?" do
     it "detects .bak timestamps" do
       Utils.backup_folder?("WebStorm2025.2.bak.1700000000").should be_true

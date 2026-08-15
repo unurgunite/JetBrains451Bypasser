@@ -347,6 +347,38 @@ module JBUpdater
       matches.max_by(&.[1])[0]
     end
 
+    # Returns the newest versioned config directory for a product name.
+    #
+    # Unlike {resolve_product_folder} this is non-destructive (never creates
+    # the base dir) and returns an absolute path of a *matching* folder, or
+    # `nil` when no versioned folder exists. Backup folders are skipped.
+    #
+    # This is used by {DetectProducts.all} so a product with multiple config
+    # versions (e.g. `RubyMine2025.3`, `RubyMine2026.1`, `RubyMine2026.2`)
+    # resolves to the **latest** one instead of an arbitrary glob match.
+    #
+    # @param base_dir [String] JetBrains config base directory
+    # @param name [String] Product name (e.g. `"RubyMine"`)
+    # @return [String?] Absolute path of the newest matching dir, or `nil`
+    def self.latest_versioned_config_dir(base_dir : String, name : String) : String?
+      return nil unless Dir.exists?(base_dir)
+
+      pattern = /^#{Regex.escape(name)}(\d|$)/i
+      matches = [] of {String, Array(Float64)}
+
+      Dir.each_child(base_dir) do |entry|
+        next unless pattern.matches?(entry)
+        next if backup_folder?(entry)
+        tail = entry.sub(/^#{name}/i, "")
+        matches << {entry, tail.empty? ? [0.0, 0.0, 0.0] : version_numbers(tail)}
+      end
+
+      return nil if matches.empty?
+
+      best = matches.max_by(&.[1])[0]
+      File.join(base_dir, best)
+    end
+
     # Extracts up to three version numbers from a product folder suffix.
     #
     # Tolerates non-numeric fragments (e.g. `"2025.2-backup"` → `[2025.0, 2.0]`)
