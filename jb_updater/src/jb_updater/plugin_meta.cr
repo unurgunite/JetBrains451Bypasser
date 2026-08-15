@@ -105,9 +105,9 @@ module JBUpdater
       id = id_node.try &.content
       name = name_node.try &.content
       version = version_node.try &.content
-      return nil unless id && version
+      return unless id && version
       new(id: id.strip, name: name.try(&.strip), version: version.strip, since: since.try &.strip, until_build: until_build.try &.strip, path: path)
-    rescue ex : XML::Error
+    rescue XML::Error
       nil
     end
 

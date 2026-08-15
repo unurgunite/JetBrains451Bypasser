@@ -10,7 +10,7 @@ describe PluginMeta do
           <version>2025.1.0</version>
           <idea-version since-build="252.0" until-build="260.*"/>
         </idea-plugin>
-      XML
+        XML
 
       if p = PluginMeta.parse_xml(xml, "/tmp/fake")
         p.id.should eq "org.jetbrains.demo"
@@ -30,7 +30,7 @@ describe PluginMeta do
           <id>com.example.my</id>
           <version>1.0</version>
         </idea-plugin>
-      XML
+        XML
       p = PluginMeta.parse_xml(xml, "/tmp/fake")
       p.should_not be_nil
       p.try(&.name).should eq "My Plugin"
@@ -42,7 +42,7 @@ describe PluginMeta do
           <name>Fallback Plugin</name>
           <version>1.0</version>
         </idea-plugin>
-      XML
+        XML
       PluginMeta.parse_xml(xml, "/tmp/fake").should_not be_nil
     end
 
@@ -63,7 +63,7 @@ describe PluginMeta do
             <id>com.example.scanned</id>
             <version>1.0</version>
           </idea-plugin>
-        XML
+          XML
 
         result = PluginMeta.scan_dir(dir)
         result.size.should eq 1
@@ -98,7 +98,7 @@ describe PluginMeta do
             <id>com.example.fromdir</id>
             <version>2.0</version>
           </idea-plugin>
-        XML
+          XML
 
         p = PluginMeta.parse_from_dir(dir)
         p.should_not be_nil

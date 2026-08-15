@@ -58,26 +58,26 @@ module App
 
   # Drains accumulated log messages for display on the UI thread.
   def self.drain_log_buffer : Array(String)
-    @@log_buffer_mutex.synchronize {
+    @@log_buffer_mutex.synchronize do
       buf = @@log_buffer.dup
       @@log_buffer.clear
       buf
-    }
+    end
   end
 
   # Appends a message to the thread-safe log buffer.
   def self.push_log(msg : String)
-    @@log_buffer_mutex.synchronize {
+    @@log_buffer_mutex.synchronize do
       @@log_buffer << msg
-    }
+    end
   end
 
   # Records download progress from a background thread.
   def self.update_progress(downloaded : Int64, total : Int64)
-    @@download_progress_mutex.synchronize {
+    @@download_progress_mutex.synchronize do
       @@download_progress = total > 0 ? ((downloaded.to_f / total) * 100).to_i : 0
       @@download_total = total
-    }
+    end
   end
 
   # macOS Sonoma bug: setEditable:NO prevents NSTextStorage text changes.
@@ -324,8 +324,8 @@ end
 # @param text [String?] Path string (may contain `~`)
 # @return [String?] Expanded path or nil
 private def expand_tilde(text : String?) : String?
-  return nil unless text
-  return nil if text.empty?
+  return unless text
+  return if text.empty?
   JBUpdater::Utils.expand_tilde(text)
 end
 
@@ -410,34 +410,32 @@ private def run_cli(args : Array(String)) : Nil
   App.log.append("[CLI] jb_updater #{args.join(" ")}\n")
 
   Thread.new do
-    begin
-      output = IO::Memory.new
-      status = Process.run(exe, args: args, output: output, error: output)
+    output = IO::Memory.new
+    status = Process.run(exe, args: args, output: output, error: output)
 
-      result = output.to_s
-      unless result.empty?
-        result.each_line do |line|
-          UIng.queue_main do
-            next if App.shutting_down?
-            App.log.append("[subprocess] #{line}\n")
-          end
+    result = output.to_s
+    unless result.empty?
+      result.each_line do |line|
+        UIng.queue_main do
+          next if App.shutting_down?
+          App.log.append("[subprocess] #{line}\n")
         end
       end
+    end
 
-      UIng.queue_main do
-        next if App.shutting_down?
-        App.log.append("[CLI] exit code: #{status.exit_code}\n")
-        App.plugin_progress.value = 100 if status.success?
-        App.busy = false
-        App.debug_reenable
-      end
-    rescue ex
-      UIng.queue_main do
-        next if App.shutting_down?
-        App.log.append("[CLI] ERROR: #{ex.message}\n")
-        App.busy = false
-        App.debug_reenable
-      end
+    UIng.queue_main do
+      next if App.shutting_down?
+      App.log.append("[CLI] exit code: #{status.exit_code}\n")
+      App.plugin_progress.value = 100 if status.success?
+      App.busy = false
+      App.debug_reenable
+    end
+  rescue ex
+    UIng.queue_main do
+      next if App.shutting_down?
+      App.log.append("[CLI] ERROR: #{ex.message}\n")
+      App.busy = false
+      App.debug_reenable
     end
   end
 end
@@ -469,7 +467,6 @@ private def queue_install(xml_id : String, plugins_dir : String, build : String)
       break if item.nil?
 
       xml_id, plugins_dir, build = item
-      status_msg = ""
 
       remaining = JBUpdater::GUI::Actions.queue_size
       completed = JBUpdater::GUI::Actions.total - remaining
@@ -830,7 +827,7 @@ browse_model_handler = UIng::Table::Model::Handler.new do
   num_columns { 4 }
   column_type { |_col| UIng::Table::Value::Type::String }
   num_rows { App.browse_plugins.size }
-  cell_value { |row, col|
+  cell_value do |row, col|
     if row < App.browse_plugins.size
       plugin = App.browse_plugins[row]
       case col
@@ -845,7 +842,7 @@ browse_model_handler = UIng::Table::Model::Handler.new do
     else
       UIng::Table::Value.new("")
     end
-  }
+  end
 end
 
 browse_model = UIng::Table::Model.new(browse_model_handler)
@@ -929,7 +926,7 @@ installed_handler = UIng::Table::Model::Handler.new do
   num_columns { 5 }
   column_type { |_col| UIng::Table::Value::Type::String }
   num_rows { App.installed_plugins_arr.size }
-  cell_value { |row, col|
+  cell_value do |row, col|
     plugin = App.installed_plugins_arr[row]?
     next UIng::Table::Value.new("") unless plugin
     case col
@@ -939,7 +936,7 @@ installed_handler = UIng::Table::Model::Handler.new do
     when 3 then UIng::Table::Value.new(plugin.since || "—")
     else        UIng::Table::Value.new(plugin.until_build || "—")
     end
-  }
+  end
 end
 installed_model = UIng::Table::Model.new(installed_handler)
 App.installed_table = installed_table = UIng::Table.new(installed_model)
@@ -1265,50 +1262,48 @@ if inst && inst.size > 0
 end
 
 # Warm marketplace cache after UI is visible (1s delay)
-UIng.timer(1_000) {
+UIng.timer(1_000) do
   build = resolve_build.call
   JBUpdater::PluginMarketplace.list_by_build(build)
   log.append("[Browse] Marketplace cache warmed: #{build}\n")
   0
-}
+end
 
 search_entry.on_changed do |text|
-  begin
-    query = text || ""
-    if query.empty?
-      model = App.browse_table_model
-      if model
-        old_count = App.browse_plugins.size
-        App.browse_plugins = [] of JBUpdater::PluginInfo
-        (0...old_count).each { |i| model.row_deleted(0) }
-      end
-      App.selected_xml_id = nil
-      browse_status.text = "Type to search plugins..."
-      next
-    end
-
-    build = resolve_build.call
-    plugins = JBUpdater::PluginMarketplace.search(query, build)
-
+  query = text || ""
+  if query.empty?
     model = App.browse_table_model
-    next unless model
-
-    old_count = App.browse_plugins.size
-    App.browse_plugins = plugins
-    if old_count == 0
-      plugins.each_with_index { |_, i| model.row_inserted(i) }
-    elsif plugins.size >= old_count
-      (0...old_count).each { |i| model.row_changed(i) }
-      (old_count...plugins.size).each { |i| model.row_inserted(i) }
-    else
-      (0...plugins.size).each { |i| model.row_changed(i) }
-      (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+    if model
+      old_count = App.browse_plugins.size
+      App.browse_plugins = [] of JBUpdater::PluginInfo
+      (0...old_count).each { |i| model.row_deleted(0) }
     end
-    browse_status.text = "Found #{plugins.size} results"
-  rescue ex
-    log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
-    browse_status.text = "Search error: #{ex.class} #{ex.message}"
+    App.selected_xml_id = nil
+    browse_status.text = "Type to search plugins..."
+    next
   end
+
+  build = resolve_build.call
+  plugins = JBUpdater::PluginMarketplace.search(query, build)
+
+  model = App.browse_table_model
+  next unless model
+
+  old_count = App.browse_plugins.size
+  App.browse_plugins = plugins
+  if old_count == 0
+    plugins.each_with_index { |_, i| model.row_inserted(i) }
+  elsif plugins.size >= old_count
+    (0...old_count).each { |i| model.row_changed(i) }
+    (old_count...plugins.size).each { |i| model.row_inserted(i) }
+  else
+    (0...plugins.size).each { |i| model.row_changed(i) }
+    (plugins.size...old_count).reverse_each { |i| model.row_deleted(i) }
+  end
+  browse_status.text = "Found #{plugins.size} results"
+rescue ex
+  log.append("[Browse] Search error: #{ex.class}: #{ex.message}\n")
+  browse_status.text = "Search error: #{ex.class} #{ex.message}"
 end
 
 btn_top.on_clicked do

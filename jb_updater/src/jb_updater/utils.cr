@@ -203,7 +203,7 @@ module JBUpdater
           numbers = parts.map(&.to_f).fill(0.0, parts.size...3)
           matches << {entry, numbers}
         end
-      rescue ex : File::NotFoundError
+      rescue File::NotFoundError
         raise "No config folder found for product '#{short}' under #{base_dir}"
       end
 
