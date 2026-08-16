@@ -44,6 +44,13 @@ module JBUpdater
     getter vendor : String?
     # Preview image URL, or `nil`.
     getter preview : String?
+    # Warning note about compatibility with the selected IDE build, or `nil`.
+    #
+    # Set when a plugin is only found through an older-build fallback
+    # (e.g. DocScribe declares support only up to `261.*` but is shown
+    # for a `262` IDE). It may still work — author just hasn't widened
+    # the declared range — so it is a soft warning, not a hard block.
+    getter compat_note : String?
 
     # @param id [Int64] Marketplace numeric ID
     # @param xml_id [String] XML identifier
@@ -57,6 +64,7 @@ module JBUpdater
     # @param tags [Array(String)] Tag list
     # @param vendor [String?] Vendor name
     # @param preview [String?] Preview image URL
+    # @param compat_note [String?] Compatibility warning note
     def initialize(
       @id : Int64,
       @xml_id : String,
@@ -70,7 +78,22 @@ module JBUpdater
       @tags : Array(String) = [] of String,
       @vendor : String? = nil,
       @preview : String? = nil,
+      @compat_note : String? = nil,
     )
+    end
+
+    # Returns a copy of this plugin with a compatibility note attached.
+    #
+    # `PluginInfo` is a value struct; the note is only known after the
+    # plugin has been fetched (e.g. as an older-build fallback hit).
+    #
+    # @param note [String] Warning text (e.g. `"Declared only up to 261.*"`)
+    # @return [PluginInfo] Copy with `compat_note` set
+    def with_compat_note(note : String) : PluginInfo
+      PluginInfo.new(
+        id, xml_id, name, description, icon, categories, downloads, rating,
+        author, tags, vendor, preview, note
+      )
     end
 
     # Parses the JetBrains Marketplace XML response into an array of `PluginInfo`.
@@ -260,7 +283,8 @@ module JBUpdater
         # with the requested build. Some plugins declare a narrow range
         # (e.g. DocScribe: `261.*`) yet still work on newer IDEs. Fall
         # back through older builds of the same product so they show up
-        # in search results.
+        # in search results. Plugins found this way are flagged with a
+        # compatibility note (soft warning — they usually still work).
         if results.empty?
           Utils.previous_builds(build, limit: 4).each do |alt_build|
             alt = list_by_build(alt_build).select do |plugin|
@@ -268,7 +292,8 @@ module JBUpdater
                 plugin.xml_id.downcase.includes?(query_lower)
             end
             unless alt.empty?
-              results = alt
+              note = "Declared for build #{alt_build}, not for #{build} — may still work"
+              results = alt.map(&.with_compat_note(note))
               break
             end
           end

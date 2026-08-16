@@ -175,4 +175,18 @@ describe PluginInfo do
       p.star_rating.should eq "★★★★★"
     end
   end
+
+  describe "#with_compat_note" do
+    it "returns a copy with the note attached and all fields preserved" do
+      base = PluginInfo.new(id: 32349_i64, xml_id: "com.florexlabs.docscribe", name: "DocScribe",
+        description: "desc", downloads: 46_i64, rating: 4.5)
+      noted = base.with_compat_note("Declared for build RM-261, not for RM-262 — may still work")
+      noted.compat_note.should eq "Declared for build RM-261, not for RM-262 — may still work"
+      noted.name.should eq "DocScribe"
+      noted.xml_id.should eq "com.florexlabs.docscribe"
+      noted.downloads.should eq 46_i64
+      noted.rating.should eq 4.5
+      base.compat_note.should be_nil
+    end
+  end
 end

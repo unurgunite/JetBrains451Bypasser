@@ -957,7 +957,7 @@ browse_model_handler = UIng::Table::Model::Handler.new do
     if row < App.browse_plugins.size
       plugin = App.browse_plugins[row]
       case col
-      when 0 then UIng::Table::Value.new(plugin.name)
+      when 0 then UIng::Table::Value.new(plugin.compat_note ? "⚠ #{plugin.name}" : plugin.name)
       when 1
         installed = App.installed_plugins
         value = installed ? (installed.has_key?(plugin.xml_id) ? "✓" : "") : "—"
@@ -1759,10 +1759,14 @@ browse_table.on_selection_changed do |selection|
   plugin = row >= 0 ? App.browse_plugins[row]? : nil
   if plugin
     App.selected_xml_id = plugin.xml_id
-    stripped = plugin.description[0, 500]
-    preview = stripped[0, 500]
-    App.log.append("[Browse] detail: #{preview.size}B #{preview.count('\n')} lines (#{preview.size - preview.count('\n')} non-newline)\n")
-    App.safe_set_text(browse_detail, preview)
+    if note = plugin.compat_note
+      App.safe_set_text(browse_detail, "⚠ #{note}\n\n#{plugin.description}")
+    else
+      stripped = plugin.description[0, 500]
+      preview = stripped[0, 500]
+      App.log.append("[Browse] detail: #{preview.size}B #{preview.count('\n')} lines (#{preview.size - preview.count('\n')} non-newline)\n")
+      App.safe_set_text(browse_detail, preview)
+    end
   else
     App.safe_set_text(browse_detail, "Select a plugin to view details")
     App.selected_xml_id = nil
@@ -1784,7 +1788,9 @@ btn_install_browse.on_clicked do
 
   build = resolve_build.call
 
-  log.append("[Browse] Installing plugin: #{xml_id} for build #{build}\n")
+  warn = App.browse_plugins.any? { |plugin| plugin.xml_id == xml_id && plugin.compat_note }
+  log.append(warn ? "[Browse] ⚠ #{xml_id} may not be fully compatible with build #{build}; installing latest compatible version\n" : "[Browse] Installing plugin: #{xml_id} for build #{build}\n")
+  browse_status.text = warn ? "Installing (compatibility warning)…" : "Installing…"
 
   queue_install(xml_id, plugins_dir, build)
 end
