@@ -1,4 +1,6 @@
 require "file_utils"
+require "compress/zip"
+require "compress/deflate"
 
 module JBUpdater
   # Shared utility methods used across the codebase.
@@ -35,18 +37,11 @@ module JBUpdater
       str.gsub(/[^A-Za-z0-9_.-]/, "_")
     end
 
-    # Checks whether the `unzip` tool is available on `$PATH`.
+    # Extracts a ZIP archive into a target directory using the pure-Crystal
+    # `Compress::Zip` stdlib reader (no external `unzip` binary).
     #
-    # @return [Bool] `true` if `which unzip` succeeds
-    def self.unzip_available? : Bool
-      status = Process.run("which",
-        args: ["unzip"],
-        output: Process::Redirect::Close,
-        error: Process::Redirect::Close)
-      status.success?
-    end
-
-    # Extracts a ZIP archive into a target directory.
+    # Runs safely from background threads — unlike `Process.run` which
+    # deadlocks in spawned threads on some Crystal versions.
     #
     # If the archive contains a single root directory its contents are
     # flattened into `dest_dir`. Existing directories are backed up
@@ -54,16 +49,14 @@ module JBUpdater
     #
     # @param zip_path [String] Path to the ZIP file
     # @param dest_dir [String] Target installation directory
-    # @raise [RuntimeError] If `unzip` is not found or the command fails
+    # @raise [RuntimeError] If the archive cannot be read or extracted
     def self.extract_zip(zip_path : String, dest_dir : String) : Nil
-      raise "'unzip' not found" unless unzip_available?
       tmp_root = File.join(Dir.tempdir,
         "jb-plg-#{Time.utc.to_unix}-#{Random::Secure.hex(4)}")
       FileUtils.mkdir_p(tmp_root)
 
       begin
-        status = Process.run("unzip", args: ["-qq", "-o", zip_path, "-d", tmp_root])
-        raise "unzip failed for #{zip_path}" unless status.success?
+        extract_zip_entries(zip_path, tmp_root)
 
         entries = Dir.children(tmp_root).reject(&.==("__MACOSX"))
         root = if entries.size == 1 && File.directory?(File.join(tmp_root, entries.first))
@@ -85,6 +78,132 @@ module JBUpdater
       end
     end
 
+    # Parses the central directory of a zip and returns file entries
+    # (name, method, compressed size, local header offset).
+    #
+    # Unlike `Compress::Zip`, this never touches DOS timestamps, so
+    # archives with invalid timestamp fields (common on JetBrains
+    # marketplace) are still readable.
+    private def self.zip_file_entries(zip_path : String) : Array(Tuple(String, UInt16, UInt32, UInt32))
+      file_bytes = File.open(zip_path, "rb", &.gets_to_end.to_slice)
+      io = IO::Memory.new(file_bytes)
+      le = IO::ByteFormat::LittleEndian
+
+      eocd = -1
+      search_from = [file_bytes.size - 65_557, 0].max
+      i = file_bytes.size - 4
+      while i >= search_from
+        if file_bytes[i] == 0x50 && file_bytes[i + 1] == 0x4B &&
+           file_bytes[i + 2] == 0x05 && file_bytes[i + 3] == 0x06
+          eocd = i
+          break
+        end
+        i -= 1
+      end
+      raise "Invalid zip: end of central directory not found" if eocd < 0
+
+      io.pos = eocd + 10
+      total = io.read_bytes(UInt16, le)
+      io.pos = eocd + 16
+      cd_offset = io.read_bytes(UInt32, le)
+      raise "Invalid zip: bad central directory offset" if cd_offset >= file_bytes.size
+
+      entries = Array(Tuple(String, UInt16, UInt32, UInt32)).new(total)
+
+      io.pos = cd_offset.to_i
+      total.times do
+        sig = io.read_bytes(UInt32, le)
+        raise "Invalid zip: bad central directory entry" unless sig == 0x02014B50
+        io.pos += 2 + 2 + 2 # version made / needed / flags
+        method = io.read_bytes(UInt16, le)
+        io.pos += 2 + 2 + 4 # mod time / date / crc
+        comp_size = io.read_bytes(UInt32, le)
+        io.pos += 4 # uncomp size
+        name_len = io.read_bytes(UInt16, le)
+        extra_len = io.read_bytes(UInt16, le)
+        comment_len = io.read_bytes(UInt16, le)
+        io.pos += 2 + 2 + 4 # disk start / internal / external attrs
+        offset = io.read_bytes(UInt32, le)
+        name_bytes = Bytes.new(name_len)
+        io.read_fully(name_bytes)
+        io.pos += extra_len + comment_len
+        name = String.new(name_bytes)
+        next if name.ends_with?('/') || name.starts_with?("__MACOSX/") || name.includes?("..")
+        entries << {name, method, comp_size, offset}
+      end
+
+      entries
+    end
+
+    # Extracts a zip archive to a directory using a byte-level reader.
+    private def self.extract_zip_entries(zip_path : String, dest_dir : String) : Nil
+      entries = zip_file_entries(zip_path)
+
+      entries.each do |name, method, comp_size, offset|
+        target = File.join(dest_dir, name)
+        FileUtils.mkdir_p(File.dirname(target))
+        File.open(target, "w") do |out_file|
+          zip_entry_bytes(zip_path, method, comp_size, offset) do |io|
+            if method == 0
+              IO.copy(io, out_file, comp_size)
+            else
+              reader = Compress::Deflate::Reader.new(io)
+              IO.copy(reader, out_file)
+            end
+          end
+        end
+      end
+    end
+
+    # Yields a deflate/stored entry's decompressed bytes stream.
+    private def self.zip_entry_bytes(zip_path : String, method : UInt16, comp_size : UInt32, offset : UInt32, & : IO ->)
+      file_bytes = File.open(zip_path, "rb", &.gets_to_end.to_slice)
+      io = IO::Memory.new(file_bytes)
+      le = IO::ByteFormat::LittleEndian
+
+      io.pos = offset.to_i
+      sig = io.read_bytes(UInt32, le)
+      raise "Invalid zip: bad local header" unless sig == 0x04034B50
+      io.pos += 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 # version/flag/method/time/date/crc/sizes
+      name_len = io.read_bytes(UInt16, le)
+      extra_len = io.read_bytes(UInt16, le)
+      io.pos += name_len + extra_len
+
+      if method == 0
+        yield io
+      elsif method == 8
+        comp_data = Bytes.new(comp_size)
+        io.read_fully(comp_data)
+        yield IO::Memory.new(comp_data)
+      else
+        raise "Invalid zip: unsupported compression method #{method}"
+      end
+    end
+
+    # Reads a single file out of a zip archive as a String.
+    #
+    # Returns `nil` if the entry is missing or cannot be decoded. Safe to
+    # call from background threads (no `Process.run`, no `Compress::Zip`
+    # timestamp bug).
+    def self.read_zip_file(zip_path : String, inner_path : String) : String?
+      entry = zip_file_entries(zip_path).find { |(name, _, _, _)| name == inner_path }
+      return unless entry
+      _, method, comp_size, offset = entry
+      result = String.build do |str|
+        zip_entry_bytes(zip_path, method, comp_size, offset) do |io|
+          if method == 0
+            IO.copy(io, str, comp_size)
+          else
+            reader = Compress::Deflate::Reader.new(io)
+            IO.copy(reader, str)
+          end
+        end
+      end
+      result
+    rescue
+      nil
+    end
+
     # --------------------------------------------------------------------------
     # Build / version helpers
     # --------------------------------------------------------------------------
@@ -102,6 +221,40 @@ module JBUpdater
       core = str.gsub(/^[A-Z]+-/, "")
       parts = core.split('.', 3).map { |part| part == "*" ? INF : part.to_f }
       parts.fill(0.0, parts.size...3)
+    end
+
+    # Generates older build identifiers for the same product code.
+    #
+    # Marketplace APIs filter plugins by strict build compatibility
+    # (e.g. DocScribe declares only `261.*`, skipping RubyMine 2026.2).
+    # This helper walks backwards in yearly/monor increments so callers
+    # can search/download across slightly older compatible builds.
+    #
+    # Example: `"RM-262"` → `["RM-261", "RM-253", "RM-252", "RM-251", ...]`
+    #
+    # @param build_str [String] Current build (e.g. `"RM-262.9437.192"`)
+    # @param limit [Int32] Maximum number of older builds to produce
+    # @return [Array(String)] Older build strings for the same product
+    def self.previous_builds(build_str : String, limit : Int32 = 8) : Array(String)
+      m = build_str.match(/^([A-Z]+)-(\d{3})/)
+      return [] of String unless m
+      code = m[1]
+      year = m[2][0, 2].to_i
+      minor = m[2][2].to_i
+      return [] of String if minor.zero?
+
+      result = [] of String
+      result << "#{code}-#{year}#{minor - 1}" if minor > 1
+
+      (year - 1).downto(year - 4) do |y|
+        break if result.size >= limit
+        [3, 2, 1].each do |alt_minor|
+          result << "#{code}-#{y}#{alt_minor}"
+          break if result.size >= limit
+        end
+      end
+
+      result[0...limit]
     end
 
     # Checks whether a build version falls within a `[since, until]` range.
@@ -123,21 +276,37 @@ module JBUpdater
     #
     # Strips trailing version numbers and spaces, matches the base
     # name case-insensitively, and returns the short code
-    # (e.g. `"RubyMine2025.2"` -> `"RM"`, `"phpstorm"` -> `"PS"`).
+    # (e.g. `"RubyMine2025.2"` -> `"RM"`, `"ruby"` -> `"RM"`).
     # Unknown names fall back to the first two uppercase characters.
     #
     # @param name [String] Product name (e.g. `"RubyMine2025.2"` or `"phpstorm"`)
     # @return [String] Product code (e.g. `"RM"`)
     def self.product_code(name : String) : String
       mapping = {
-        "rubymine" => "RM",
-        "webstorm" => "WS",
-        "pycharm"  => "PY",
-        "clion"    => "CL",
-        "goland"   => "GO",
-        "intellij" => "IU",
-        "phpstorm" => "PS",
-        "rider"    => "RD",
+        "ruby"      => "RM",
+        "rubymine"  => "RM",
+        "rm"        => "RM",
+        "webstorm"  => "WS",
+        "ws"        => "WS",
+        "pycharm"   => "PY",
+        "py"        => "PY",
+        "clion"     => "CL",
+        "cl"        => "CL",
+        "goland"    => "GO",
+        "go"        => "GO",
+        "intellij"  => "IU",
+        "idea"      => "IU",
+        "iu"        => "IU",
+        "phpstorm"  => "PS",
+        "ps"        => "PS",
+        "rider"     => "RD",
+        "rd"        => "RD",
+        "datagrip"  => "DG",
+        "dg"        => "DG",
+        "dataspell" => "DS",
+        "ds"        => "DS",
+        "aqua"      => "QA",
+        "appcode"   => "AC",
       }
 
       key = name.gsub(/[\d ].*/, "").downcase
@@ -197,10 +366,10 @@ module JBUpdater
       begin
         Dir.each_child(base_dir) do |entry|
           next unless pattern.matches?(entry)
+          next if backup_folder?(entry)
           tail = entry.sub(/^#{short}/i, "")
           next if tail.empty?
-          parts = tail.split('.', 3)
-          numbers = parts.map(&.to_f).fill(0.0, parts.size...3)
+          numbers = version_numbers(tail)
           matches << {entry, numbers}
         end
       rescue File::NotFoundError
@@ -210,6 +379,64 @@ module JBUpdater
       raise "No config folder found for product '#{short}' under #{base_dir}" if matches.empty?
 
       matches.max_by(&.[1])[0]
+    end
+
+    # Returns the newest versioned config directory for a product name.
+    #
+    # Unlike {resolve_product_folder} this is non-destructive (never creates
+    # the base dir) and returns an absolute path of a *matching* folder, or
+    # `nil` when no versioned folder exists. Backup folders are skipped.
+    #
+    # This is used by {DetectProducts.all} so a product with multiple config
+    # versions (e.g. `RubyMine2025.3`, `RubyMine2026.1`, `RubyMine2026.2`)
+    # resolves to the **latest** one instead of an arbitrary glob match.
+    #
+    # @param base_dir [String] JetBrains config base directory
+    # @param name [String] Product name (e.g. `"RubyMine"`)
+    # @return [String?] Absolute path of the newest matching dir, or `nil`
+    def self.latest_versioned_config_dir(base_dir : String, name : String) : String?
+      return unless Dir.exists?(base_dir)
+
+      pattern = /^#{Regex.escape(name)}(\d|$)/i
+      matches = [] of {String, Array(Float64)}
+
+      Dir.each_child(base_dir) do |entry|
+        next unless pattern.matches?(entry)
+        next if backup_folder?(entry)
+        tail = entry.sub(/^#{name}/i, "")
+        matches << {entry, tail.empty? ? [0.0, 0.0, 0.0] : version_numbers(tail)}
+      end
+
+      return if matches.empty?
+
+      best = matches.max_by(&.[1])[0]
+      File.join(base_dir, best)
+    end
+
+    # Extracts up to three version numbers from a product folder suffix.
+    #
+    # Tolerates non-numeric fragments (e.g. `"2025.2-backup"` → `[2025.0, 2.0]`)
+    # instead of raising on `String#to_f`.
+    #
+    # @param tail [String] Folder name suffix after the product name
+    # @return [Array(Float64)] Three-element version array
+    def self.version_numbers(tail : String) : Array(Float64)
+      parts = tail.split('.', 3)
+      numbers = parts.map do |part|
+        match = part.match(/\A[^0-9]*(\d+(?:\.\d+)?)/)
+        match ? match[1].to_f : 0.0
+      end
+      numbers.push(0.0, 0.0, 0.0)[0, 3]
+    end
+
+    # Detects backup-style folder names produced by updater backups.
+    #
+    # Matches `.bak`, `.bak.<timestamp>`, `-backup`, and `_backup` suffixes.
+    #
+    # @param entry [String] Folder name
+    # @return [Bool] `true` if the name looks like a backup folder
+    def self.backup_folder?(entry : String) : Bool
+      entry.matches?(/(\.bak|[-_]?backup)/i)
     end
 
     # Returns the `plugins` subdirectory for a JetBrains product, creating it if needed.

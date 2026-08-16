@@ -95,6 +95,28 @@ describe PluginInfo do
         XML
       PluginInfo.parse(xml).size.should eq 1
     end
+
+    it "parses a rating" do
+      xml = <<-XML
+        <plugin-list>
+          <idea-plugin>
+            <id>com.example.rated</id>
+            <name>Rated Plugin</name>
+            <description>Big</description>
+            <rating>4.6</rating>
+          </idea-plugin>
+          <idea-plugin>
+            <id>com.example.unrated</id>
+            <name>Unrated Plugin</name>
+            <description>Big</description>
+          </idea-plugin>
+        </plugin-list>
+        XML
+      plugins = PluginInfo.parse(xml)
+      plugins.size.should eq 2
+      plugins[0].rating.should eq 4.6
+      plugins[1].rating.should eq 0.0
+    end
   end
 
   describe "#download_url" do
@@ -138,9 +160,33 @@ describe PluginInfo do
   end
 
   describe "#star_rating" do
-    it "returns five stars" do
+    it "renders em-dash for unrated plugins" do
       p = PluginInfo.new(id: 1_i64, xml_id: "x", name: "x", description: "")
-      p.star_rating.should eq "⭐⭐⭐⭐⭐"
+      p.star_rating.should eq "—"
+    end
+
+    it "renders filled stars for rated plugins" do
+      p = PluginInfo.new(id: 1_i64, xml_id: "x", name: "x", description: "", rating: 4.2)
+      p.star_rating.should eq "★★★★☆"
+    end
+
+    it "renders five stars for a perfect rating" do
+      p = PluginInfo.new(id: 1_i64, xml_id: "x", name: "x", description: "", rating: 5.0)
+      p.star_rating.should eq "★★★★★"
+    end
+  end
+
+  describe "#with_compat_note" do
+    it "returns a copy with the note attached and all fields preserved" do
+      base = PluginInfo.new(id: 32349_i64, xml_id: "com.florexlabs.docscribe", name: "DocScribe",
+        description: "desc", downloads: 46_i64, rating: 4.5)
+      noted = base.with_compat_note("Declared for build RM-261, not for RM-262 — may still work")
+      noted.compat_note.should eq "Declared for build RM-261, not for RM-262 — may still work"
+      noted.name.should eq "DocScribe"
+      noted.xml_id.should eq "com.florexlabs.docscribe"
+      noted.downloads.should eq 46_i64
+      noted.rating.should eq 4.5
+      base.compat_note.should be_nil
     end
   end
 end

@@ -178,8 +178,7 @@ On macOS:
 
 On Linux/Windows:
 
-- Use the `*-bundle-*` archives so GUI and CLI are in the same directory.
-- Run the GUI binary (`./jb_updater_gui` or `jb_updater_gui.exe`).
+- Run the GUI binary (`./jb_updater_gui` or `jb_updater_gui.exe`) from the `*-bundle-*` archives.
 
 ---
 
@@ -194,8 +193,9 @@ shards install
 crystal build src/main.cr --release -o jb_updater
 ./jb_updater --help
 
-# GUI
-crystal build src/gui/main_gui.cr --release -o jb_updater_gui
+# GUI (requires -Dpreview_mt so background threads can do network I/O,
+# see "GUI background threads" note below)
+crystal build src/gui/main_gui.cr --release -Dpreview_mt -o jb_updater_gui
 ./jb_updater_gui
 ```
 
@@ -219,7 +219,7 @@ Build optimized binaries:
 
 ```bash
 crystal build src/main.cr --release -o jb_updater
-crystal build src/gui/main_gui.cr --release -o jb_updater_gui
+crystal build src/gui/main_gui.cr --release -Dpreview_mt -o jb_updater_gui
 ```
 
 ---
@@ -253,6 +253,18 @@ GitHub Actions will attach fresh binaries for that tag to the Release page.
 ---
 
 ## Notes
+
+### GUI background threads
+
+The GUI runs marketplace fetches, plugin search, downloads, and IDE-release queries on background threads and marshals
+UI updates back to the main thread with `UIng.queue_main`. On Crystal >= 1.21 the single-threaded runtime does not
+install a fiber execution context on `Thread.new` threads, so background threads that touch evented I/O fail with
+`Thread#execution_context cannot be nil`. Building the GUI with `-Dpreview_mt` sets up per-thread contexts and makes
+these threads safe.
+
+GUI button actions run the same logic in-process (no `jb_updater` subprocess), mirroring the CLI argument dispatch.
+This avoids `Process.run` from a background thread, which deadlocks under Crystal 1.21 (child process spawning is only
+supported on the main execution context).
 
 - Close your JetBrains IDE before updating plugins (to avoid locked files).
 - Requires the system `unzip` tool for extracting plugin archives.

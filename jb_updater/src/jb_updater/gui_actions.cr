@@ -10,8 +10,9 @@ module JBUpdater
       # Resolves the IDE build string from user input or auto-detection.
       #
       # Priority:
-      # 1. `ide_product_text` (IDE tab's "IDE code or name" field)
-      # 2. `build_text` (Plugins tab's "Build" field)
+      # 1. `build_text` (Plugins tab's "Build" field) — the form the user is
+      #    actually looking at when installing/updating plugins
+      # 2. `ide_product_text` (IDE tab's "IDE code or name" field)
       # 3. First detected product's build from {DetectProducts.all}
       # 4. Fallback `"IC-252"`
       #
@@ -24,9 +25,9 @@ module JBUpdater
         build_text : String?,
         detected : Array(DetectedProduct),
       ) : String
-        code = ide_product_text
-        return code if code && !code.empty?
         code = build_text
+        return code if code && !code.empty?
+        code = ide_product_text
         return code if code && !code.empty?
         if d = detected.first?
           return d.build

@@ -75,7 +75,7 @@ module JBUpdater
           build = build_code(name, code, app)
 
           config_base = Utils.jetbrains_config_base
-          config_dir = Dir.glob(File.join(config_base, "#{name}*")).first?
+          config_dir = Utils.latest_versioned_config_dir(config_base, name)
           plugins_dir = config_dir ? File.join(config_dir, "plugins") : nil
 
           products << DetectedProduct.new(

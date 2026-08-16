@@ -40,6 +40,13 @@ module JBUpdater
       build_url = latest_ide_download_url(product)
       final_uri = HTTPClient.override_ide_repo_host(build_url, opts.ide_downloads_host)
 
+      if opts.dry_run?
+        Log.header("Dry run — no files will be downloaded or modified")
+        Log.info("Would download: #{final_uri}")
+        Log.info("Mode: #{opts.brew_patch ? "Homebrew cask patch" : "direct DMG download"}")
+        return
+      end
+
       if opts.brew_patch
         patch_homebrew_cask(product, final_uri)
       else
@@ -66,8 +73,13 @@ module JBUpdater
 
       body = res.body || raise "empty response body"
       data = JSON.parse(body)
-      version = data[product_code][0]["version"].as_s
-      downloads = data[product_code][0]["downloads"]
+
+      releases = IDEReleases.extract_releases_arr(data, product_code)
+      release = releases.try(&.first?)
+      raise "No downloads found for product code '#{product_code}'" unless release
+
+      version = release["version"].as_s
+      downloads = release["downloads"]
 
       platform_key = download_key_for(platform, opts.arch)
 
@@ -161,6 +173,11 @@ module JBUpdater
             end
       dmg_path = File.join(Dir.tempdir, "upgrade-#{product}-#{Time.utc.to_unix}#{ext}")
 
+      if opts.dry_run?
+        Log.warn("Dry run: would download #{uri} to #{dmg_path}")
+        return
+      end
+
       cdn_uri = uri
 
       Log.header("Downloading #{product} from #{cdn_uri.host}…")
@@ -216,6 +233,13 @@ module JBUpdater
 
       content = File.read(cask_path)
       new_content = content.gsub(/url\s+["'].*["']/, %(url "#{uri}"))
+
+      if opts.dry_run?
+        Log.warn("Dry run: would patch #{cask_path}")
+        Log.info("Replacing cask url with: #{uri}")
+        return
+      end
+
       File.write(cask_path, new_content)
 
       Log.success("Patched cask: #{cask_path}")

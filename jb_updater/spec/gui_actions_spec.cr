@@ -10,9 +10,9 @@ module JBUpdater
           Actions.resolve_build("RM-252", "", detected).should eq "RM-252"
         end
 
-        it "returns ide_product_text over build_text" do
+        it "returns build_text over ide_product_text" do
           detected = [DetectedProduct.new("Test", "TT", "TT-999", nil, nil, nil)]
-          Actions.resolve_build("RM-252", "WS-242", detected).should eq "RM-252"
+          Actions.resolve_build("RM-252", "WS-242", detected).should eq "WS-242"
         end
 
         it "falls back to build_text when ide_product_text is nil" do

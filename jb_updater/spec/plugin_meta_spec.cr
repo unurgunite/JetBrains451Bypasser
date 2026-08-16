@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "compress/zip"
 include JBUpdater
 
 describe PluginMeta do
@@ -116,6 +117,21 @@ describe PluginMeta do
   describe ".read_text_from_jar" do
     it "returns nil when jar does not exist" do
       PluginMeta.read_text_from_jar("/tmp/nonexistent.jar", "META-INF/plugin.xml").should be_nil
+    end
+
+    it "reads plugin.xml out of a real zip/jar archive" do
+      with_tmpdir do |dir|
+        jar = File.join(dir, "plugin.jar")
+        File.open(jar, "w") do |io|
+          Compress::Zip::Writer.open(io) do |zip|
+            zip.add("META-INF/plugin.xml") { |e| e.print "<idea-plugin><id>com.example.jartest</id></idea-plugin>" }
+          end
+        end
+
+        xml = PluginMeta.read_text_from_jar(jar, "META-INF/plugin.xml")
+        xml.should_not be_nil
+        xml.try(&.should contain "com.example.jartest")
+      end
     end
   end
 end

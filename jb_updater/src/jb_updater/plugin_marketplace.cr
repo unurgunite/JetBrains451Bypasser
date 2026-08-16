@@ -44,6 +44,13 @@ module JBUpdater
     getter vendor : String?
     # Preview image URL, or `nil`.
     getter preview : String?
+    # Warning note about compatibility with the selected IDE build, or `nil`.
+    #
+    # Set when a plugin is only found through an older-build fallback
+    # (e.g. DocScribe declares support only up to `261.*` but is shown
+    # for a `262` IDE). It may still work — author just hasn't widened
+    # the declared range — so it is a soft warning, not a hard block.
+    getter compat_note : String?
 
     # @param id [Int64] Marketplace numeric ID
     # @param xml_id [String] XML identifier
@@ -57,6 +64,7 @@ module JBUpdater
     # @param tags [Array(String)] Tag list
     # @param vendor [String?] Vendor name
     # @param preview [String?] Preview image URL
+    # @param compat_note [String?] Compatibility warning note
     def initialize(
       @id : Int64,
       @xml_id : String,
@@ -70,7 +78,22 @@ module JBUpdater
       @tags : Array(String) = [] of String,
       @vendor : String? = nil,
       @preview : String? = nil,
+      @compat_note : String? = nil,
     )
+    end
+
+    # Returns a copy of this plugin with a compatibility note attached.
+    #
+    # `PluginInfo` is a value struct; the note is only known after the
+    # plugin has been fetched (e.g. as an older-build fallback hit).
+    #
+    # @param note [String] Warning text (e.g. `"Declared only up to 261.*"`)
+    # @return [PluginInfo] Copy with `compat_note` set
+    def with_compat_note(note : String) : PluginInfo
+      PluginInfo.new(
+        id, xml_id, name, description, icon, categories, downloads, rating,
+        author, tags, vendor, preview, note
+      )
     end
 
     # Parses the JetBrains Marketplace XML response into an array of `PluginInfo`.
@@ -86,53 +109,60 @@ module JBUpdater
       begin
         doc = XML.parse(cleaned)
         doc.xpath_nodes("//idea-plugin").each do |plugin_node|
-          next unless plugin_node
-
-          xml_id = ""
-          name = ""
-          description = ""
-          vendor = ""
-
-          if id_node = plugin_node.xpath_node("id")
-            xml_id = id_node.content
+          if plugin = parse_plugin_node(plugin_node)
+            result << plugin
           end
-          if name_node = plugin_node.xpath_node("name")
-            name = name_node.content
-          end
-          if desc_node = plugin_node.xpath_node("description")
-            description = desc_node.content
-          end
-          if vendor_node = plugin_node.xpath_node("vendor")
-            vendor = vendor_node.content
-          end
-
-          downloads = 0_i64
-          if dm = plugin_node["downloads"]?
-            downloads = dm.to_i64 rescue 0_i64
-          end
-
-          categories = [] of String
-          if tag_node = plugin_node.xpath_node("tags")
-            tag_node.content.split(",").each do |tag|
-              t = tag.strip
-              categories << t unless t.empty? || categories.includes?(t)
-            end
-          end
-
-          result << PluginInfo.new(
-            id: 0_i64,
-            xml_id: xml_id,
-            name: name,
-            description: JBUpdater.html_strip(description).gsub(/\s+/, " ").strip,
-            categories: categories,
-            downloads: downloads,
-            vendor: vendor,
-          )
         end
       rescue
       end
 
       result
+    end
+
+    # Extracts a single `PluginInfo` from an `<idea-plugin>` XML node.
+    #
+    # Missing optional fields (rating, downloads, tags) default safely.
+    #
+    # @param plugin_node [XML::Node] The `<idea-plugin>` element
+    # @return [PluginInfo?] Parsed plugin, or `nil` for empty nodes
+    private def self.parse_plugin_node(plugin_node : XML::Node) : PluginInfo?
+      xml_id = node_text(plugin_node, "id")
+      return if xml_id.empty?
+
+      description = node_text(plugin_node, "description")
+      downloads = 0_i64
+      if dm = plugin_node["downloads"]?
+        downloads = dm.to_i64 rescue 0_i64
+      end
+      rating = node_text(plugin_node, "rating").to_f rescue 0.0
+
+      categories = [] of String
+      if tag_node = plugin_node.xpath_node("tags")
+        tag_node.content.split(",").each do |tag|
+          t = tag.strip
+          categories << t unless t.empty? || categories.includes?(t)
+        end
+      end
+
+      PluginInfo.new(
+        id: 0_i64,
+        xml_id: xml_id,
+        name: node_text(plugin_node, "name"),
+        description: JBUpdater.html_strip(description).gsub(/\s+/, " ").strip,
+        categories: categories,
+        downloads: downloads,
+        rating: rating,
+        vendor: node_text(plugin_node, "vendor"),
+      )
+    end
+
+    # Reads the text content of a direct child element, or `""`.
+    #
+    # @param node [XML::Node] Parent element
+    # @param element [String] Child element name
+    # @return [String] Element content or empty string
+    private def self.node_text(node : XML::Node, element : String) : String
+      node.xpath_node(element).try(&.content) || ""
     end
 
     # Returns the direct file download URL for this plugin.
@@ -170,13 +200,15 @@ module JBUpdater
       end
     end
 
-    # Placeholder star rating display.
+    # Renders the plugin's average rating as filled/empty stars.
     #
-    # Currently always returns five stars.
+    # Returns an em-dash for unrated plugins.
     #
-    # @return [String] `"⭐⭐⭐⭐⭐"`
+    # @return [String] e.g. `"★★★★☆"` or `"—"`
     def star_rating : String
-      "⭐" * 5
+      return "—" if rating <= 0.0
+      filled = rating.round.to_i.clamp(0, 5)
+      "★" * filled + "☆" * (5 - filled)
     end
   end
 
@@ -187,10 +219,11 @@ module JBUpdater
   # build string to avoid redundant requests.
   class PluginMarketplace
     @@cache = {} of String => Array(PluginInfo)
+    @@cache_mutex = Mutex.new
 
     # Clears the in-memory plugin list cache.
     def self.clear_cache
-      @@cache.clear
+      @@cache_mutex.synchronize { @@cache.clear }
     end
 
     # Fetches (or returns cached) plugin list for a given IDE build.
@@ -201,7 +234,7 @@ module JBUpdater
     # @param build [String] IDE build string
     # @return [Array(PluginInfo)] List of available plugins
     def self.list_by_build(build : String) : Array(PluginInfo)
-      cached = @@cache[build]?
+      cached = @@cache_mutex.synchronize { @@cache[build]? }
       return cached if cached
 
       params = HTTP::Params{"build" => build}
@@ -209,7 +242,7 @@ module JBUpdater
       xml_str = fetch_raw_with_retry(url)
       return [] of PluginInfo if xml_str.nil? || xml_str.empty?
       plugins = PluginInfo.parse(xml_str)
-      @@cache[build] = plugins
+      @@cache_mutex.synchronize { @@cache[build] = plugins }
       plugins
     end
 
@@ -241,10 +274,32 @@ module JBUpdater
         plugins
       else
         query_lower = query.downcase
-        plugins.select do |plugin|
+        results = plugins.select do |plugin|
           plugin.name.downcase.includes?(query_lower) ||
             plugin.xml_id.downcase.includes?(query_lower)
         end
+
+        # The plugin list API only returns plugins explicitly compatible
+        # with the requested build. Some plugins declare a narrow range
+        # (e.g. DocScribe: `261.*`) yet still work on newer IDEs. Fall
+        # back through older builds of the same product so they show up
+        # in search results. Plugins found this way are flagged with a
+        # compatibility note (soft warning — they usually still work).
+        if results.empty?
+          Utils.previous_builds(build, limit: 4).each do |alt_build|
+            alt = list_by_build(alt_build).select do |plugin|
+              plugin.name.downcase.includes?(query_lower) ||
+                plugin.xml_id.downcase.includes?(query_lower)
+            end
+            unless alt.empty?
+              note = "Declared for build #{alt_build}, not for #{build} — may still work"
+              results = alt.map(&.with_compat_note(note))
+              break
+            end
+          end
+        end
+
+        results
       end
     end
 
