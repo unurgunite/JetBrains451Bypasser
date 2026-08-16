@@ -915,12 +915,8 @@ main_actions = UIng::Box.new(:horizontal)
 main_actions.padded = true
 
 btn_list = UIng::Button.new("List installed")
-btn_install = UIng::Button.new("Install by IDs")
-btn_update = UIng::Button.new("Update all")
 
 main_actions.append(btn_list, false)
-main_actions.append(btn_install, false)
-main_actions.append(btn_update, false)
 batch_group.child = main_actions
 btn_group.append(batch_group, false)
 
@@ -1105,8 +1101,13 @@ installed_actions.padded = true
 btn_scan_installed = UIng::Button.new("Scan")
 btn_uninstall = UIng::Button.new("Uninstall selected")
 btn_uninstall.disable
+btn_update = UIng::Button.new("Update all")
+btn_update_selected = UIng::Button.new("Update selected")
+btn_update_selected.disable
 
 installed_actions.append(btn_scan_installed, false)
+installed_actions.append(btn_update, false)
+installed_actions.append(btn_update_selected, false)
 installed_actions.append(btn_uninstall, false)
 
 installed_status = UIng::Label.new("Click Scan to list installed plugins")
@@ -1157,8 +1158,10 @@ installed_table.on_selection_changed do |selection|
   App.cancel_uninstall
   if selection.num_rows > 0
     btn_uninstall.enable
+    btn_update_selected.enable
   else
     btn_uninstall.disable
+    btn_update_selected.disable
   end
 end
 
@@ -1293,7 +1296,8 @@ combo_products.on_selected do
 end
 
 all_buttons = [] of UIng::Button
-all_buttons.concat([btn_list, btn_install, btn_update])
+all_buttons.concat([btn_list])
+all_buttons.concat([btn_update, btn_update_selected, btn_uninstall])
 all_buttons.concat([btn_list_releases, btn_upgrade])
 App.set_widgets(log, overall_bar, plugin_bar, all_buttons)
 
@@ -1418,27 +1422,6 @@ btn_list.on_clicked do
   end
 end
 
-btn_install.on_clicked do
-  UIng.queue_main do
-    if App.busy?
-      status_label.text = "Already running… please wait"
-      next
-    end
-    raw = e_plugins_dir.text
-    if raw.nil? || raw.empty?
-      log.append("ERROR: Plugins dir is required for Install plugins.\n")
-      status_label.text = "Error: missing plugins dir"
-      next
-    end
-    plugins_dir = expand_tilde(raw)
-    e_plugins_dir.text = plugins_dir if plugins_dir
-    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""))
-    new_run_header("Install plugins", args)
-    run_cli(args)
-    save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
-  end
-end
-
 btn_update.on_clicked do
   UIng.queue_main do
     if App.busy?
@@ -1455,6 +1438,40 @@ btn_update.on_clicked do
     e_plugins_dir.text = plugins_dir if plugins_dir
     args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""), include_install: false)
     new_run_header("Update plugins", args)
+    run_cli(args)
+    save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
+  end
+end
+
+btn_update_selected.on_clicked do
+  UIng.queue_main do
+    if App.busy?
+      status_label.text = "Already running… please wait"
+      next
+    end
+    raw = e_plugins_dir.text
+    if raw.nil? || raw.empty?
+      log.append("ERROR: Plugins dir is required for Update selected plugins.\n")
+      status_label.text = "Error: missing plugins dir"
+      next
+    end
+    ids = [] of String
+    installed_table.selection do |sel|
+      sel.rows.each do |row|
+        plugin = App.installed_plugins_arr[row]?
+        ids << plugin.id if plugin
+      end
+    end
+    if ids.empty?
+      installed_status.text = "Select at least one installed plugin to update"
+      status_label.text = "No plugin selected"
+      next
+    end
+    plugins_dir = expand_tilde(raw)
+    e_plugins_dir.text = plugins_dir if plugins_dir
+    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""), include_install: false)
+    args << "--install-plugin" << ids.join(",")
+    new_run_header("Update selected plugins", args)
     run_cli(args)
     save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
   end

@@ -223,6 +223,40 @@ module JBUpdater
       parts.fill(0.0, parts.size...3)
     end
 
+    # Generates older build identifiers for the same product code.
+    #
+    # Marketplace APIs filter plugins by strict build compatibility
+    # (e.g. DocScribe declares only `261.*`, skipping RubyMine 2026.2).
+    # This helper walks backwards in yearly/monor increments so callers
+    # can search/download across slightly older compatible builds.
+    #
+    # Example: `"RM-262"` → `["RM-261", "RM-253", "RM-252", "RM-251", ...]`
+    #
+    # @param build_str [String] Current build (e.g. `"RM-262.9437.192"`)
+    # @param limit [Int32] Maximum number of older builds to produce
+    # @return [Array(String)] Older build strings for the same product
+    def self.previous_builds(build_str : String, limit : Int32 = 8) : Array(String)
+      m = build_str.match(/^([A-Z]+)-(\d{3})/)
+      return [] of String unless m
+      code = m[1]
+      year = m[2][0, 2].to_i
+      minor = m[2][2].to_i
+      return [] of String if minor.zero?
+
+      result = [] of String
+      result << "#{code}-#{year}#{minor - 1}" if minor > 1
+
+      (year - 1).downto(year - 4) do |y|
+        break if result.size >= limit
+        [3, 2, 1].each do |alt_minor|
+          result << "#{code}-#{y}#{alt_minor}"
+          break if result.size >= limit
+        end
+      end
+
+      result[0...limit]
+    end
+
     # Checks whether a build version falls within a `[since, until]` range.
     #
     # A `nil` bound is treated as unbounded (0 for lower, infinity for upper).

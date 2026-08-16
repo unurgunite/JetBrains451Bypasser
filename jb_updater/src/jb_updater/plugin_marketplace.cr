@@ -251,10 +251,30 @@ module JBUpdater
         plugins
       else
         query_lower = query.downcase
-        plugins.select do |plugin|
+        results = plugins.select do |plugin|
           plugin.name.downcase.includes?(query_lower) ||
             plugin.xml_id.downcase.includes?(query_lower)
         end
+
+        # The plugin list API only returns plugins explicitly compatible
+        # with the requested build. Some plugins declare a narrow range
+        # (e.g. DocScribe: `261.*`) yet still work on newer IDEs. Fall
+        # back through older builds of the same product so they show up
+        # in search results.
+        if results.empty?
+          Utils.previous_builds(build, limit: 4).each do |alt_build|
+            alt = list_by_build(alt_build).select do |plugin|
+              plugin.name.downcase.includes?(query_lower) ||
+                plugin.xml_id.downcase.includes?(query_lower)
+            end
+            unless alt.empty?
+              results = alt
+              break
+            end
+          end
+        end
+
+        results
       end
     end
 

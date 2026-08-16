@@ -78,6 +78,29 @@ describe Utils do
     end
   end
 
+  describe ".previous_builds" do
+    it "generates next older minor build for the same product" do
+      Utils.previous_builds("RM-262").should eq ["RM-261", "RM-253", "RM-252", "RM-251", "RM-243", "RM-242", "RM-241", "RM-233"]
+    end
+
+    it "handles full build string with patch number" do
+      Utils.previous_builds("RM-262.9437.192", limit: 3).should eq ["RM-261", "RM-253", "RM-252"]
+    end
+
+    it "respects the limit" do
+      Utils.previous_builds("RM-262", limit: 2).should eq ["RM-261", "RM-253"]
+    end
+
+    it "returns empty for minor 0" do
+      Utils.previous_builds("RM-260").should be_empty
+    end
+
+    it "returns empty for malformed input" do
+      Utils.previous_builds("not-a-build").should be_empty
+      Utils.previous_builds("").should be_empty
+    end
+  end
+
   describe ".latest_versioned_config_dir" do
     it "returns nil when base dir does not exist" do
       Utils.latest_versioned_config_dir("/tmp/__jb_no_such_dir__", "RubyMine").should be_nil
