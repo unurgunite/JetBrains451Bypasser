@@ -1,5 +1,7 @@
 require "spec"
 require "../src/jb_updater"
+require "../src/jb_updater/plugin_marketplace"
+require "./support/tmpdir"
 
 module JBUpdater
   class HTTPClient
