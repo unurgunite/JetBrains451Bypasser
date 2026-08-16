@@ -14,3 +14,5 @@ jb_updater/jb_updater_cli
 jb_updater/bin/ameba
 jb_updater/bin/jb_updater
 jb_updater/bin/jb_updater_gui
+jb_updater/qa_artifacts
+
