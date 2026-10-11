@@ -25,523 +25,9 @@ require "uing"
 {% end %}
 
 # Global access to log/progress widgets and browser state.
-module App
-  @@log : UIng::MultilineEntry?
-  @@overall_progress : UIng::ProgressBar?
-  @@plugin_progress : UIng::ProgressBar?
-  @@buttons : Array(UIng::Button) = [] of UIng::Button
-  @@busy : Bool = false
-  @@shutting_down : Bool = false
-
-  # Browse tab state
-  @@browse_plugins : Array(JBUpdater::PluginInfo) = [] of JBUpdater::PluginInfo
-  @@browse_table_model : UIng::Table::Model? = nil
-  @@browse_handler : UIng::Table::Model::Handler? = nil
-  @@selected_xml_id : String? = nil
-  @@search_id : Int64 = 0
-  @@detected_products : Array(JBUpdater::DetectedProduct)? = nil
-  @@installed_plugins : Hash(String, JBUpdater::PluginMeta)? = nil
-  @@installed_plugins_arr : Array(JBUpdater::PluginMeta) = [] of JBUpdater::PluginMeta
-  @@installed_table : UIng::Table? = nil
-  @@installed_model : UIng::Table::Model? = nil
-  @@ide_releases : Array(JBUpdater::IDERelease) = [] of JBUpdater::IDERelease
-  @@ide_selected_row : Int32 = -1
-  @@ide_release_table : UIng::Table? = nil
-  @@ide_release_model : UIng::Table::Model? = nil
-
-  # Background operation state
-  @@op_status : String = ""
-  @@op_done : Bool = false
-  @@op_mutex : Mutex = Mutex.new
-  @@log_buffer : Array(String) = [] of String
-  @@log_buffer_mutex : Mutex = Mutex.new
-
-  # Status bar label (bottom of the window).
-  @@status_label : UIng::Label? = nil
-
-  # Two-step uninstall confirmation state.
-  @@pending_uninstall : String? = nil
-  @@pending_uninstall_at : Time::Instant = Time.instant
-
-  def self.status_label : UIng::Label
-    @@status_label || raise "status label not initialized"
-  end
-
-  def self.status_label=(label : UIng::Label)
-    @@status_label = label
-  end
-
-  @@ide_badge : UIng::Label? = nil
-
-  def self.ide_badge : UIng::Label?
-    @@ide_badge
-  end
-
-  def self.ide_badge=(label : UIng::Label)
-    @@ide_badge = label
-  end
-
-  # Arms a two-step uninstall confirmation for a plugin ID.
-  def self.arm_uninstall(id : String)
-    @@pending_uninstall = id
-    @@pending_uninstall_at = Time.instant
-  end
-
-  # Consumes the confirmation if it matches and is still recent.
-  def self.confirm_uninstall?(id : String) : Bool
-    armed = @@pending_uninstall == id
-    recent = @@pending_uninstall_at.elapsed < 10.seconds
-    @@pending_uninstall = nil
-    armed && recent
-  end
-
-  def self.cancel_uninstall
-    @@pending_uninstall = nil
-  end
-
-  # Download progress (set from background thread, read from UI timer)
-  @@download_progress : Int32 = 0
-  @@download_total : Int64 = 0_i64
-  @@download_progress_mutex : Mutex = Mutex.new
-
-  # Drains accumulated log messages for display on the UI thread.
-  def self.drain_log_buffer : Array(String)
-    @@log_buffer_mutex.synchronize do
-      buf = @@log_buffer.dup
-      @@log_buffer.clear
-      buf
-    end
-  end
-
-  # Appends a message to the thread-safe log buffer.
-  def self.push_log(msg : String)
-    @@log_buffer_mutex.synchronize do
-      @@log_buffer << msg
-    end
-  end
-
-  # Records download progress from a background thread.
-  def self.update_progress(downloaded : Int64, total : Int64)
-    @@download_progress_mutex.synchronize do
-      @@download_progress = total > 0 ? ((downloaded.to_f / total) * 100).to_i : 0
-      @@download_total = total
-    end
-  end
-
-  # macOS Sonoma bug: setEditable:NO prevents NSTextStorage text changes.
-  # Workaround: temporarily enable editing, set text, disable editing.
-  def self.safe_set_text(entry : UIng::MultilineEntry, text : String)
-    entry.read_only = false
-    entry.text = text
-    entry.read_only = true
-  end
-
-  # Reads the current download progress percentage.
-  def self.read_progress : Int32
-    @@download_progress_mutex.synchronize { @@download_progress }
-  end
-
-  def self.op_status : String
-    @@op_status
-  end
-
-  def self.op_status=(status : String)
-    @@op_status = status
-  end
-
-  def self.op_done : Bool
-    @@op_done
-  end
-
-  def self.op_done=(done : Bool)
-    @@op_done = done
-  end
-
-  def self.op_mutex : Mutex
-    @@op_mutex
-  end
-
-  def self.browse_plugins
-    @@browse_plugins
-  end
-
-  def self.browse_plugins=(plugins : Array(JBUpdater::PluginInfo))
-    @@browse_plugins = plugins
-  end
-
-  def self.browse_table_model
-    @@browse_table_model
-  end
-
-  def self.browse_table_model=(model : UIng::Table::Model?)
-    @@browse_table_model = model
-  end
-
-  def self.browse_handler
-    @@browse_handler
-  end
-
-  def self.browse_handler=(handler : UIng::Table::Model::Handler?)
-    @@browse_handler = handler
-  end
-
-  def self.selected_xml_id
-    @@selected_xml_id
-  end
-
-  def self.selected_xml_id=(id : String?)
-    @@selected_xml_id = id
-  end
-
-  def self.search_id
-    @@search_id
-  end
-
-  def self.search_id=(id : Int64)
-    @@search_id = id
-  end
-
-  def self.detected_products
-    @@detected_products
-  end
-
-  def self.detected_products=(products : Array(JBUpdater::DetectedProduct)?)
-    @@detected_products = products
-  end
-
-  def self.installed_plugins
-    @@installed_plugins
-  end
-
-  def self.installed_plugins=(plugins : Hash(String, JBUpdater::PluginMeta)?)
-    @@installed_plugins = plugins
-    refresh_installed_list
-  end
-
-  def self.installed_plugins_arr
-    @@installed_plugins_arr
-  end
-
-  def self.refresh_installed_list
-    if hash = @@installed_plugins
-      @@installed_plugins_arr = hash.values.sort_by!(&.id)
-    else
-      @@installed_plugins_arr = [] of JBUpdater::PluginMeta
-    end
-  end
-
-  def self.installed_table
-    @@installed_table
-  end
-
-  def self.installed_table=(table : UIng::Table?)
-    @@installed_table = table
-  end
-
-  def self.installed_model
-    @@installed_model
-  end
-
-  def self.installed_model=(model : UIng::Table::Model?)
-    @@installed_model = model
-  end
-
-  def self.ide_releases
-    @@ide_releases
-  end
-
-  def self.ide_releases=(releases : Array(JBUpdater::IDERelease))
-    @@ide_releases = releases
-  end
-
-  def self.ide_selected_row
-    @@ide_selected_row
-  end
-
-  def self.ide_selected_row=(row : Int32)
-    @@ide_selected_row = row
-  end
-
-  def self.ide_release_table
-    @@ide_release_table
-  end
-
-  def self.ide_release_table=(table : UIng::Table?)
-    @@ide_release_table = table
-  end
-
-  def self.ide_release_model
-    @@ide_release_model
-  end
-
-  def self.ide_release_model=(model : UIng::Table::Model?)
-    @@ide_release_model = model
-  end
-
-  def self.browse_detail
-    @@browse_detail
-  end
-
-  def self.browse_detail=(entry : UIng::MultilineEntry?)
-    @@browse_detail = entry
-  end
-
-  # Registers the log, progress bars, and tracked buttons for global access.
-  def self.set_widgets(
-    log : UIng::MultilineEntry,
-    overall : UIng::ProgressBar,
-    plugin : UIng::ProgressBar,
-    buttons : Array(UIng::Button),
-  )
-    @@log = log
-    @@overall_progress = overall
-    @@plugin_progress = plugin
-    @@buttons = buttons
-  end
-
-  def self.log : UIng::MultilineEntry
-    @@log || raise "log not initialized"
-  end
-
-  def self.overall_progress : UIng::ProgressBar
-    @@overall_progress || raise "overall_progress not initialized"
-  end
-
-  def self.plugin_progress : UIng::ProgressBar
-    @@plugin_progress || raise "plugin_progress not initialized"
-  end
-
-  def self.busy? : Bool
-    @@busy
-  end
-
-  def self.shutting_down? : Bool
-    @@shutting_down
-  end
-
-  def self.mark_shutting_down
-    @@shutting_down = true
-  end
-
-  # Forces the UI out of busy state and enables all tracked buttons.
-  # Must be called from the UI thread.
-  def self.debug_reenable
-    return if @@shutting_down
-
-    if @@log
-      App.log.append("[GUI] debug_reenable(): forcing not busy and enabling buttons\n") rescue nil
-    end
-
-    @@busy = false
-    @@buttons.each &.enable
-  end
-
-  # Enables or disables all tracked buttons and resets progress bars.
-  # Must be called from the UI thread.
-  def self.busy=(busy : Bool)
-    return if @@shutting_down
-
-    @@busy = busy
-
-    if @@log
-      begin
-        App.log.append("[GUI] set_busy(#{busy}) for #{@@buttons.size} buttons\n")
-      rescue
-      end
-    end
-
-    enabled = !busy
-    @@buttons.each do |btn|
-      if enabled
-        btn.enable
-      else
-        btn.disable
-      end
-    end
-
-    if busy
-      App.overall_progress.value = 0
-      App.plugin_progress.value = 0
-    else
-      App.overall_progress.value = 100
-      App.plugin_progress.value = 100
-    end
-  end
-end
-
-# Settings persistence helpers.
-#
-# Stores GUI field values as JSON under `~/.jb_updater_gui/config.json`.
-module Settings
-  CONFIG_DIR  = File.expand_path(File.join(ENV["HOME"], ".jb_updater_gui"))
-  CONFIG_FILE = File.join(CONFIG_DIR, "config.json")
-end
-
-# Reads the saved config JSON, returning an empty hash on error.
-#
-# @return [Hash(String, String)] Saved config key-value pairs
-private struct SavedConfig
-  include JSON::Serializable
-
-  getter data : Hash(String, String)
-
-  def initialize(@data = {} of String => String)
-  end
-end
-
-private def load_config : Hash(String, String)
-  return {} of String => String unless File.exists?(Settings::CONFIG_FILE)
-  begin
-    SavedConfig.from_json(File.read(Settings::CONFIG_FILE)).data
-  rescue
-    {} of String => String
-  end
-end
-
-# Writes config hash to JSON file.
-#
-# @param hash [Hash(String, String)] Config key-value pairs
-private def save_config(hash : Hash(String, String))
-  Dir.mkdir_p(Settings::CONFIG_DIR) unless Dir.exists?(Settings::CONFIG_DIR)
-  File.write(Settings::CONFIG_FILE, hash.to_json)
-end
-
-# Expands `~` in a path string.
-#
-# @param text [String?] Path string (may contain `~`)
-# @return [String?] Expanded path or nil
-private def expand_tilde(text : String?) : String?
-  return unless text
-  return if text.empty?
-  JBUpdater::Utils.expand_tilde(text)
-end
-
-# Appends a formatted section header to the log console.
-def new_run_header(action : String, args : Array(String))
-  UIng.queue_main do
-    App.log.append("\n")
-    App.log.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-    App.log.append("#{action} at #{Time.local}\n")
-    App.log.append("Command: ./jb_updater #{args.join(" ")}\n")
-    App.log.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-  end
-end
-
-# Builds a CLI argument array from the current GUI field values.
-#
-# @return [Array(String)] CLI arguments for `jb_updater`
-private def arch_args(combo_arch : UIng::Combobox) : Array(String)
-  case combo_arch.selected
-  when 1 then ["--arch", "arm"]
-  when 2 then ["--arch", "intel"]
-  else        [] of String
-  end
-end
-
-private def add_opt(args : Array(String), flag : String, value : String?)
-  args.concat([flag, value]) if value && !value.empty?
-end
-
-private def build_args(
-  e_plugins_dir : UIng::Entry,
-  e_build : UIng::Entry,
-  e_product : UIng::Entry,
-  e_install_ids : UIng::Entry,
-  combo_arch : UIng::Combobox,
-  chk_dry : UIng::Checkbox,
-  chk_list : UIng::Checkbox,
-  include_install : Bool = true,
-) : Array(String)
-  args = [] of String
-
-  add_opt(args, "--plugins-dir", expand_tilde(e_plugins_dir.text))
-  add_opt(args, "--build", e_build.text)
-  add_opt(args, "--product", e_product.text)
-  add_opt(args, "--install-plugin", e_install_ids.text) if include_install
-
-  args.concat(arch_args(combo_arch))
-
-  args << "--dry-run" if chk_dry.checked?
-  args << "--list" if chk_list.checked?
-  args
-end
-
-# Cached CPU architecture, detected once on the main context at startup.
-#
-# `uname -m` runs through `Process.run`, which only works on the main
-# execution context; caching keeps it out of background threads.
-ARCH = begin
-  io = IO::Memory.new
-  status = Process.run("uname", args: ["-m"], output: io)
-  machine = io.to_s.strip
-  if status.success? && (machine == "arm64" || machine == "aarch64")
-    "arm"
-  else
-    "intel"
-  end
-rescue
-  "intel"
-end
-
-# Runs `jb_updater` logic in-process, mirroring {CLI} argument dispatch.
-#
-# Everything runs on a background thread exactly like the legacy
-# subprocess path, but avoids `Process.run` from a spawned thread,
-# which deadlocks under Crystal 1.21 (spawning is main-context only).
-# `Log.*` output and HTTP progress already route to the GUI console
-# and progress bars via the listeners installed at startup.
-#
-# @param args [Array(String)] CLI arguments
-private def run_cli(args : Array(String)) : Nil
-  return if App.busy?
-
-  App.busy = true
-  App.log.append("[CLI] jb_updater #{args.join(" ")}\n")
-
-  Thread.new do
-    opts = JBUpdater.parse_cli(args)
-    opts.arch ||= ARCH
-
-    if opts.list_ide_releases?
-      product = JBUpdater::Utils.product_code(opts.product || raise "missing --product")
-      arch = opts.arch || ARCH
-      releases = JBUpdater::IDEReleases.fetch(
-        product,
-        channel: "release",
-        downloads_host: opts.ide_downloads_host,
-        arch: arch,
-        latest: false,
-      )
-      JBUpdater::Log.info("Available releases for #{product}:")
-      releases.each do |rel|
-        JBUpdater::Log.info("- #{rel.version} (#{rel.channel}) #{rel.date}  -> #{rel.link}")
-      end
-    elsif opts.upgrade_ide?
-      JBUpdater::IDEUpdater.new(opts).run
-    elsif pd = opts.plugins_dir
-      opts.plugins_dir = JBUpdater::Utils.expand_tilde(pd)
-      JBUpdater::Updater.new(opts).run
-    else
-      raise "no operation requested (missing --product, --plugins-dir, or --upgrade-ide)"
-    end
-
-    UIng.queue_main do
-      next if App.shutting_down?
-      App.log.append("[CLI] finished\n")
-      App.status_label.text = "Done (exit 0)"
-      App.busy = false
-      App.debug_reenable
-    end
-  rescue ex
-    UIng.queue_main do
-      next if App.shutting_down?
-      App.log.append("[CLI] ERROR: #{ex.message}\n")
-      App.status_label.text = "Error: #{ex.message}"
-      App.busy = false
-      App.debug_reenable
-    end
-  end
-end
+require "./app_state"
+require "./settings"
+require "./cli_runner"
 
 # Enqueues a plugin for queue-based sequential installation from the Browse tab.
 #
@@ -641,7 +127,7 @@ private def save_plugins_settings(
   data["arch"] = combo_arch.selected.to_s
   data["combo_products_selected"] = combo_products.selected.to_s
   data["dry_run"] = chk_dry.checked?.to_s
-  save_config(data)
+  GuiSettings.save(data)
 end
 
 # Saves IDE tab UI field values to config.
@@ -654,7 +140,7 @@ private def save_ide_settings(
   data["ide_product"] = e_ide_product.text || ""
   data["ide_path"] = e_ide_path.text || ""
   data["brew"] = chk_brew.checked?.to_s
-  save_config(data)
+  GuiSettings.save(data)
 end
 
 # Restores Plugins tab field values from saved config.
@@ -668,7 +154,7 @@ private def apply_plugins_settings(
   chk_dry : UIng::Checkbox,
   log : UIng::MultilineEntry,
 )
-  config = load_config
+  config = GuiSettings.load
   e_plugins_dir.text = config.fetch("plugins_dir", "")
   e_build.text = config.fetch("build", "")
   e_product.text = config.fetch("product", "")
@@ -707,7 +193,7 @@ private def apply_ide_settings(
   e_ide_path : UIng::Entry,
   chk_brew : UIng::Checkbox,
 )
-  config = load_config
+  config = GuiSettings.load
   val = config.fetch("ide_product", "")
   e_ide_product.text = val =~ /\A[A-Z]+-\d/ ? val : ""
   e_ide_path.text = config.fetch("ide_path", "")
@@ -1144,7 +630,7 @@ private def apply_installed_scan(scanned : Hash(String, JBUpdater::PluginMeta)) 
 end
 
 btn_scan_installed.on_clicked do
-  dir = expand_tilde(e_plugins_dir.text) || e_plugins_dir.text || ""
+  dir = GuiSettings.expand_tilde(e_plugins_dir.text) || e_plugins_dir.text || ""
   if dir.empty?
     installed_status.text = "Set Plugins Directory first"
     next
@@ -1357,7 +843,7 @@ if btn_remove_cache
         log.append("ERROR: Plugins dir is required for Remove cache.\n")
         status_label.text = "Error: missing plugins dir"
       else
-        plugins_dir = expand_tilde(raw) || raw
+        plugins_dir = GuiSettings.expand_tilde(raw) || raw
         if !Dir.exists?(plugins_dir)
           log.append("ERROR: Plugins dir '#{plugins_dir}' does not exist.\n")
           status_label.text = "Error: dir not found"
@@ -1402,9 +888,9 @@ btn_list.on_clicked do
       status_label.text = "Error: missing plugins dir"
       next
     end
-    plugins_dir = expand_tilde(raw) || raw
+    plugins_dir = GuiSettings.expand_tilde(raw) || raw
     e_plugins_dir.text = plugins_dir
-    new_run_header("List installed plugins", ["--list", "--plugins-dir", plugins_dir])
+    CliRunner.new_run_header("List installed plugins", ["--list", "--plugins-dir", plugins_dir])
     App.busy = true
     Thread.new do
       scanned = JBUpdater::PluginMeta.scan_dir(plugins_dir)
@@ -1445,11 +931,11 @@ btn_update.on_clicked do
       status_label.text = "Error: missing plugins dir"
       next
     end
-    plugins_dir = expand_tilde(raw)
+    plugins_dir = GuiSettings.expand_tilde(raw)
     e_plugins_dir.text = plugins_dir if plugins_dir
-    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""), include_install: false)
-    new_run_header("Update plugins", args)
-    run_cli(args)
+    args = CliRunner.build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""), include_install: false)
+    CliRunner.new_run_header("Update plugins", args)
+    CliRunner.run(args)
     save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
   end
 end
@@ -1478,12 +964,12 @@ btn_update_selected.on_clicked do
       status_label.text = "No plugin selected"
       next
     end
-    plugins_dir = expand_tilde(raw)
+    plugins_dir = GuiSettings.expand_tilde(raw)
     e_plugins_dir.text = plugins_dir if plugins_dir
-    args = build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""), include_install: false)
+    args = CliRunner.build_args(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, chk_dry, UIng::Checkbox.new(""), include_install: false)
     args << "--install-plugin" << ids.join(",")
-    new_run_header("Update selected plugins", args)
-    run_cli(args)
+    CliRunner.new_run_header("Update selected plugins", args)
+    CliRunner.run(args)
     save_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry)
   end
 end
@@ -1500,14 +986,14 @@ btn_list_releases.on_clicked do
       status_label.text = "Error: missing IDE code"
     else
       code = JBUpdater::Utils.product_code(product)
-      new_run_header("List IDE releases", ["--list-ide-releases", "--product", product])
+      CliRunner.new_run_header("List IDE releases", ["--list-ide-releases", "--product", product])
 
       App.busy = true
       Thread.new do
         releases = JBUpdater::IDEReleases.fetch(
           code,
           channel: "release",
-          arch: ARCH,
+          arch: CliRunner::ARCH,
           latest: false,
         )
         UIng.queue_main do
@@ -1561,7 +1047,7 @@ btn_download_release.on_clicked do
       next
     end
 
-    new_run_header("Download #{rel.version}", [rel.link.to_s])
+    CliRunner.new_run_header("Download #{rel.version}", [rel.link.to_s])
 
     dest_dir = File.join(ENV["HOME"]? || Dir.tempdir, "Downloads")
     Dir.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
@@ -1607,8 +1093,8 @@ btn_upgrade.on_clicked do
     args += ["--ide-path", ide_path] if ide_path && !ide_path.empty?
     args << "--brew" if chk_brew.checked?
 
-    new_run_header("Upgrade IDE", args)
-    run_cli(args)
+    CliRunner.new_run_header("Upgrade IDE", args)
+    CliRunner.run(args)
     save_ide_settings(e_ide_product, e_ide_path, chk_brew)
   end
 end
@@ -1627,7 +1113,7 @@ load_installed_for_browse = -> {
   App.installed_plugins = nil
   raw = e_plugins_dir.text
   if raw && !raw.empty?
-    dir = expand_tilde(raw) || raw
+    dir = GuiSettings.expand_tilde(raw) || raw
     App.installed_plugins = JBUpdater::PluginMeta.scan_dir(dir) rescue nil
   end
 }
