@@ -44,6 +44,7 @@ jobs:
 
       - name: Run Catalyst static perf analysis
         working-directory: ./jb_updater
+        shell: bash
         run: |
           crystal build lib/catalyst/src/catalyst.cr -o "${RUNNER_TEMP}/catalyst"
           "${RUNNER_TEMP}/catalyst" --baseline .catalyst-baseline.json --ci src/ || "${RUNNER_TEMP}/catalyst" --ci src/
