@@ -5,7 +5,9 @@ on:
     branches:
       - master
       - develop
+      - 'v*'
       - 'feature/**'
+      - 'fix/**'
 
 jobs:
   test-build:
@@ -35,6 +37,16 @@ jobs:
       - name: Run Ameba linter
         working-directory: ./jb_updater
         run: ./bin/ameba || ./lib/ameba/bin/ameba || crystal run lib/ameba/src/cli.cr -- .
+
+      - name: Check formatting
+        working-directory: ./jb_updater
+        run: crystal tool format --check src/ spec/
+
+      - name: Run Catalyst static perf analysis
+        working-directory: ./jb_updater
+        run: |
+          crystal build lib/catalyst/src/catalyst.cr -o /tmp/catalyst
+          /tmp/catalyst --baseline .catalyst-baseline.json --ci src/ || /tmp/catalyst --ci src/
 
       - name: Build CLI
         working-directory: ./jb_updater

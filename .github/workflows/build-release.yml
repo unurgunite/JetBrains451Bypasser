@@ -206,6 +206,16 @@ jobs:
         working-directory: jb_updater
         run: ./bin/lint
 
+      - name: Check formatting
+        working-directory: jb_updater
+        run: crystal tool format --check src/ spec/
+
+      - name: Run Catalyst static perf analysis
+        working-directory: jb_updater
+        run: |
+          crystal build lib/catalyst/src/catalyst.cr --release --no-debug -o /tmp/catalyst
+          /tmp/catalyst --baseline .catalyst-baseline.json --ci src/ || /tmp/catalyst --ci src/
+
       - name: Run specs
         working-directory: jb_updater
         run: crystal spec -v
@@ -303,6 +313,11 @@ jobs:
         run: |
           mkdir -p release-assets
           find ./all-artifacts -type f -exec mv {} ./release-assets/ \;
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          shasum -a 256 * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
