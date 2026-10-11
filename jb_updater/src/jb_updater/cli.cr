@@ -119,6 +119,10 @@ module JBUpdater
         opts.no_tty_progress_bar = true
       end
       parser.on("--brew", "Patch Homebrew cask Ruby file instead of direct install") { opts.brew_patch = true }
+      parser.on("-v", "--version", "Show version") do
+        puts "jb_updater #{JbUpdater::VERSION}"
+        exit 0
+      end
       parser.on("-h", "--help", "Show help") do
         puts parser
         exit 0
