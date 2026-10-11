@@ -380,12 +380,19 @@ end
 # Reads the saved config JSON, returning an empty hash on error.
 #
 # @return [Hash(String, String)] Saved config key-value pairs
+private struct SavedConfig
+  include JSON::Serializable
+
+  getter data : Hash(String, String)
+
+  def initialize(@data = {} of String => String)
+  end
+end
+
 private def load_config : Hash(String, String)
   return {} of String => String unless File.exists?(Settings::CONFIG_FILE)
   begin
-    JSON.parse(File.read(Settings::CONFIG_FILE))
-      .as_h
-      .transform_values(&.as_s)
+    SavedConfig.from_json(File.read(Settings::CONFIG_FILE)).data
   rescue
     {} of String => String
   end
@@ -1308,8 +1315,12 @@ UIng.timer(150) do
     if (App.log.text.try(&.size) || 0) > 60_000
       App.log.text = "… (older log trimmed)\n"
     end
-    msgs.each do |msg|
-      App.log.append(msg + "\n")
+    unless msgs.empty?
+      App.log.append(String.build do |io|
+        msgs.each do |msg|
+          io << msg << "\n"
+        end
+      end)
     end
   end
   pct = App.read_progress
