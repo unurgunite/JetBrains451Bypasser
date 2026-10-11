@@ -181,6 +181,7 @@ module JBUpdater
       cdn_uri = uri
 
       Log.header("Downloading #{product} from #{cdn_uri.host}…")
+      check_running_ide(product)
       begin
         HTTPClient.download(cdn_uri, dmg_path)
         Log.success("Downloaded to #{dmg_path}")
@@ -189,6 +190,41 @@ module JBUpdater
         Log.fail("Download failed: #{ex.message}")
         Log.info("Tip: try again with CDN mirror (--upgrade-ide automatically uses it)")
       end
+    end
+
+    # Checks whether the IDE being upgraded is currently running.
+    #
+    # Upgrading over a running IDE corrupts the install on macOS/Windows
+    # (locked files) and confuses Toolbox-managed installs. Prompts the
+    # user to quit first; aborts on refusal.
+    #
+    # @param product [String] Product name (e.g. `"RubyMine"`)
+    private def check_running_ide(product : String) : Nil
+      base = product.sub(/\d{4}\.\d+$/, "")
+      return unless ide_process_running?(base)
+      Log.warn("#{base} appears to be running — quit it before upgrading to avoid a corrupt install.")
+      print "Continue anyway? [y/N] "
+      answer = gets.try(&.strip.downcase) || "n"
+      unless answer == "y" || answer == "yes"
+        Log.info("Aborted — quit #{base} and re-run.")
+        exit 1
+      end
+    end
+
+    # Returns true when a process matching the IDE name is found.
+    private def ide_process_running?(base : String) : Bool
+      pattern = base.downcase
+      {% if flag?(:darwin) || flag?(:linux) %}
+        output, status = Utils.run_cmd("pgrep", "-afil", pattern)
+        return false unless status.success?
+        output.lines.any? { |line| line.downcase.includes?(pattern) && !line.includes?("jb_updater") }
+      {% elsif flag?(:windows) %}
+        output, status = Utils.run_cmd("tasklist", "/FO", "CSV", "/NH")
+        return false unless status.success?
+        output.downcase.includes?(pattern)
+      {% else %}
+        false
+      {% end %}
     end
 
     # Overrides `download.jetbrains.com` host with `download-cdn.jetbrains.com`.
