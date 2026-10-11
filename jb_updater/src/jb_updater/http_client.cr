@@ -219,6 +219,9 @@ module JBUpdater
         end
         Log.info "Checksum OK: #{fname}"
       end
+      # Windows rename fails when the target exists (POSIX overwrites),
+      # so remove a pre-existing dest (e.g. File.tempfile in specs).
+      File.delete(dest_path) if File.exists?(dest_path)
       File.rename(part_path, dest_path)
       notify_download_complete(fname, dest_path, downloaded)
     end
