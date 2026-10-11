@@ -232,6 +232,10 @@ module JBUpdater
       end
 
       content = File.read(cask_path)
+      unless content =~ /url\s+["'].*["']/
+        Log.fail("No url line found in #{cask_path} — unsupported cask format.")
+        exit 1
+      end
       new_content = content.gsub(/url\s+["'].*["']/, %(url "#{uri}"))
 
       if opts.dry_run?
@@ -240,10 +244,13 @@ module JBUpdater
         return
       end
 
+      backup = "#{cask_path}.bak.#{Time.utc.to_unix}"
+      File.copy(cask_path, backup)
       File.write(cask_path, new_content)
 
-      Log.success("Patched cask: #{cask_path}")
+      Log.success("Patched cask: #{cask_path} (backup: #{backup})")
       Log.info("Now run: brew upgrade #{product.downcase}")
+      Log.warn("Note: `brew update` refreshes taps and will overwrite this patch — re-run with --brew after updating.")
     end
 
     # Returns the expected Homebrew cask filename for a product.
