@@ -60,10 +60,10 @@ On macOS, `JBUpdater.app` bundles both `jb_updater_gui` and `jb_updater` plus Op
 macOS CLI archives also include the OpenSSL dylibs alongside the binary.
 
 > [!NOTE]
-> macOS builds are unsigned / unnotarized. You may need to clear quarantine locally:
+> macOS builds are unsigned / unnotarized. Run the first-run helper:
 > ```bash
-> xattr -cr JBUpdater.app
-> open JBUpdater.app
+> ./tools/macos-first-run.sh /Applications/JBUpdater.app
+> open /Applications/JBUpdater.app
 > ```
 
 > [!NOTE]
@@ -169,10 +169,10 @@ On macOS:
 
 1. Download `jb_updater-gui-macos-${arch}.zip` from Releases.
 2. Unzip and move `JBUpdater.app` to `/Applications`.
-3. (First run) Clear quarantine:
+3. (First run) Clear quarantine and ad-hoc sign:
 
    ```bash
-   xattr -cr /Applications/JBUpdater.app
+   ./tools/macos-first-run.sh /Applications/JBUpdater.app
    open /Applications/JBUpdater.app
    ```
 
