@@ -93,9 +93,9 @@ module JBUpdater
 
     # Follows an HTTP redirect by parsing the Location header.
     private def self.follow_redirect(response : HTTP::Client::Response, uri : URI, dest_path : String, depth : Int32) : Nil
-      raise "Too many redirects: #{depth}" if depth > 5
+      raise RuntimeError.new("Too many redirects: #{depth}") if depth > 5
       loc = response.headers["Location"]?
-      raise "redirect without Location header for #{uri}" unless loc
+      raise RuntimeError.new("redirect without Location header for #{uri}") unless loc
       next_uri = URI.parse(loc)
       unless next_uri.absolute?
         next_uri = URI.new(
@@ -132,7 +132,7 @@ module JBUpdater
     # @param expected_sha256 [String?] Optional hex SHA-256 to verify after download
     # @raise [RuntimeError] On too many redirects, missing Location header, non-200 status, or checksum mismatch
     def self.download(uri : URI, dest_path : String, depth = 0, expected_sha256 : String? = nil) : Nil
-      raise "Too many redirects: #{depth}" if depth > 5
+      raise RuntimeError.new("Too many redirects: #{depth}") if depth > 5
       attempt_download(uri, dest_path, depth, expected_sha256)
     end
 
@@ -155,11 +155,13 @@ module JBUpdater
           sleep delay.seconds
         end
       end
-      raise(last_error || RuntimeError.new("Download failed for #{uri}"))
+      last = last_error
+      raise(last) if last
+      raise RuntimeError.new("Download failed for #{uri}")
     end
 
     private def self.single_download(uri : URI, dest_path : String, depth : Int32, expected_sha256 : String?) : Nil
-      raise "Too many redirects: #{depth}" if depth > 5
+      raise RuntimeError.new("Too many redirects: #{depth}") if depth > 5
       fname = File.basename(dest_path)
       part_path = "#{dest_path}.part"
       Log.info "Downloading: #{fname} ← #{uri}"
@@ -192,7 +194,7 @@ module JBUpdater
           when 301, 302
             follow_redirect(response, uri, dest_path, depth)
           else
-            raise "HTTP #{response.status_code} #{response.status_message} for #{uri}"
+            raise RuntimeError.new("HTTP #{response.status_code} #{response.status_message} for #{uri}")
           end
         end
       ensure
@@ -215,7 +217,7 @@ module JBUpdater
         actual = digest.final.hexstring
         unless actual.downcase == sha.downcase
           File.delete(part_path) rescue nil
-          raise "SHA-256 mismatch for #{fname}: expected #{sha}, got #{actual}"
+          raise RuntimeError.new("SHA-256 mismatch for #{fname}: expected #{sha}, got #{actual}")
         end
         Log.info "Checksum OK: #{fname}"
       end
