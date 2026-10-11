@@ -32,4 +32,30 @@ describe IDEReleases do
       IDEReleases.extract_releases_arr(data, "RM").should be_nil
     end
   end
+
+  describe IDERelease do
+    it "defaults checksum_link and size to nil" do
+      rel = IDERelease.new(
+        version: "2026.2.3",
+        channel: "release",
+        date: "2026-09-18",
+        link: URI.parse("https://download-cdn.jetbrains.com/ruby/RM.dmg")
+      )
+      rel.checksum_link.should be_nil
+      rel.size.should be_nil
+    end
+
+    it "stores checksum link and size" do
+      rel = IDERelease.new(
+        version: "2026.2.3",
+        channel: "release",
+        date: "2026-09-18",
+        link: URI.parse("https://download-cdn.jetbrains.com/ruby/RM.dmg"),
+        checksum_link: URI.parse("https://download-cdn.jetbrains.com/ruby/RM.dmg.sha256"),
+        size: 1015459827_i64
+      )
+      rel.checksum_link.try(&.to_s).should eq "https://download-cdn.jetbrains.com/ruby/RM.dmg.sha256"
+      rel.size.should eq 1015459827_i64
+    end
+  end
 end

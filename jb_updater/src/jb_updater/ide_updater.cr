@@ -37,8 +37,8 @@ module JBUpdater
       end
 
       product = opts.product || raise "product not set"
-      build_url = latest_ide_download_url(product)
-      final_uri = HTTPClient.override_ide_repo_host(build_url, opts.ide_downloads_host)
+      release = latest_ide_release(product)
+      final_uri = HTTPClient.override_ide_repo_host(release.link, opts.ide_downloads_host)
 
       if opts.dry_run?
         Log.header("Dry run — no files will be downloaded or modified")
@@ -50,45 +50,25 @@ module JBUpdater
       if opts.brew_patch
         patch_homebrew_cask(product, final_uri)
       else
-        upgrade_direct(product, final_uri)
+        upgrade_direct(product, final_uri, release)
       end
     end
 
-    # Fetches the latest IDE download URL from the JetBrains releases API.
-    #
-    # Queries `data.services.jetbrains.com/products/releases` and selects
-    # the architecture-appropriate download link (Apple Silicon or Intel).
+    # Fetches the latest IDE release (with checksum metadata) from the
+    # JetBrains releases API.
     #
     # @param product [String] Product name (e.g. `"RubyMine2025.2"`)
-    # @return [URI] Direct download URL for the latest version
-    private def latest_ide_download_url(product : String) : URI
+    # @return [IDERelease] Latest release for the current platform/arch
+    private def latest_ide_release(product : String) : IDERelease
       product_code = infer_product_code(product)
-      url = "https://data.services.jetbrains.com/products/releases?code=#{Utils.escape(product_code)}&latest=true&type=release"
-      Log.info("Fetching latest release for #{product_code}")
-
-      res = HTTPClient.head_or_get(url)
-      if res.status_code != 200
-        raise "JetBrains releases API returned #{res.status_code}"
-      end
-
-      body = res.body || raise "empty response body"
-      data = JSON.parse(body)
-
-      releases = IDEReleases.extract_releases_arr(data, product_code)
-      release = releases.try(&.first?)
-      raise "No downloads found for product code '#{product_code}'" unless release
-
-      version = release["version"].as_s
-      downloads = release["downloads"]
-
-      platform_key = download_key_for(platform, opts.arch)
-
-      entry = downloads[platform_key]? || raise "No download entry found for platform '#{platform}' (#{platform_key}) for #{product_code}"
-      link = entry["link"].as_s
-
-      dmg_url = link
-      Log.success("Latest version #{version}")
-      URI.parse(dmg_url)
+      releases = IDEReleases.fetch(
+        product_code,
+        channel: "release",
+        downloads_host: opts.ide_downloads_host,
+        arch: opts.arch,
+        latest: true
+      )
+      releases.first? || raise "No downloads found for product code '#{product_code}'"
     end
 
     # Determines the current OS platform.
@@ -162,10 +142,12 @@ module JBUpdater
     # Downloads the IDE DMG to a temporary directory.
     #
     # The user must mount and install the DMG manually.
+    # Verifies size and SHA-256 from the releases API when available.
     #
     # @param product [String] Product name (for logging)
     # @param uri [URI] Download URL (with CDN override already applied)
-    private def upgrade_direct(product : String, uri : URI) : Nil
+    # @param release [IDERelease] Release metadata (checksum + size)
+    private def upgrade_direct(product : String, uri : URI, release : IDERelease) : Nil
       ext = case platform
             when "mac"     then ".dmg"
             when "windows" then ".exe"
@@ -182,14 +164,52 @@ module JBUpdater
 
       Log.header("Downloading #{product} from #{cdn_uri.host}…")
       check_running_ide(product)
+      sha = fetch_expected_sha256(release)
       begin
-        HTTPClient.download(cdn_uri, dmg_path)
+        HTTPClient.download(cdn_uri, dmg_path, 0, sha)
+        verify_size(dmg_path, release.size)
         Log.success("Downloaded to #{dmg_path}")
         Log.info("Mount the DMG and drag the new app into /Applications manually")
       rescue ex
         Log.fail("Download failed: #{ex.message}")
         Log.info("Tip: try again with CDN mirror (--upgrade-ide automatically uses it)")
       end
+    end
+
+    # Fetches the expected SHA-256 hex from the release's checksum link.
+    #
+    # The checksum file uses `sha256sum` format (`<hex> *<filename>`).
+    # Returns `nil` when unavailable so the download proceeds unverified.
+    #
+    # @param release [IDERelease] Release metadata
+    # @return [String?] SHA-256 hex or nil
+    private def fetch_expected_sha256(release : IDERelease) : String?
+      link = release.checksum_link
+      return unless link
+      Log.info("Fetching checksum: #{link}")
+      res = HTTPClient.head_or_get(link.to_s)
+      return unless res.status_code == 200
+      body = res.body || return
+      if m = body.match(/([0-9a-fA-F]{64})/)
+        Log.info("Expected SHA-256: #{m[1]}")
+        m[1]
+      end
+    rescue ex
+      Log.warn("Could not fetch checksum (#{ex.message}) — proceeding unverified")
+      nil
+    end
+
+    # Verifies the downloaded file size against the API metadata.
+    #
+    # @param path [String] Downloaded file path
+    # @param expected [Int64?] Expected size in bytes
+    private def verify_size(path : String, expected : Int64?) : Nil
+      return unless expected
+      actual = File.size(path)
+      if actual != expected
+        raise RuntimeError.new("Size mismatch for #{File.basename(path)}: expected #{expected}, got #{actual}")
+      end
+      Log.info("Size OK: #{Utils.format_bytes(actual)}")
     end
 
     # Checks whether the IDE being upgraded is currently running.
