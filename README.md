@@ -86,10 +86,11 @@ On macOS:
 
 - Download the `jb_updater-gui-macos-*.zip` artifact.
 - Unzip and drag `JBUpdater.app` into `/Applications`.
-- Because the app is unsigned and not notarized, you may need to clear the quarantine flag:
+- Because the app is unsigned and not notarized, run the first-run helper
+  (clears quarantine, applies ad-hoc signature):
 
   ```bash
-  xattr -cr /Applications/JBUpdater.app
+  ./tools/macos-first-run.sh /Applications/JBUpdater.app
   open /Applications/JBUpdater.app
   ```
 
