@@ -32,6 +32,11 @@ reasons) by switching to CDN mirrors and direct API calls.
 - Upgrades entire IDEs via the JetBrains Releases API.
 - Auto‑detects architecture (`arm` or `intel`) and fetches the correct build.
 - Compact progress bar while downloading (CLI) and progress bars in GUI.
+- Resilient downloads: automatic retry with backoff, resume of partial
+  files, and checksum verification (SHA-256 from the Releases API for
+  IDEs, S3 ETag MD5 for plugins).
+- Human-readable errors with fix hints instead of raw backtraces.
+- `-v / --version` prints the current version.
 - Zero runtime dependencies: self‑contained native binaries.
 - Optional `--brew` mode patches a Homebrew Cask so `brew upgrade` just works (macOS).
 
@@ -86,8 +91,7 @@ Update plugins for a specific IDE:
 
 ```bash
 jb_updater \
-  --plugins-dir "$HOME/Library/Application Support/JetBrains/RubyMine2025.2/plugins" \
-  --only-incompatible
+  --plugins-dir "$HOME/Library/Application Support/JetBrains/RubyMine2025.2/plugins"
 ```
 
 Install specific plugins by ID:
@@ -143,7 +147,8 @@ jb_updater --product WebStorm --upgrade-ide --brew
 | `--ide-path PATH`            | Specify custom IDE installation path                          |
 | `--list-ide-releases`        | List available IDE releases by product code (e.g. `RM`, `WS`) |
 | `--no-tty-progress-bar`      | Disable ASCII TTY progress bars (useful with GUI wrapper)     |
-| `--brew`                     | Patch Homebrew cask Ruby file (macOS, WIP)                    |
+| `--brew`                     | Patch Homebrew cask Ruby file (macOS)                         |
+| `-v`, `--version`            | Show version                                                  |
 | `-h`, `--help`               | Show help                                                     |
 
 ---
