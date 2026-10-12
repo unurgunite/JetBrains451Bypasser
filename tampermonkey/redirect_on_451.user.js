@@ -104,4 +104,12 @@
   } else {
     check();
   }
+
+  // Test hook: expose pure helpers so node:test can require the logic
+  // without a browser. A single read-only global; harmless in Tampermonkey.
+  try {
+    if (typeof globalThis !== 'undefined') {
+      globalThis.__jb451 = {rewrite: rewrite, alreadyOnFinalHost: alreadyOnFinalHost, RULES: RULES, FINAL_HOSTS: FINAL_HOSTS};
+    }
+  } catch (e) { /* ignore */ }
 })();
