@@ -91,7 +91,8 @@ Update plugins for a specific IDE:
 
 ```bash
 jb_updater \
-  --plugins-dir "$HOME/Library/Application Support/JetBrains/RubyMine2025.2/plugins"
+  --plugins-dir "$HOME/Library/Application Support/JetBrains/RubyMine2025.2/plugins" \
+  --only-incompatible
 ```
 
 Install specific plugins by ID:
@@ -138,6 +139,7 @@ jb_updater --product WebStorm --upgrade-ide --brew
 |------------------------------|---------------------------------------------------------------|
 | `--plugins-dir DIR`          | Plugins directory                                             |
 | `-b`, `--build BUILD`        | IDE build                                                     |
+| `--only-incompatible`        | Update only plugins incompatible with the build               |
 | `-d`, `--dry-run`            | Dry run                                                       |
 | `-l`, `--list`               | List plugins                                                  |
 | `-i`, `--install-plugin IDS` | Install plugins (comma-separated)                             |

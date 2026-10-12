@@ -75,6 +75,7 @@ module JBUpdater
   #
   # - `--plugins-dir DIR`
   # - `-b` / `--build BUILD`
+  # - `--only-incompatible`
   # - `-d` / `--dry-run`
   # - `-l` / `--list`
   # - `-i` / `--install-plugin IDS`
@@ -96,6 +97,7 @@ module JBUpdater
       parser.banner = "Usage: jb_updater [options]"
       parser.on("--plugins-dir DIR", "Plugins directory") { |v| opts.plugins_dir = v }
       parser.on("-b", "--build BUILD", "IDE build") { |v| opts.build = v }
+      parser.on("--only-incompatible", "Update only plugins incompatible with the build") { opts.only_incompatible = true }
       parser.on("-d", "--dry-run", "Dry run") { opts.dry_run = true }
       parser.on("-l", "--list", "List plugins") { opts.list = true }
       parser.on("-i", "--install-plugin IDS", "Install plugins (comma-separated)") { |v| opts.install_ids = v.split(',') }

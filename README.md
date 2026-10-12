@@ -68,7 +68,8 @@ For example, to update plugins for RubyMine:
 
 ```bash
 jb_updater \
-  --plugins-dir "$HOME/Library/Application Support/JetBrains/RubyMine2025.2/plugins"
+  --plugins-dir "$HOME/Library/Application Support/JetBrains/RubyMine2025.2/plugins" \
+  --only-incompatible
 ```
 
 To upgrade an IDE:
