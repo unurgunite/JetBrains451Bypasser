@@ -1,5 +1,6 @@
 require "http/client"
 require "uri"
+require "digest/md5"
 require "digest/sha256"
 
 module JBUpdater
@@ -187,10 +188,10 @@ module JBUpdater
             # Server ignored Range (or fresh download): restart from scratch.
             File.delete(part_path) if resume_from > 0
             downloaded = stream_to_file(response, part_path, fname, 0_i64)
-            finish_download(part_path, dest_path, fname, downloaded, expected_sha256)
+            finish_download(part_path, dest_path, fname, downloaded, expected_sha256, response.headers["ETag"]?)
           when 206
             downloaded = stream_to_file(response, part_path, fname, resume_from)
-            finish_download(part_path, dest_path, fname, downloaded, expected_sha256)
+            finish_download(part_path, dest_path, fname, downloaded, expected_sha256, nil)
           when 301, 302
             follow_redirect(response, uri, dest_path, depth)
           else
@@ -202,24 +203,63 @@ module JBUpdater
       end
     end
 
-    # Verifies checksum (if given) and moves `.part` to final destination.
-    private def self.finish_download(part_path : String, dest_path : String, fname : String, downloaded : Int64, expected_sha256 : String?) : Nil
+    # Extracts the MD5 hex from an ETag header, or `nil`.
+    #
+    # Only plain 32-hex ETags (single-part S3 objects) qualify;
+    # multipart (`<hex>-<n>`) and weak (`W/`) ETags are skipped.
+    private def self.plain_etag_md5(etag : String?) : String?
+      return unless etag
+      clean = etag.strip.strip('"')
+      return unless clean =~ /\A[0-9a-fA-F]{32}\z/
+      clean.downcase
+    end
+
+    # Verifies file SHA-256 against the expected hex.
+    private def self.verify_sha256(path : String, fname : String, expected : String) : Nil
+      digest = Digest::SHA256.new
+      hash_file(path, digest)
+      actual = digest.final.hexstring
+      unless actual.downcase == expected.downcase
+        File.delete(path) rescue nil
+        raise RuntimeError.new("SHA-256 mismatch for #{fname}: expected #{expected}, got #{actual}")
+      end
+      Log.info "Checksum OK (SHA-256): #{fname}"
+    end
+
+    # Verifies file MD5 against the ETag hex.
+    private def self.verify_md5(path : String, fname : String, expected : String) : Nil
+      digest = Digest::MD5.new
+      hash_file(path, digest)
+      actual = digest.final.hexstring
+      unless actual.downcase == expected.downcase
+        File.delete(path) rescue nil
+        raise RuntimeError.new("MD5 mismatch for #{fname}: expected #{expected}, got #{actual}")
+      end
+      Log.info "Checksum OK (ETag MD5): #{fname}"
+    end
+
+    # Feeds a file into a digest in 64 KB chunks.
+    private def self.hash_file(path : String, digest : Digest) : Nil
+      File.open(path, "rb") do |file|
+        buf = Bytes.new(65536)
+        loop do
+          n = file.read(buf)
+          break if n == 0
+          digest.update(buf[0, n])
+        end
+      end
+    end
+
+    #
+    # Falls back to ETag MD5 verification: S3/CloudFront return the file
+    # MD5 as a plain 32-hex ETag for single-part objects. Multipart ETags
+    # (`<hex>-<n>`) are skipped. No verification on resumed (206) downloads
+    # since the ETag describes the whole object, not the range.
+    private def self.finish_download(part_path : String, dest_path : String, fname : String, downloaded : Int64, expected_sha256 : String?, etag : String? = nil) : Nil
       if sha = expected_sha256
-        digest = Digest::SHA256.new
-        File.open(part_path, "rb") do |file|
-          buf = Bytes.new(65536)
-          loop do
-            n = file.read(buf)
-            break if n == 0
-            digest.update(buf[0, n])
-          end
-        end
-        actual = digest.final.hexstring
-        unless actual.downcase == sha.downcase
-          File.delete(part_path) rescue nil
-          raise RuntimeError.new("SHA-256 mismatch for #{fname}: expected #{sha}, got #{actual}")
-        end
-        Log.info "Checksum OK: #{fname}"
+        verify_sha256(part_path, fname, sha)
+      elsif etag_md5 = plain_etag_md5(etag)
+        verify_md5(part_path, fname, etag_md5)
       end
       # Windows rename fails when the target exists (POSIX overwrites),
       # so remove a pre-existing dest (e.g. File.tempfile in specs).

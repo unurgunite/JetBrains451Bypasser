@@ -172,4 +172,84 @@ describe "download integration" do
       server.close
     end
   end
+
+  it "verifies ETag MD5 when the server sends a plain ETag" do
+    zip = build_test_zip
+    digest = Digest::MD5.new
+    digest.update(zip)
+    etag = %("#{digest.final.hexstring}")
+    tcp = TCPServer.new("127.0.0.1", 0)
+    port = tcp.local_address.port
+    tcp.close
+    server = HTTP::Server.new do |ctx|
+      ctx.response.status_code = 200
+      ctx.response.content_length = zip.size
+      ctx.response.headers["ETag"] = etag
+      ctx.response.output.write(zip)
+    end
+    server.bind_tcp "127.0.0.1", port
+    spawn { server.listen }
+    sleep 50.milliseconds
+    begin
+      with_tmpdir do |dir|
+        dest = File.join(dir, "plugin.zip")
+        HTTPClient.download(URI.parse("http://127.0.0.1:#{port}/etag.zip"), dest)
+        File.exists?(dest).should be_true
+      end
+    ensure
+      server.close
+    end
+  end
+
+  it "rejects download on ETag MD5 mismatch" do
+    zip = build_test_zip
+    tcp = TCPServer.new("127.0.0.1", 0)
+    port = tcp.local_address.port
+    tcp.close
+    server = HTTP::Server.new do |ctx|
+      ctx.response.status_code = 200
+      ctx.response.content_length = zip.size
+      ctx.response.headers["ETag"] = %("00000000000000000000000000000000")
+      ctx.response.output.write(zip)
+    end
+    server.bind_tcp "127.0.0.1", port
+    spawn { server.listen }
+    sleep 50.milliseconds
+    begin
+      with_tmpdir do |dir|
+        dest = File.join(dir, "plugin.zip")
+        expect_raises(RuntimeError, /MD5 mismatch/) do
+          HTTPClient.download(URI.parse("http://127.0.0.1:#{port}/bad.zip"), dest)
+        end
+        File.exists?(dest).should be_false
+      end
+    ensure
+      server.close
+    end
+  end
+
+  it "skips ETag verification for multipart ETags" do
+    zip = build_test_zip
+    tcp = TCPServer.new("127.0.0.1", 0)
+    port = tcp.local_address.port
+    tcp.close
+    server = HTTP::Server.new do |ctx|
+      ctx.response.status_code = 200
+      ctx.response.content_length = zip.size
+      ctx.response.headers["ETag"] = %("abc123-5")
+      ctx.response.output.write(zip)
+    end
+    server.bind_tcp "127.0.0.1", port
+    spawn { server.listen }
+    sleep 50.milliseconds
+    begin
+      with_tmpdir do |dir|
+        dest = File.join(dir, "plugin.zip")
+        HTTPClient.download(URI.parse("http://127.0.0.1:#{port}/multi.zip"), dest)
+        File.exists?(dest).should be_true
+      end
+    ensure
+      server.close
+    end
+  end
 end
