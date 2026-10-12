@@ -8,6 +8,8 @@
 // @match        https://download-cdn.jetbrains.com/*
 // @match        https://plugins.jetbrains.com/*
 // @match        https://downloads.marketplace.jetbrains.com/*
+// @updateURL    https://github.com/unurgunite/JetBrains451Bypasser/raw/refs/heads/master/tampermonkey/redirect_on_451.user.js
+// @downloadURL  https://github.com/unurgunite/JetBrains451Bypasser/raw/refs/heads/master/tampermonkey/redirect_on_451.user.js
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==
