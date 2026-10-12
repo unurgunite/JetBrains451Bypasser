@@ -318,6 +318,7 @@ jobs:
             echo "⚠️  Manual releases are allowed only from master branch."
             exit 1
           fi
+      - uses: actions/checkout@v4
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -326,6 +327,10 @@ jobs:
         run: |
           mkdir -p release-assets
           find ./all-artifacts -type f -exec mv {} ./release-assets/ \;
+      - name: Add Tampermonkey userscript
+        run: |
+          cp tampermonkey/redirect_on_451.user.js release-assets/
+          node --check release-assets/redirect_on_451.user.js
       - name: Generate checksums
         run: |
           cd release-assets
