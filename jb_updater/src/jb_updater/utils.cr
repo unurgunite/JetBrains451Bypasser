@@ -12,6 +12,20 @@ module JBUpdater
     # Infinity constant used in version range comparisons.
     INF = Float64::INFINITY
 
+    # Atomically replaces *dest* with *src*.
+    #
+    # `File.rename` overwrites on POSIX but raises
+    # `File::AccessDeniedError` on Windows when the target exists,
+    # so a pre-existing destination is removed first. Used for
+    # `.part` → final renames after downloads.
+    #
+    # @param src [String] Source path (must exist)
+    # @param dest [String] Destination path (may exist)
+    def self.atomic_replace(src : String, dest : String) : Nil
+      File.delete(dest) if File.exists?(dest)
+      File.rename(src, dest)
+    end
+
     # --------------------------------------------------------------------------
     # General utilities
     # --------------------------------------------------------------------------

@@ -261,10 +261,8 @@ module JBUpdater
       elsif etag_md5 = plain_etag_md5(etag)
         verify_md5(part_path, fname, etag_md5)
       end
-      # Windows rename fails when the target exists (POSIX overwrites),
-      # so remove a pre-existing dest (e.g. File.tempfile in specs).
-      File.delete(dest_path) if File.exists?(dest_path)
-      File.rename(part_path, dest_path)
+      # Windows rename fails when the target exists (POSIX overwrites).
+      Utils.atomic_replace(part_path, dest_path)
       notify_download_complete(fname, dest_path, downloaded)
     end
 

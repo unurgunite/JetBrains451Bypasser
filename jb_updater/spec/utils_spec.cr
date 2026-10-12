@@ -3,6 +3,30 @@ require "compress/zip"
 include JBUpdater
 
 describe Utils do
+  describe ".atomic_replace" do
+    it "renames over an existing destination" do
+      with_tmpdir do |dir|
+        src = File.join(dir, "new.bin")
+        dest = File.join(dir, "old.bin")
+        File.write(src, "new")
+        File.write(dest, "stale")
+        Utils.atomic_replace(src, dest)
+        File.exists?(src).should be_false
+        File.read(dest).should eq "new"
+      end
+    end
+
+    it "renames when the destination is absent" do
+      with_tmpdir do |dir|
+        src = File.join(dir, "new.bin")
+        dest = File.join(dir, "fresh.bin")
+        File.write(src, "data")
+        Utils.atomic_replace(src, dest)
+        File.read(dest).should eq "data"
+      end
+    end
+  end
+
   describe ".safe" do
     it "replaces forbidden characters with underscores" do
       Utils.safe("a/b:c*?.zip").should eq "a_b_c__.zip"
