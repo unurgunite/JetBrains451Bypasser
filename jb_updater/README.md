@@ -32,6 +32,11 @@ reasons) by switching to CDN mirrors and direct API calls.
 - Upgrades entire IDEs via the JetBrains Releases API.
 - Auto‑detects architecture (`arm` or `intel`) and fetches the correct build.
 - Compact progress bar while downloading (CLI) and progress bars in GUI.
+- Resilient downloads: automatic retry with backoff, resume of partial
+  files, and checksum verification (SHA-256 from the Releases API for
+  IDEs, S3 ETag MD5 for plugins).
+- Human-readable errors with fix hints instead of raw backtraces.
+- `-v / --version` prints the current version.
 - Zero runtime dependencies: self‑contained native binaries.
 - Optional `--brew` mode patches a Homebrew Cask so `brew upgrade` just works (macOS).
 
@@ -60,10 +65,10 @@ On macOS, `JBUpdater.app` bundles both `jb_updater_gui` and `jb_updater` plus Op
 macOS CLI archives also include the OpenSSL dylibs alongside the binary.
 
 > [!NOTE]
-> macOS builds are unsigned / unnotarized. You may need to clear quarantine locally:
+> macOS builds are unsigned / unnotarized. Run the first-run helper:
 > ```bash
-> xattr -cr JBUpdater.app
-> open JBUpdater.app
+> ./tools/macos-first-run.sh /Applications/JBUpdater.app
+> open /Applications/JBUpdater.app
 > ```
 
 > [!NOTE]
@@ -134,6 +139,7 @@ jb_updater --product WebStorm --upgrade-ide --brew
 |------------------------------|---------------------------------------------------------------|
 | `--plugins-dir DIR`          | Plugins directory                                             |
 | `-b`, `--build BUILD`        | IDE build                                                     |
+| `--only-incompatible`        | Update only plugins incompatible with the build               |
 | `-d`, `--dry-run`            | Dry run                                                       |
 | `-l`, `--list`               | List plugins                                                  |
 | `-i`, `--install-plugin IDS` | Install plugins (comma-separated)                             |
@@ -143,7 +149,8 @@ jb_updater --product WebStorm --upgrade-ide --brew
 | `--ide-path PATH`            | Specify custom IDE installation path                          |
 | `--list-ide-releases`        | List available IDE releases by product code (e.g. `RM`, `WS`) |
 | `--no-tty-progress-bar`      | Disable ASCII TTY progress bars (useful with GUI wrapper)     |
-| `--brew`                     | Patch Homebrew cask Ruby file (macOS, WIP)                    |
+| `--brew`                     | Patch Homebrew cask Ruby file (macOS)                         |
+| `-v`, `--version`            | Show version                                                  |
 | `-h`, `--help`               | Show help                                                     |
 
 ---
@@ -169,10 +176,10 @@ On macOS:
 
 1. Download `jb_updater-gui-macos-${arch}.zip` from Releases.
 2. Unzip and move `JBUpdater.app` to `/Applications`.
-3. (First run) Clear quarantine:
+3. (First run) Clear quarantine and ad-hoc sign:
 
    ```bash
-   xattr -cr /Applications/JBUpdater.app
+   ./tools/macos-first-run.sh /Applications/JBUpdater.app
    open /Applications/JBUpdater.app
    ```
 

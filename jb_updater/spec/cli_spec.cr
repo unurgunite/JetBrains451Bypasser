@@ -55,5 +55,15 @@ describe JBUpdater do
       opts = JBUpdater.parse_cli(["-i", "com.example.plugin,org.test"])
       opts.install_ids.should eq ["com.example.plugin", "org.test"]
     end
+
+    it "parses --only-incompatible" do
+      opts = JBUpdater.parse_cli(["--only-incompatible"])
+      opts.only_incompatible?.should be_true
+    end
+
+    it "defaults only_incompatible to false" do
+      opts = JBUpdater.parse_cli([] of String)
+      opts.only_incompatible?.should be_false
+    end
   end
 end

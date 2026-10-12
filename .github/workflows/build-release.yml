@@ -206,6 +206,29 @@ jobs:
         working-directory: jb_updater
         run: ./bin/lint
 
+      - name: Check formatting
+        working-directory: jb_updater
+        run: crystal tool format --check src/ spec/
+
+      - name: Run Catalyst static perf analysis (Unix)
+        if: runner.os != 'Windows'
+        working-directory: jb_updater
+        run: |
+          crystal build lib/catalyst/src/catalyst.cr --release --no-debug -o "${RUNNER_TEMP}/catalyst"
+          "${RUNNER_TEMP}/catalyst" --baseline .catalyst-baseline.json --ci src/ || "${RUNNER_TEMP}/catalyst" --ci src/
+
+      # Report-only on Windows: catalyst baseline stores Unix-style paths,
+      # so every finding looks "new" under backslash separators (upstream
+      # catalyst issue). Linux/macOS jobs enforce the gate.
+      - name: Run Catalyst static perf analysis (Windows)
+        if: runner.os == 'Windows'
+        working-directory: jb_updater
+        shell: pwsh
+        run: |
+          crystal build lib/catalyst/src/catalyst.cr --release --no-debug -o "$env:RUNNER_TEMP/catalyst.exe"
+          & "$env:RUNNER_TEMP/catalyst.exe" src/
+          exit 0
+
       - name: Run specs
         working-directory: jb_updater
         run: crystal spec -v
@@ -295,6 +318,7 @@ jobs:
             echo "⚠️  Manual releases are allowed only from master branch."
             exit 1
           fi
+      - uses: actions/checkout@v4
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -303,6 +327,15 @@ jobs:
         run: |
           mkdir -p release-assets
           find ./all-artifacts -type f -exec mv {} ./release-assets/ \;
+      - name: Add Tampermonkey userscript
+        run: |
+          cp tampermonkey/redirect_on_451.user.js release-assets/
+          node --check release-assets/redirect_on_451.user.js
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          shasum -a 256 * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

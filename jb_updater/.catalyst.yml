@@ -1,0 +1,12 @@
+severity: warning
+format: terminal
+
+rules: {}
+
+ignore:
+  - lib/**
+  - vendor/**
+  - "**/*_spec.cr"
+
+paths:
+  - src/
