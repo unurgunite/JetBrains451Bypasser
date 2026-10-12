@@ -60,3 +60,17 @@ jobs:
       - name: Run CLI --help
         working-directory: ./jb_updater
         run: ./jb_updater --help
+
+  userscript-test:
+    name: Tampermonkey userscript tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check userscript syntax
+        working-directory: ./tampermonkey
+        run: node --check redirect_on_451.user.js
+
+      - name: Run userscript tests
+        working-directory: ./tampermonkey
+        run: node --test redirect_on_451.test.mjs
