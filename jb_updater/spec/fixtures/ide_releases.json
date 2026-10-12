@@ -1,0 +1,613 @@
+{
+ "RM": [
+  {
+   "date": "2026-09-18",
+   "type": "release",
+   "downloads": {
+    "linuxARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3-aarch64.tar.gz",
+     "size": 1110320534,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3-aarch64.tar.gz.sha256"
+    },
+    "linux": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.tar.gz",
+     "size": 1086825957,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.tar.gz.sha256"
+    },
+    "thirdPartyLibrariesJson": {
+     "link": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2.3-third-party-libraries.json",
+     "size": 69790,
+     "checksumLink": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2.3-third-party-libraries.json.sha256"
+    },
+    "windows": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.exe",
+     "size": 815516160,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.exe.sha256"
+    },
+    "windowsZip": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.win.zip",
+     "size": 1108891083,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.win.zip.sha256"
+    },
+    "windowsARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3-aarch64.exe",
+     "size": 806360680,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3-aarch64.exe.sha256"
+    },
+    "mac": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.dmg",
+     "size": 1063425598,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3.dmg.sha256"
+    },
+    "macM1": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3-aarch64.dmg",
+     "size": 1015459827,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.3-aarch64.dmg.sha256"
+    }
+   },
+   "patches": {
+    "win": [
+     {
+      "fromBuild": "262.10315.129",
+      "link": "https://download.jetbrains.com/ruby/RM-262.10315.129-262.10968.66-patch-win.jar",
+      "size": 37709558,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.10315.129-262.10968.66-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "261.27258.52",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10968.66-patch-win.jar",
+      "size": 467583847,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10968.66-patch-win.jar.sha256"
+     }
+    ],
+    "mac": [
+     {
+      "fromBuild": "262.10315.129",
+      "link": "https://download.jetbrains.com/ruby/RM-262.10315.129-262.10968.66-patch-mac.jar",
+      "size": 35833774,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.10315.129-262.10968.66-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "261.27258.52",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10968.66-patch-mac.jar",
+      "size": 444265296,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10968.66-patch-mac.jar.sha256"
+     }
+    ],
+    "unix": [
+     {
+      "fromBuild": "262.10315.129",
+      "link": "https://download.jetbrains.com/ruby/RM-262.10315.129-262.10968.66-patch-unix.jar",
+      "size": 36393075,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.10315.129-262.10968.66-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "261.27258.52",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10968.66-patch-unix.jar",
+      "size": 418296054,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10968.66-patch-unix.jar.sha256"
+     }
+    ]
+   },
+   "notesLink": "https://youtrack.jetbrains.com/articles/RUBY-A-220365385",
+   "licenseRequired": true,
+   "version": "2026.2.3",
+   "majorVersion": "2026.2",
+   "build": "262.10968.66",
+   "whatsnew": "<h3>RubyMine 2026.2.3 Is Out!</h3>\n<p>Fixes and improvements:</p>\n<ul>\n <li>Fixed Go to Declaration, inspections, and annotators for Ruby constants in Slim templates: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-36013\">RUBY-36013</a></li>\n <li>Fixed an issue where Rails tests run via Rake configurations failed on Windows: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-35940\">RUBY-35940</a></li>\n <li>Fixed an issue that prevented running RSpec tests with Ruby 4.x interpreters in WSL: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-36055\">RUBY-36055</a></li>\n <li>Fixed data loss when canceling merge conflict resolution: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-251324\">IJPL-251324</a></li>\n <li>Fixed an IDE freeze caused by write actions waiting indefinitely for background tasks: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-253271\">IJPL-253271</a></li>\n</ul>\n<p>For the full list of closed issues, refer to the <a href=\"https://youtrack.jetbrains.com/articles/RUBY-A-220365385/RubyMine-2026.2.3-262.10968.66-build-Release-Notes\">release notes</a>.</p>",
+   "uninstallFeedbackLinks": {
+    "linuxARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "windowsJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "windowsZipJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "linux": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "thirdPartyLibrariesJson": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "windows": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "windowsZip": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "windowsARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "linuxJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "mac": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "macJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3",
+    "macM1": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.3"
+   },
+   "printableReleaseType": null
+  },
+  {
+   "date": "2026-09-03",
+   "type": "release",
+   "downloads": {
+    "linuxARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2-aarch64.tar.gz",
+     "size": 1099834799,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2-aarch64.tar.gz.sha256"
+    },
+    "linux": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.tar.gz",
+     "size": 1076361306,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.tar.gz.sha256"
+    },
+    "thirdPartyLibrariesJson": {
+     "link": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2.2-third-party-libraries.json",
+     "size": 69358,
+     "checksumLink": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2.2-third-party-libraries.json.sha256"
+    },
+    "windows": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.exe",
+     "size": 805323072,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.exe.sha256"
+    },
+    "windowsZip": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.win.zip",
+     "size": 1098449514,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.win.zip.sha256"
+    },
+    "windowsARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2-aarch64.exe",
+     "size": 796175856,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2-aarch64.exe.sha256"
+    },
+    "mac": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.dmg",
+     "size": 1053037020,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2.dmg.sha256"
+    },
+    "macM1": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2-aarch64.dmg",
+     "size": 1005029742,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.2-aarch64.dmg.sha256"
+    }
+   },
+   "patches": {
+    "win": [
+     {
+      "fromBuild": "262.10315.71",
+      "link": "https://download.jetbrains.com/ruby/RM-262.10315.71-262.10315.129-patch-win.jar",
+      "size": 23599816,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.10315.71-262.10315.129-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "261.27258.52",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10315.129-patch-win.jar",
+      "size": 454465280,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10315.129-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "262.9437.192",
+      "link": "https://download.jetbrains.com/ruby/RM-262.9437.192-262.10315.129-patch-win.jar",
+      "size": 77587736,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.9437.192-262.10315.129-patch-win.jar.sha256"
+     }
+    ],
+    "mac": [
+     {
+      "fromBuild": "262.10315.71",
+      "link": "https://download.jetbrains.com/ruby/RM-262.10315.71-262.10315.129-patch-mac.jar",
+      "size": 21216105,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.10315.71-262.10315.129-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "261.27258.52",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10315.129-patch-mac.jar",
+      "size": 431748230,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10315.129-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "262.9437.192",
+      "link": "https://download.jetbrains.com/ruby/RM-262.9437.192-262.10315.129-patch-mac.jar",
+      "size": 108782110,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.9437.192-262.10315.129-patch-mac.jar.sha256"
+     }
+    ],
+    "unix": [
+     {
+      "fromBuild": "262.10315.71",
+      "link": "https://download.jetbrains.com/ruby/RM-262.10315.71-262.10315.129-patch-unix.jar",
+      "size": 19500689,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.10315.71-262.10315.129-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "261.27258.52",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10315.129-patch-unix.jar",
+      "size": 405497726,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.52-262.10315.129-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "262.9437.192",
+      "link": "https://download.jetbrains.com/ruby/RM-262.9437.192-262.10315.129-patch-unix.jar",
+      "size": 74658570,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.9437.192-262.10315.129-patch-unix.jar.sha256"
+     }
+    ]
+   },
+   "notesLink": "https://youtrack.jetbrains.com/articles/RUBY-A-220365381",
+   "licenseRequired": true,
+   "version": "2026.2.2",
+   "majorVersion": "2026.2",
+   "build": "262.10315.129",
+   "whatsnew": "<h3>RubyMine 2026.2.2 Is Out!</h3>\n<p>Fixes and improvements:</p>\n<ul>\n <li>Fixed missing <i>External Sources</i> results in Find in Files: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-252666\">IJPL-252666</a></li>\n <li>Fixed Terminal tab order not being preserved between IDE sessions: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-212254\">IJPL-212254</a></li>\n <li>Added plugin IDs to the <i>Plugins</i> page in Settings: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-164187\">IJPL-164187</a></li>\n <li>Improved IDE responsiveness when opening directories containing large numbers of files: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-93385\">IJPL-93385</a></li>\n <li>Fixed an issue where a Git commit could still be created after being canceled: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-242092\">IJPL-242092</a></li>\n <li>Added support for clickable OSC 8 hyperlinks in the Reworked Terminal: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-246212\">IJPL-246212</a></li>\n</ul>\n<p>For the full list of closed issues, refer to the <a href=\"https://youtrack.jetbrains.com/articles/RUBY-A-220365381/RubyMine-2026.2.2-262.10315.129-build-Release-Notes\">release notes</a>.</p>",
+   "uninstallFeedbackLinks": {
+    "linuxARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "windowsJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "windowsZipJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "linux": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "thirdPartyLibrariesJson": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "windows": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "windowsZip": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "windowsARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "linuxJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "mac": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "macJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2",
+    "macM1": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.2"
+   },
+   "printableReleaseType": null
+  },
+  {
+   "date": "2026-08-11",
+   "type": "release",
+   "downloads": {
+    "linuxARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1-aarch64.tar.gz",
+     "size": 1095230942,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1-aarch64.tar.gz.sha256"
+    },
+    "linux": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.tar.gz",
+     "size": 1071602261,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.tar.gz.sha256"
+    },
+    "thirdPartyLibrariesJson": {
+     "link": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2.1-third-party-libraries.json",
+     "size": 69119,
+     "checksumLink": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2.1-third-party-libraries.json.sha256"
+    },
+    "windows": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.exe",
+     "size": 802460592,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.exe.sha256"
+    },
+    "windowsZip": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.win.zip",
+     "size": 1093557970,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.win.zip.sha256"
+    },
+    "windowsARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1-aarch64.exe",
+     "size": 793233600,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1-aarch64.exe.sha256"
+    },
+    "mac": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.dmg",
+     "size": 1049100845,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1.dmg.sha256"
+    },
+    "macM1": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1-aarch64.dmg",
+     "size": 1000941157,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.1-aarch64.dmg.sha256"
+    }
+   },
+   "patches": {
+    "win": [
+     {
+      "fromBuild": "262.9437.66",
+      "link": "https://download.jetbrains.com/ruby/RM-262.9437.66-262.9437.192-patch-win.jar",
+      "size": 18030654,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.9437.66-262.9437.192-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.9437.192-patch-win.jar",
+      "size": 446186604,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.9437.192-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "262.8665.308",
+      "link": "https://download.jetbrains.com/ruby/RM-262.8665.308-262.9437.192-patch-win.jar",
+      "size": 54509602,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.8665.308-262.9437.192-patch-win.jar.sha256"
+     }
+    ],
+    "mac": [
+     {
+      "fromBuild": "262.9437.66",
+      "link": "https://download.jetbrains.com/ruby/RM-262.9437.66-262.9437.192-patch-mac.jar",
+      "size": 16144842,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.9437.66-262.9437.192-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.9437.192-patch-mac.jar",
+      "size": 423474658,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.9437.192-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "262.8665.308",
+      "link": "https://download.jetbrains.com/ruby/RM-262.8665.308-262.9437.192-patch-mac.jar",
+      "size": 86350245,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.8665.308-262.9437.192-patch-mac.jar.sha256"
+     }
+    ],
+    "unix": [
+     {
+      "fromBuild": "262.9437.66",
+      "link": "https://download.jetbrains.com/ruby/RM-262.9437.66-262.9437.192-patch-unix.jar",
+      "size": 16018787,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.9437.66-262.9437.192-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.9437.192-patch-unix.jar",
+      "size": 397152321,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.9437.192-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "262.8665.308",
+      "link": "https://download.jetbrains.com/ruby/RM-262.8665.308-262.9437.192-patch-unix.jar",
+      "size": 52178373,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.8665.308-262.9437.192-patch-unix.jar.sha256"
+     }
+    ]
+   },
+   "notesLink": "https://youtrack.jetbrains.com/articles/RUBY-A-220365377",
+   "licenseRequired": true,
+   "version": "2026.2.1",
+   "majorVersion": "2026.2",
+   "build": "262.9437.192",
+   "whatsnew": "<h3>RubyMine 2026.2.1 Is Out!</h3>\n<p>Fixes and improvements:</p>\n<ul>\n <li>Fixed debugger support for projects in paths containing non-ASCII characters: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-34195\">RUBY-34195</a></li>\n <li>Improved stepping performance with the <i>Ignore non-project files</i> option enabled: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-35773\">RUBY-35773</a></li>\n <li>Improved project analysis performance for Rails projects with large RSpec files: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-35648\">RUBY-35648</a></li>\n <li>Added a bundled Figma skill for AI Assistant: <a href=\"https://youtrack.jetbrains.com/issue/WEB-78488\">WEB-78488</a></li>\n <li>Fixed empty Find in Files results despite existing matches: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-246834\">IJPL-246834</a></li>\n</ul>\n<p>For the full list of closed issues, refer to the <a href=\"https://youtrack.jetbrains.com/articles/RUBY-A-220365377/RubyMine-2026.2.1-262.9437.192-build-Release-Notes\">release notes</a>.</p>",
+   "uninstallFeedbackLinks": {
+    "linuxARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "windowsJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "windowsZipJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "linux": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "thirdPartyLibrariesJson": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "windows": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "windowsZip": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "windowsARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "linuxJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "mac": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "macJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1",
+    "macM1": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2.1"
+   },
+   "printableReleaseType": null
+  },
+  {
+   "date": "2026-07-21",
+   "type": "release",
+   "downloads": {
+    "linuxARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2-aarch64.tar.gz",
+     "size": 1094122063,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2-aarch64.tar.gz.sha256"
+    },
+    "linux": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.tar.gz",
+     "size": 1070534777,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.tar.gz.sha256"
+    },
+    "thirdPartyLibrariesJson": {
+     "link": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2-third-party-libraries.json",
+     "size": 69105,
+     "checksumLink": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.2-third-party-libraries.json.sha256"
+    },
+    "windows": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.exe",
+     "size": 801593856,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.exe.sha256"
+    },
+    "windowsZip": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.win.zip",
+     "size": 1092523125,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.win.zip.sha256"
+    },
+    "windowsARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2-aarch64.exe",
+     "size": 792195280,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2-aarch64.exe.sha256"
+    },
+    "mac": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2.dmg",
+     "size": 1048051866,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2.dmg.sha256"
+    },
+    "macM1": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.2-aarch64.dmg",
+     "size": 999698624,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.2-aarch64.dmg.sha256"
+    }
+   },
+   "patches": {
+    "win": [
+     {
+      "fromBuild": "262.8665.179",
+      "link": "https://download.jetbrains.com/ruby/RM-262.8665.179-262.8665.308-patch-win.jar",
+      "size": 19793674,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.8665.179-262.8665.308-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.8665.308-patch-win.jar",
+      "size": 410585209,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.8665.308-patch-win.jar.sha256"
+     }
+    ],
+    "mac": [
+     {
+      "fromBuild": "262.8665.179",
+      "link": "https://download.jetbrains.com/ruby/RM-262.8665.179-262.8665.308-patch-mac.jar",
+      "size": 17630733,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.8665.179-262.8665.308-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.8665.308-patch-mac.jar",
+      "size": 354165184,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.8665.308-patch-mac.jar.sha256"
+     }
+    ],
+    "unix": [
+     {
+      "fromBuild": "262.8665.179",
+      "link": "https://download.jetbrains.com/ruby/RM-262.8665.179-262.8665.308-patch-unix.jar",
+      "size": 17784383,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-262.8665.179-262.8665.308-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.8665.308-patch-unix.jar",
+      "size": 361870185,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-262.8665.308-patch-unix.jar.sha256"
+     }
+    ]
+   },
+   "notesLink": "https://youtrack.jetbrains.com/articles/RUBY-A-220365370",
+   "licenseRequired": true,
+   "version": "2026.2",
+   "majorVersion": "2026.2",
+   "build": "262.8665.308",
+   "whatsnew": "<h3>RubyMine 2026.2 Is Released!</h3>\n<p><a href=\"https://www.jetbrains.com/ruby/whatsnew/\">Visit our website</a> or <a href=\"https://blog.jetbrains.com/ruby/2026/07/rubymine-2026-2-agentic-debugging-native-github-copilot-integration-default-symbol-based-code-insight-and-more/\">read the blog post</a> to learn about the latest new features and improvements.</p>\n<p>Here are the highlights:</p>\n<ul>\n <li>Symbol-based code insight enabled by default: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-35608\">RUBY-35608</a></li>\n <li>Agentic debugging with a bundled <code>rubymine-debugger</code> skill: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-35613\">RUBY-35613</a></li>\n <li>Added symbol-based code insight support for parameter definitions: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-34752\">RUBY-34752</a></li>\n <li>Added support for excluding individual files from projects: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-9342\">IJPL-9342</a></li>\n <li>Added support for navigating to specific source code lines from Markdown links: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-93490\">IJPL-93490</a></li>\n <li>Added support for GitHub alerts in Markdown preview: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-247643\">IJPL-247643</a></li>\n <li>Added support for dragging files and folders into the Terminal to insert their paths: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-103786\">IJPL-103786</a></li>\n <li>Fixed a freeze caused by Ruby stack trace hyperlink processing, especially noticeable in WSL environments: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-34220\">RUBY-34220</a></li>\n <li>Added navigation support for qualified names in backticks: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-246124\">IJPL-246124</a></li>\n <li>Added support for TODO items in Markdown HTML comments: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-92221\">IJPL-92221</a></li>\n <li>Added support for clickable OSC 8 hyperlinks in the Terminal tool window: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-103740\">IJPL-103740</a></li>\n <li>Improved editing performance for large JSON files: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-220556\">IJPL-220556</a></li>\n <li>Added full Keymap support for double-modifier shortcuts like Shift-Shift and Ctrl-Ctrl, including search, remapping, and customization: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-61450\">IJPL-61450</a></li>\n <li>Reduced IDE memory usage: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-212987\">IJPL-212987</a></li>\n <li>RBS inlay hint improvements: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-31073\">RUBY-31073</a>, <a href=\"https://youtrack.jetbrains.com/issue/RUBY-31074\">RUBY-31074</a>, <a href=\"https://youtrack.jetbrains.com/issue/RUBY-30081\">RUBY-30081</a>, <a href=\"https://youtrack.jetbrains.com/issue/RUBY-35596\">RUBY-35596</a></li>\n <li>Reduced idle CPU usage caused by RuboCop background highlighting: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-34766\">RUBY-34766</a></li>\n <li>Improved type inference for <code>FactoryBot.create</code> and other qualified factory calls: <a href=\"https://youtrack.jetbrains.com/issue/RUBY-23514\">RUBY-23514</a></li>\n <li>Automatic installation of plugins specified in <code>devcontainer.json</code> when opening Dev Container projects: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-240976\">IJPL-240976</a></li>\n <li>Implemented ranking for plugin search in settings: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-7519\">IJPL-7519</a></li>\n <li>Implemented suggestions for mentions in GitHub pull request comments: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-74258\">IJPL-74258</a></li>\n</ul>\n<p>For the full list of closed issues, refer to the <a href=\"https://youtrack.jetbrains.com/articles/RUBY-A-220365369\">release notes</a>.</p>",
+   "uninstallFeedbackLinks": {
+    "linuxARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "windowsJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "windowsZipJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "linux": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "thirdPartyLibrariesJson": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "windows": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "windowsZip": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "windowsARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "linuxJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "mac": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "macJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2",
+    "macM1": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.2"
+   },
+   "printableReleaseType": null
+  },
+  {
+   "date": "2026-08-13",
+   "type": "release",
+   "downloads": {
+    "linuxARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5-aarch64.tar.gz",
+     "size": 1037954563,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5-aarch64.tar.gz.sha256"
+    },
+    "linux": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.tar.gz",
+     "size": 1043020900,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.tar.gz.sha256"
+    },
+    "thirdPartyLibrariesJson": {
+     "link": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.1.5-third-party-libraries.json",
+     "size": 67527,
+     "checksumLink": "https://resources.jetbrains.com/storage/third-party-libraries/ruby/RubyMine-2026.1.5-third-party-libraries.json.sha256"
+    },
+    "windows": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.exe",
+     "size": 785748664,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.exe.sha256"
+    },
+    "windowsZip": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.win.zip",
+     "size": 1065539179,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.win.zip.sha256"
+    },
+    "windowsARM64": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5-aarch64.exe",
+     "size": 776922152,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5-aarch64.exe.sha256"
+    },
+    "mac": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.dmg",
+     "size": 1026539686,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5.dmg.sha256"
+    },
+    "macM1": {
+     "link": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5-aarch64.dmg",
+     "size": 977973686,
+     "checksumLink": "https://download.jetbrains.com/ruby/RubyMine-2026.1.5-aarch64.dmg.sha256"
+    }
+   },
+   "patches": {
+    "win": [
+     {
+      "fromBuild": "261.27258.19",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.19-261.27258.52-patch-win.jar",
+      "size": 25814594,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.19-261.27258.52-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "253.33813.45",
+      "link": "https://download.jetbrains.com/ruby/RM-253.33813.45-261.27258.52-patch-win.jar",
+      "size": 368996125,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-253.33813.45-261.27258.52-patch-win.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-261.27258.52-patch-win.jar",
+      "size": 38121483,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-261.27258.52-patch-win.jar.sha256"
+     }
+    ],
+    "mac": [
+     {
+      "fromBuild": "261.27258.19",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.19-261.27258.52-patch-mac.jar",
+      "size": 24232735,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.19-261.27258.52-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "253.33813.45",
+      "link": "https://download.jetbrains.com/ruby/RM-253.33813.45-261.27258.52-patch-mac.jar",
+      "size": 409822507,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-253.33813.45-261.27258.52-patch-mac.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-261.27258.52-patch-mac.jar",
+      "size": 37181475,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-261.27258.52-patch-mac.jar.sha256"
+     }
+    ],
+    "unix": [
+     {
+      "fromBuild": "261.27258.19",
+      "link": "https://download.jetbrains.com/ruby/RM-261.27258.19-261.27258.52-patch-unix.jar",
+      "size": 24437006,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.27258.19-261.27258.52-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "253.33813.45",
+      "link": "https://download.jetbrains.com/ruby/RM-253.33813.45-261.27258.52-patch-unix.jar",
+      "size": 371933217,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-253.33813.45-261.27258.52-patch-unix.jar.sha256"
+     },
+     {
+      "fromBuild": "261.26222.67",
+      "link": "https://download.jetbrains.com/ruby/RM-261.26222.67-261.27258.52-patch-unix.jar",
+      "size": 38037371,
+      "checksumLink": "https://download.jetbrains.com/ruby/RM-261.26222.67-261.27258.52-patch-unix.jar.sha256"
+     }
+    ]
+   },
+   "notesLink": "https://youtrack.jetbrains.com/articles/RUBY-A-220365378",
+   "licenseRequired": true,
+   "version": "2026.1.5",
+   "majorVersion": "2026.1",
+   "build": "261.27258.52",
+   "whatsnew": "<h3>RubyMine 2026.1.5 Is Out!</h3>\n<p>Fixes and improvements:</p>\n<ul>\n <li>Fixed automatic reporting of freezes on Remote Development hosts when automatic reporting is enabled: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-248422\">IJPL-248422</a></li>\n <li>Fixed Smart Step Into in read-only files, including external libraries: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-249996\">IJPL-249996</a></li>\n <li>Fixed <i>Capture Memory Snapshot</i> and <i>Get Thread Dump</i> actions in Remote Development: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-244260\">IJPL-244260</a></li>\n <li>Fixed repeated GitHub Actions requests that could cause GitHub rate-limit errors: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-214348\">IJPL-214348</a></li>\n <li>Fixed a false-positive warning for the <code>environment.deployment</code> property in GitHub Actions workflows: <a href=\"https://youtrack.jetbrains.com/issue/IJPL-241935\">IJPL-241935</a></li>\n</ul>\n<p>For the full list of closed issues, refer to the <a href=\"https://youtrack.jetbrains.com/articles/RUBY-A-220365378/RubyMine-2026.1.5-261.27258.52-build-Release-Notes\">release notes</a>.</p>",
+   "uninstallFeedbackLinks": {
+    "linuxARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "windowsJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "windowsZipJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "linux": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "thirdPartyLibrariesJson": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "windows": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "windowsZip": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "windowsARM64": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "linuxJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "mac": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "macJBR8": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5",
+    "macM1": "https://www.jetbrains.com/ruby/uninstall/?edition=2026.1.5"
+   },
+   "printableReleaseType": null
+  }
+ ]
+}
