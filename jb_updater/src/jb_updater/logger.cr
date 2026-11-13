@@ -70,5 +70,58 @@ module JBUpdater
       STDERR.puts line.colorize(:red)
       emit(line)
     end
+
+    # Prints a red fatal error with an optional hint, then exits(1).
+    #
+    # Unlike an unhandled exception, this never dumps a backtrace —
+    # the user gets the cause and what to do next.
+    #
+    # @param msg [String] Error message
+    # @param hint [String?] Follow-up suggestion
+    def fatal(msg : String, hint : String? = nil) : NoReturn
+      fail(msg)
+      if hint
+        STDERR.puts "  → #{hint}"
+        emit("  → #{hint}")
+      end
+      exit 1
+    end
+
+    # Converts a low-level exception into a human-readable message.
+    #
+    # @param ex [Exception] The error to explain
+    # @return [Tuple(String, String?)] Message and optional hint
+    def explain(ex : Exception) : Tuple(String, String?)
+      case ex
+      when Socket::ConnectError, Socket::Error, IO::TimeoutError
+        {"Network error: #{ex.message}", "Check your connection or proxy. JBUpdater respects HTTP(S)_PROXY env vars."}
+      when OpenSSL::SSL::Error
+        {"TLS error: #{ex.message}", "The mirror may be blocked — try --ide-downloads-host or --downloads-host."}
+      when File::NotFoundError
+        {"File not found: #{ex.message}", nil}
+      when File::AccessDeniedError
+        {"Permission denied: #{ex.message}", "Re-run with sufficient rights or pick another directory."}
+      else
+        explain_runtime(ex)
+      end
+    end
+
+    # Explains RuntimeError/Exception messages from HTTP and CLI layers.
+    private def explain_runtime(ex : Exception) : Tuple(String, String?)
+      msg = ex.message || ex.class.to_s
+      if msg.starts_with?("HTTP 451")
+        {msg, "Blocked (HTTP 451) — the CDN mirror should bypass this; retry or report the URL."}
+      elsif msg.starts_with?("HTTP 429")
+        {msg, "Rate limited — wait a minute and retry."}
+      elsif msg.starts_with?("HTTP 5")
+        {msg, "Server error — retry; downloads resume automatically."}
+      elsif msg.includes?("Could not detect") || msg.includes?("Missing --")
+        {msg, "Pass the missing option explicitly (see --help)."}
+      elsif ex.is_a?(RuntimeError) || ex.is_a?(Exception)
+        {msg, "Re-run with the same args; report with the failing command."}
+      else
+        {"#{ex.class}: #{msg}", "Re-run with the same args; report with the failing command."}
+      end
+    end
   end
 end

@@ -1,0 +1,9 @@
+# Force LF line endings for Crystal sources/specs so that
+# `crystal tool format --check` behaves identically on Windows (CRLF
+# checkout) and Unix runners.
+*.cr text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.js text eol=lf
+*.sh text eol=lf

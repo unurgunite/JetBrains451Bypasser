@@ -1,3 +1,12 @@
 Globs:
   - src/**/*.cr
   - spec/**/*.cr
+
+Metrics/CyclomaticComplexity:
+  Enabled: true
+  Max: 12
+  Excluded:
+    - src/gui/main_tab.cr
+    - src/gui/browse_tab.cr
+    - src/gui/installed_tab.cr
+    - src/gui/ide_tab.cr

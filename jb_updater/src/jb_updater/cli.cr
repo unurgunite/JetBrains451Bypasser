@@ -75,6 +75,7 @@ module JBUpdater
   #
   # - `--plugins-dir DIR`
   # - `-b` / `--build BUILD`
+  # - `--only-incompatible`
   # - `-d` / `--dry-run`
   # - `-l` / `--list`
   # - `-i` / `--install-plugin IDS`
@@ -96,6 +97,7 @@ module JBUpdater
       parser.banner = "Usage: jb_updater [options]"
       parser.on("--plugins-dir DIR", "Plugins directory") { |v| opts.plugins_dir = v }
       parser.on("-b", "--build BUILD", "IDE build") { |v| opts.build = v }
+      parser.on("--only-incompatible", "Update only plugins incompatible with the build") { opts.only_incompatible = true }
       parser.on("-d", "--dry-run", "Dry run") { opts.dry_run = true }
       parser.on("-l", "--list", "List plugins") { opts.list = true }
       parser.on("-i", "--install-plugin IDS", "Install plugins (comma-separated)") { |v| opts.install_ids = v.split(',') }
@@ -119,6 +121,10 @@ module JBUpdater
         opts.no_tty_progress_bar = true
       end
       parser.on("--brew", "Patch Homebrew cask Ruby file instead of direct install") { opts.brew_patch = true }
+      parser.on("-v", "--version", "Show version") do
+        puts "jb_updater #{JbUpdater::VERSION}"
+        exit 0
+      end
       parser.on("-h", "--help", "Show help") do
         puts parser
         exit 0

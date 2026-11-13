@@ -1,0 +1,1544 @@
+<?xml version='1.0' encoding='UTF-8'?><plugin-repository><ff>"Graphics"</ff><category name="Graphics"><idea-plugin downloads="4592" size="112046" date="1088714643000" updatedDate="1088714643000" url=""><name>Gold Section</name><id>Gold Section</id><description><![CDATA[Gold Section 2(GS2) is a design tool for building nice palette for HTML
+        documents by method of "gold section" (in base of one is magical number 1.618033985017358...).]]></description><version>2.26.1</version><vendor email="davidovsv@yandex.ru" url="http://stasdavydov.com/">Stanislav Davydov</vendor><rating>4.4</rating><change-notes><![CDATA[<h3>2.26</h3>
+<ul>
+    <li>Some icons changed. Especialy thanks to Alex Efimov.</li>
+</ul>
+
+<h3>2.25</h3>
+<ul>
+    <li>Bugfixes.</li>
+</ul>
+
+<h3>2.23</h3>
+<ul>
+    <li>New HTML Preview functionality. Now you can set up some HTML template and
+    watch it in different color schemas.</li>
+    <li>Bugfixes.</li>
+</ul>
+
+<h3>2.19</h3>
+<ul>
+    <li>Bugfixes.</li>
+</ul>
+
+<h3>2.18</h3>
+<ul>
+    <li>Bugfixes.</li>
+</ul>
+
+<h3>2.17</h3>
+<ul>
+    <li>Favorits.</li>
+    <li>Bugfixes.</li>
+</ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="40.1126"/><tags>Graphics</tags></idea-plugin><idea-plugin downloads="19236" size="11048" date="1521026867000" updatedDate="1521026867000" url=""><name>PNG Optimizer</name><id>com.bulenkov.intellij.png.optimizer</id><description><![CDATA[Plugin allows to optimize PNG files by size before commit and manually via context menu in Project View]]></description><version>1.4</version><vendor email="kb@jetbrains.com" url="">Konstantin Bulenkov</vendor><rating>4.6</rating><change-notes><![CDATA[Remove unnecessary logging]]></change-notes><idea-version min="n/a" max="n/a" since-build="131.0"/><depends>com.intellij.modules.lang</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="37877" size="21714" date="1602552702000" updatedDate="1602552702000" url=""><name>Base64 image encoder</name><id>ru.mobiledev.plugins.uigd</id><description><![CDATA[
+      Allows to view image as base64-encoded for using in CSS/HTML.<br>
+      Available as new button in image editor toolbar.
+    ]]></description><version>1.2</version><vendor email="TachikomaGT@gmail.com" url="">TachikomaGT</vendor><rating>3.9</rating><change-notes><![CDATA[
+      1.2 - Added icon, updated graphics and supported platforms range<br>
+      1.1 - 2020.1 platform support has been added, now support SVG files<br>
+      1.0 - Initial version
+    
+    ]]></change-notes><idea-version min="n/a" max="n/a" since-build="201.0"/><depends>com.intellij.modules.lang</depends><depends>com.intellij.platform.images</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="124635" size="1468514" date="1655474671000" updatedDate="1655474671000" url=""><name>Android Drawable Preview</name><id>com.mistamek.drawablepreview.drawable-preview</id><description><![CDATA[
+    Render drawable instead of default icon. Supports binary and vector images
+    ]]></description><version>1.1.6</version><vendor email="mustafaibrag@gmail.com" url="">Mista Mek</vendor><rating>3.8</rating><change-notes><![CDATA[
+    1.0 Initial release, binary and vector drawables support.<br>
+    1.1 Added support for xml drawables.<br>
+    1.1.1 Fixed bugs, decrease minimal IntelliJ version.<br>
+    1.1.2 Fixed icon replacement with another plugins. Fixed icon rendering for MacOS.<br>
+    1.1.3 Increased icons size for MacOS, fixed vector render.<br>
+    1.1.4 Fixed mipmap parsing, fixed npe.<br>
+    1.1.5 Added support for Android Studio 4.1<br>
+    1.1.6 Added support for SVG icons<br>
+    
+    ]]></change-notes><idea-version min="n/a" max="n/a" since-build="191.0"/><depends>com.intellij.modules.platform</depends><depends>org.jetbrains.android</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="10105" size="756304" date="1559035694000" updatedDate="1559035694000" url=""><name>TinyPNG</name><id>cn.deemons.tinypng.plugin</id><description><![CDATA[
+    <h1>TinyPNG</h1>
+      <br>
+      <p>
+      <b><a href="https://github.com/Deemonser/TinyPngPlugin">GitHub</a></b>
+      </p>
+      <p>
+      <b><a href="https://github.com/Deemonser/TinyPngPlugin">https://github.com/Deemonser/TinyPngPlugin</a></b>
+      </p>
+      <br>
+      <p><b>A plugin for compression picture by TinyPNG API.</b></p>
+      <br>
+      <p><b>No API Key now, no free use</b></p>
+      <br>
+      <p><b>利用 TinyPNG 的 API ，开发的图片压缩工具。</b></p>
+      <p><b>现在无需 API Key，免费无限制使用</b></p>
+      <p><b>如果有问题，欢迎大家到 GitHub 上留言。</b></p>
+      <br>
+      <p><b>Use： Tools --&gt; TinyPNG </b></p>
+      <br>
+      <img src="https://raw.githubusercontent.com/Deemonser/TinyPngPlugin/master/img/Snipaste_2019-05-28_16-17-55.png" alt="Use">
+      <p><b>更多详细信息，请查看 GitHub</b> <a href="https://github.com/Deemonser/TinyPngPlugin">https://github.com/Deemonser/TinyPngPlugin</a></p>
+
+    
+  ]]></description><version>2.3</version><vendor email="deemonsch@gmail.com" url="https://deemons.cn">Deemons</vendor><rating>3.1</rating><change-notes><![CDATA[
+      <ul>
+        <li>v2.3 fix timeOut</li>
+        <li>v2.0 去除 API Key，免费无限制使用</li>
+        <li>v1.6 fix bug</li>
+        <li>v1.5 fix bug</li>
+        <li>v1.4 edit doc</li>
+        <li>v1.3 fix some bug</li>
+        <li>v1.2 add info</li>
+        <li>v1.1 fix bug</li>
+        <li>v1.0 init</li>
+      </ul>
+
+    
+  ]]></change-notes><idea-version min="n/a" max="n/a" since-build="173.0"/><depends>com.intellij.modules.lang</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="2159" size="1553547" date="1554868626000" updatedDate="1554868626000" url=""><name>autoTinyPic</name><id>com.hhh.plugin.auto.tinypic</id><description><![CDATA[
+      Automatically add png or jpg images to the project to the https://tinypng.com/ for compression.
+    ]]></description><version>1.5</version><vendor email="haihuahuang2013@163.com" url="https://github.com/3HJack">OnePiece</vendor><rating>00</rating><change-notes><![CDATA[
+    1. Automatically monitor the images added to the project and compress.<br>
+
+    2. Manually select images for compression.<br>
+
+    3. Pop-up prompt when the image is still larger than 10KB after compression.
+    
+  ]]></change-notes><idea-version min="n/a" max="n/a" since-build="173.0"/><depends>com.intellij.modules.lang</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="12736" size="1732149" date="1629551618000" updatedDate="1629551618000" url=""><name>Image Diff</name><id>de.ehmkah.projects.imgdiff</id><description><![CDATA[This plugin shows the diff of two images in the diff view.<br>
+     I am happy if you report issues, I am going to fix them.]]></description><version>1.11.0</version><vendor email="michael.krausse@directbox.com" url="http://www.m-krausse.de">m-krausse.de</vendor><rating>4.8</rating><change-notes><![CDATA[ 
+<ul>
+    <li>1.11.0
+     <ul>
+       <li><a href="https://github.com/ehmkah/imgdiff/issues/69">Bugfix - plugin works under Intellij 2021.2</a></li>
+    </ul>
+    </li><li>
+    </li><li>1.10.0
+     <ul>
+       <li><a href="https://github.com/ehmkah/imgdiff/issues/66">bugfix - plugin works under Intellij 2021.1</a></li>
+       <li>internal: upgrading dependencies</li>
+       <li>internal: moving CI from travis to github-actions</li>
+    </ul>
+    </li><li>
+    </li><li>1.9.0
+     <ul>
+       <li><a href="https://github.com/ehmkah/imgdiff/issues/60">60</a>Spot differences easier with blinking diff. Experimental feature, feedback welcome if
+       it works strange for your work. Thanks to <a href="https://github.com/grigala">George Grigalashvili</a> for helping to build it. </li>
+       <li>internal: update gradle and dependencies </li>
+    </ul>
+    </li><li>1.8.0
+     <ul>
+       <li>Plugin build with java11 and needs idea version at least 202 (e.g. IntelliJ 2020.3)</li>
+       <li><a href="https://github.com/ehmkah/imgdiff/issues/56">56</a>bugfix if baseparent is null</li>
+       <li>update to intellij 2020.3 and update used gradle versions</li>
+    </ul>
+   </li>
+   <li>1.7.0
+     <ul>
+       <li><a href="https://github.com/ehmkah/imgdiff/issues/52">issue/52</a> bugfix: no crash if image can not be read
+       </li><li>internal: update dependencies</li>
+    </ul>
+   </li>
+   <li>1.6.0
+     <ul>
+       <li>internal: update dependencies</li>
+    </ul>
+   </li>
+   <li>1.5.0
+     <ul>
+       <li><a href="https://github.com/ehmkah/imgdiff/issues/26">issue/26</a>feature: Show original image in diff as background.</li> 
+       <li>internal: upgrade dependencies</li>
+    </ul>
+   </li>
+   <li>1.4.0
+   <ul>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/43">issue/43</a>bugfix: fixed compare images in directory </li>
+    <li>internal: upgrade to intellij 2020.1</li>
+    <li>internal: upgrade to gradle 6.3</li>
+    <li>internal: updating used gradle-plugins</li>
+     <li> <a href="https://github.com/ehmkah/imgdiff/issues/16">issue/16</a>internal: upgrade to junit 5.6</li>
+  </ul>
+  </li>
+    <li>1.3.0
+    <ul>
+        <li><a href="https://github.com/ehmkah/imgdiff/issues/35">issue/35</a> bugfix: jump to source works with defined-shortcut
+    </li></ul>
+    </li><li>1.2.0
+    <ul>
+        <li><a href="https://github.com/ehmkah/imgdiff/issues/33">issue/33</a> feature: removed old behavior</li>
+        <li><a href="https://github.com/ehmkah/imgdiff/issues/40">issue/40</a> bugfix: show diff image for intellij 2019.3</li>
+        <li>internal: upgrade to gradle 6.0.1</li>
+    </ul>
+    </li>  
+    <li>1.1.0
+    <ul>
+        <li><a href="https://github.com/ehmkah/imgdiff/issues/35">issue/35</a> bugfix: jump to source from imgDiff fixed</li>
+        <li>internal: upgrade to gradle 5.6.3</li>
+        <li>internal: moved last java class to kotlin</li>
+    </ul>
+    </li>  
+    <li>1.0.0
+    <ul>
+        <li><a href="https://github.com/ehmkah/imgdiff/issues/11">issue/11</a> feature: experimental show diff between two images. see <a href="https://github.com/ehmkah/imgdiff/blob/master/README.adoc">README</a></li>
+        <li>internal: upgrade to gradle 5.6.2</li>
+    </ul>
+    </li>  
+   <li>0.7.0
+   <ul>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/24">issue/24</a> (bugfix: fixed memory leak)</li>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/22">issue/22</a> (technical: upgrade used kotlin and intellij gradle-plugin)</li>
+   </ul>
+   </li> 
+   <li>0.6.0
+   <ul>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/20">issue/20</a> (bugfix: better detect equal images)</li>
+   </ul>
+   </li>
+   <li>0.5.0
+   <ul>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/17">issue/17</a> (refactoring: update gradle to 5.6)</li>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/15">issue/15</a> (feature: make it easier to identify identical images)</li>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/13">issue/13</a> (refactoring: move source code to kotlin)</li>
+    <li><a href="https://github.com/ehmkah/imgdiff/issues/6">issue/6</a> (feature: image for plugin)</li>
+   </ul>
+   </li>
+   <li>0.4.0
+    <ul>
+  <li><a href="https://github.com/ehmkah/imgdiff/issues/9">issue/9</a> (feature Short alt+F/ to open imgDiff)</li>
+  <li><a href="https://github.com/ehmkah/imgdiff/issues/8/">issue/8</a> (feature imgDiff-dialog is resizable)</li>
+    </ul>
+   </li>
+   <li>0.3.0
+    <ul>
+      <li><a href="https://github.com/ehmkah/imgdiff/issues/5">issues/5</a> (changed color-schema for diff)</li>   
+      <li><a href="https://github.com/ehmkah/imgdiff/issues/1">issue/1</a> (bugfix dont crash if size differes</li>
+    </ul>
+    </li>                       
+   <li>0.2.0 - support gradle for build; support all jetbrain products; bugfix no crash if image size differs</li>
+   <li>0.1.0 - first offical release - very bugy</li></ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="212.0"/><depends>com.intellij.modules.lang</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="1515" size="32642" date="1582296934000" updatedDate="1582296934000" url=""><name>DddTool</name><id>ddd.diagram.tool</id><description><![CDATA[
+    The tool assists developers to quickly generate domain models from code.
+  
+  ]]></description><version>1.1</version><vendor email="thor_stefan@163.com" url="">Domain-Driven Design Tools</vendor><rating>00</rating><change-notes><![CDATA[
+    
+    <h2>Version 1.0</h2>
+    <ul>
+    <li>
+    You can new new DDD stereotypes just like new class
+    </li>
+    <li>
+    Click the "DDD Graph" link ,you can get the  DDD models with three views in plantUML
+    </li>
+    </ul>
+    <h2>Version 1.1</h2>
+     <ul>
+    <li>
+     Java functionality was extracted to a separate plugin in IntelliJ IDEA
+    </li>
+    </ul>
+  
+  ]]></change-notes><idea-version min="n/a" max="n/a" since-build="192.0"/><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.platform</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="3247" size="4150" date="1599969029000" updatedDate="1599969029000" url=""><name>ASJ Dark Color Scheme</name><id>color.scheme.ASJ Dark</id><description><![CDATA[
+      Dark Theme, inspired by Honeybee theme
+    ]]></description><version>0.22</version><vendor email="ajacobs1214@gmail.com" url="https://plugins.jetbrains.com/plugin/14769-asj-dark-color-scheme/">Andrew Jacobs</vendor><rating>4.4</rating><change-notes><![CDATA[
+      changed python method call color
+    
+  ]]></change-notes><idea-version min="n/a" max="n/a" since-build="142.0"/><depends>com.intellij.modules.lang</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="701" size="781876" date="1686663764000" updatedDate="1686663764000" url=""><name>Wayfair Progress Bar</name><id>com.github.csnzoo.ja295u.wayfair-progress-bar</id><description><![CDATA[<p>A pretty Wayfair progress bar for JetBrains IDEs.</p>
+
+<p>Gone are the days of staring at a plain progress bar.</p>
+
+<p>Elevate your development environment and productivity, 
+fostering a more visually appealing and enjoyable coding experience. 
+Embracing Wayfair identity while working on your projects.</p>]]></description><version>1.0.0</version><vendor email="josimar.a.k.a.jafa@gmail.com" url="">Josimar Andrade</vendor><rating>00</rating><change-notes><![CDATA[<h3>Added</h3>
+<ul><li>Progress bar background color gradient light violet to dark violet</li><li>Icon in the progress bar a rotating Wayfair logo</li><li>Roll back and forth on bouncy progress bar</li></ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="221.0"/><depends>com.intellij.modules.platform</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="490" size="605428" date="1779506585000" updatedDate="1779506585000" url=""><name>Dev Board</name><id>us.zoom.zva.devboard.idea</id><description><![CDATA[<p>Dev Board brings a Jira-to-release workflow board into IntelliJ IDEA.</p>
+<p>It shares the same Dev Board UI and backend contract as Cursor / VS Code, while using IntelliJ-native bridges for project switching, notify flows, and host dependency checks.</p>
+<ul>
+  <li>Track Task and Story state from Jira, MR, and task-state signals</li>
+  <li>Open Jira, Tech Design, Test Case, and MR resources from one place</li>
+  <li>Generate reviewer notify drafts and persist them across hosts</li>
+  <li>Switch task workspaces safely instead of mutating the current project by accident</li>
+</ul>]]></description><version>0.2.16</version><vendor email="ryker.chen@zoom.us" url="">ZVA</vendor><rating>00</rating><change-notes><![CDATA[<ul>
+  <li>Aligned Dev Board UI with the shared Cursor / web shell</li>
+  <li>Adopted workspace + host scoped daemons with idle shutdown</li>
+  <li>Switched skill resolution to Skill Forge runtime reconciliation instead of bundled mirrors</li>
+  <li>Added explicit AI Assistant support gating and prefill diagnostics for IDEA chat handoff</li>
+  <li>Improved notify draft, task switching, and IDEA host dependency diagnostics</li>
+</ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="241.0"/><depends>com.intellij.modules.platform</depends><tags>Graphics</tags></idea-plugin><idea-plugin downloads="199" size="31440" date="1784053257000" updatedDate="1784053257000" url=""><name>AVIF Preview</name><id>com.melrose1994.avif-preview</id><description><![CDATA[Preview AVIF images in the editor: zoom (Ctrl/Cmd + mouse wheel), fit to window, 1:1,
+        checkerboard background for transparency, HiDPI-aware rendering, and auto refresh on file change.
+        Decoding depends on avifdec (libavif), ffmpeg or ImageMagick installed on your system
+        (macOS: <code>brew install libavif</code>; Windows: <code>scoop install libavif</code>;
+        Linux: <code>apt install libavif-bin</code>). Restart the IDE after installing.]]></description><version>0.1.1</version><vendor email="heyidada1994@gmail.com" url="">melrose</vendor><rating>4.4</rating><change-notes><![CDATA[<ul>
+            <li><b>0.1.1</b> — 修复 Windows 上找不到解码器：PATH 查找改用带扩展名匹配的
+                API（原来精确匹配文件名，匹配不到 avifdec.exe）；Windows 上跳过与
+                ImageMagick 同名的 system32\convert.exe；提示文案补充各系统安装方法。</li>
+            <li><b>0.1.0</b> — 首个版本：AVIF 预览；缩放 / 适应窗口 / 1:1；透明棋盘格与 HiDPI 绘制；
+                解码结果缓存、文件变更自动刷新；缺少解码器时右下角通知提示。</li>
+        </ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="243.0"/><depends>com.intellij.modules.platform</depends><tags>Graphics</tags></idea-plugin></category><ff>"Inspection"</ff><category name="Inspection"><idea-plugin downloads="7132544" size="15682022" date="1791393329000" updatedDate="1791393329000" url="https://github.com/jshiell/checkstyle-idea"><name>CheckStyle-IDEA</name><id>CheckStyle-IDEA</id><description><![CDATA[<p>
+    This plugin provides both real-time and on-demand scanning
+    of Java files with Checkstyle from within IDEA.
+</p>
+<p>
+    Please note this is not an official part of Checkstyle - they neither endorse
+    nor bear responsibility for this plugin. Please see the README for full details.
+</p>]]></description><version>26.19.1</version><vendor email="jamie@infernus.org" url="https://infernus.org/">Jamie Shiell</vendor><rating>4.2</rating><change-notes><![CDATA[<ul>
+    <li>26.19.1: Fixed: Built-in properties (basedir, project_loc, workspace_loc, config_loc, samedir) are no longer offered as editable properties; blank ones are removed when a location is next scanned, and global locations are cleaned when next saved. A non-blank value you have set for one is kept as an override (#712).</li>
+    <li>26.19.1: Fixed: Maven and Gradle import now apply the replacement for a Checkstyle version this plugin maps to a supported one (e.g. 10.21.2 becomes 10.21.3) instead of ignoring it (#705).</li>
+    <li>26.19.1: Changed: A Checkstyle version reported by a Maven dependency or Gradle toolVersion that this plugin neither supports nor replaces now shows a warning, once per project and version per session, instead of being ignored silently (#705).</li>
+    <li>26.19.1: Fixed: The &lt;localRepository&gt; override in Maven settings.xml was ignored on newer IDEs (2026.1.x and later, NoSuchMethodError) (#706).</li>
+    <li>26.19.0: Fixed: Gradle sync no longer fails on Gradle 5.x/6.x with "Unsupported class file major version 61", even with "Import settings from Gradle" disabled; the Gradle tooling classes are now only registered when the import is enabled, and work with older Gradle JVMs (#710).</li>
+    <li>26.19.0: New: Added Checkstyle 14.3.0.</li>
+    <li>26.19.0: Changed: The "Checkstyle" and "Checkstyle Downloads" settings pages are now "Checkstyle Project" and "Checkstyle Global", nested under a new "Checkstyle" parent (Settings &gt; Tools &gt; Checkstyle).</li>
+    <li>26.19.0: Fixed: Path segment duplicated in project relative locations (#708).</li>
+    <li>26.19.0: New: Added support for global configuration settings, which apply across all projects (#707). Thanks to @alexBlakeGoudemond.</li>
+    <li>26.19.0: New: The global rule location dialog now matches the per-project one — a radio-button choice of File/URL/Classpath, and a properties step that auto-discovers and lets you edit any ${property} placeholders declared in the rules file (#707).</li>
+    <li>26.18.2: Fixed: Downloading a non-bundled Checkstyle version now honours a &lt;localRepository&gt; override in the user's Maven settings.xml, instead of always caching to ~/.m2/repository (#706).</li>
+    <li>26.18.2: Fixed: The plugin could end up configured with a Checkstyle version it doesn't support — inherited from maven-checkstyle-plugin's own default, from an explicit Maven dependency override, or from a stale/hand-edited persisted setting — which always failed downloading with "No manifest entry found" and never appeared in the version dropdown. An unsupported version is now rejected at both the Maven import and the settings-load stage, falling back to the current or default version instead (#705).</li>
+    <li>26.18.1: Fixed: "Import settings from Gradle" no longer fails Gradle sync with "compiled by a more recent version of the Java Runtime" when the target project's Gradle daemon runs an older JDK (&gt;=17) than the one used to build the plugin (#704).</li>
+    <li>26.18.0: Fixed: Failures downloading a non-bundled Checkstyle version, and Maven auto-import needing one, now report the real underlying reason (e.g. the HTTP status, TLS, or DNS error) instead of a bare, contextless message (#702).</li>
+    <li>26.18.0: Fixed: Third-party Checkstyle check JARs (thirdPartyClasspath) are no longer loaded in untrusted projects, closing a remote code execution vector where a malicious project's .idea/checkstyle-idea.xml could point at an attacker-controlled JAR. Third-party checks — and any rules file resolved via the third-party classpath rather than a plain file — activate automatically once the project is trusted.</li>
+    <li>26.18.0: New: Added a "Import settings from Gradle" opt-in, which reads a Gradle project's checkstyle {} configuration (or, if unconfigured, a raw task checkstyle(type: Checkstyle) such as AGP's) during sync and imports its configFile, configProperties, and toolVersion — the Gradle counterpart to the existing Maven import (#439).</li>
+    <li>26.17.0: New: Added Checkstyle 14.1.0.</li>
+    <li>26.17.0: Fixed: A rules file's XML entity resolution (#350) no longer allows an absolute file: entity reference to read arbitrary local files; resolution is now confined to the rules file's own directory.</li>
+    <li>26.17.0: New: Third-party check JARs can now be added by URL as well as by local file; the plugin downloads and caches the JAR, and re-downloads only when the entry is explicitly edited (#586).</li>
+    <li>26.17.0: Fixed: ConfigurationListener callbacks (e.g. the tool window's configuration override dropdown) are now always dispatched on the EDT, fixing a potential threading violation when the configuration changes from a background thread — Maven project sync or the Detect Checkstyle Configuration File action (#700).</li>
+    <li>26.17.0: New: Added a Detect Checkstyle Configuration File action, which scans config/checkstyle/checkstyle.xml, checkstyle.xml, and etc/checkstyle.xml for a conventional configuration file and adds or removes it accordingly (#618).</li>
+    <li>26.17.0: New: Built-in Checkstyle configurations (Sun Checks, Google Checks) can now be added more than once, each with its own description, scan scope, and properties (#529).</li>
+    <li>26.16.0: New: Added an Export button to the configuration locations table, to write a location's resolved rules XML to a file (#410).</li>
+    <li>26.16.0: Fixed: Importing a rules file whose `CustomImportOrder` uses `SAME_PACKAGE` now shows a warning that the group has no IntelliJ equivalent and was skipped, instead of silently dropping it (#377).</li>
+    <li>26.16.0: New: When a Maven mirror is auto-detected from settings.xml, its matching server username and password (decrypted, if encrypted) are now used automatically for the download (#698).</li>
+    <li>26.16.0: New: The artefact download mirror override now supports a username and password, sent as HTTP Basic authentication, for authenticated repositories such as a corporate Artifactory or Nexus (#698).</li>
+    <li>26.16.0: Fixed: Non-bundled Checkstyle version downloads no longer fail with NoSuchMethodError when resolving a Maven settings.xml mirror (#698).</li>
+    <li>26.16.0: Fixed: Hot-reloading enabled again.</li>
+    <li>26.16.0: New: Now built against IDEA 2025.1.7.2 (was 2024.3.7). IDEA 2024.3 and earlier are no longer supported.</li>
+    <li>26.15.0: New: Added Checkstyle 13.11.0, 14.0.0.</li>
+    <li>26.15.0: New: The option to scan modified files before a commit is now available in the Checkstyle settings, and in Settings &gt; Version Control &gt; Commit (#541).</li>
+    <li>26.15.0: New: Properties may now reference the Eclipse-CS variables, so a single property can resolve to a different value in each module, e.g. a baseDir property set to ${basedir} (#231).</li>
+    <li>26.15.0: Fixed: basedir now resolves to the Gradle subproject or Maven module directory, rather than to a source set content root or the project directory (#231).</li>
+    <li>26.14.0: New: Added Checkstyle 13.9.0, 13.10.0</li>
+    <li>26.14.0: New: Added a Refresh Results action, which rescans the selected results - or all results, if none are selected - and merges the outcome into the existing results (#1).</li>
+    <li>26.14.0: New: Added actions to check the selected or all search results (#2).</li>
+    <li>26.13.0: New: Added Checkstyle 13.8.0.</li>
+    <li>26.12.0: New: Added Checkstyle 13.7.0.</li>
+    <li>26.12.0: New: Non-bundled Checkstyle versions can now be downloaded via a Maven settings.xml mirror or a configurable IDE-wide override, for use behind firewalls where Maven Central is unreachable (#698).</li>
+    <li>26.12.0: Fixed: Improved import ordering (#623).</li>
+    <li>26.12.0: Fixed: Improved chained method call formatting (#664).</li>
+    <li>26.11.1: Fixed: Improved flow for projects with a stored version that isn't bundled (#697).</li>
+    <li>26.11.0: New: Added Checkstyle 13.6.0.</li>
+    <li>26.11.0: New: Added option to always use latest supported version of Checkstyle (#680).</li>
+    <li><em>For older changes please see the changelog.</em></li>
+</ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="251.0"/><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><depends>com.intellij.modules.vcs</depends><depends>com.intellij.modules.xml</depends><depends>intellij.platform.vcs.impl</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="26109" size="5369957" date="1617684162000" updatedDate="1617684162000" url=""><name>CodeNarc</name><id>CodeNarc</id><description><![CDATA[<b>CodeNarc</b> analyzes Groovy code for defects, bad practices, inconsistencies, style issues and more.
+A flexible framework for rules, rulesets and custom rules means it's easy to configure CodeNarc to
+fit into your project. Build tool, framework support, and report generation are all enterprise ready.]]></description><version>4.4.0</version><vendor email="cedric.champeau@gmail.com" url="">Slava Dobromyslov, Vladimir Orany, originally Cédric Champeau and Daniel Demus</vendor><rating>4.6</rating><change-notes><![CDATA[<p>Version 4.4.0
+</p><ul>
+    <li>Made plugin working in the newer versions of IntelliJ</li>
+</ul>
+<b>Version 4.3.1</b>
+<ul>
+    <li>Fix some warnings and a deprecation reported by jetbrains verifier</li>
+</ul>
+<b>Version 4.3.0</b>
+<ul>
+    <li>Merge the CodeNarc-Updated plugin back into the CodeNarc and force replacement</li>
+    <li>Collapse the configuration in Inspections to one node with subnodes for each ruleset</li>
+    <li>Squash another null reference exception</li>
+</ul>
+<b>Version 4.2.1</b>
+<ul>
+<li>Improve the texts shown on the inspections configuration panels</li>
+<li>Link to the rule-description at the codenarc website from the inspections configuration panel</li>
+</ul>
+<b>Version 4.2.0</b>
+<ul>
+<li>New CodeNarc, new plugin.CodeNarc v1.4</li>
+</ul>
+<b>Version 4.1.2</b>
+<ul>
+<li>Fix more range out of bounds exceptions</li>
+</ul>
+<b>Version 4.1.1</b>
+<ul>
+<li>Respect @SurpressWarnings</li>
+<li>Prevent some index out of bounds exceptions</li>
+</ul>
+<b>Version 4.1.0</b>
+<ul>
+<li>Expose the codenarc rule configuration in the IDEA inspection settings dialog</li>
+<li>Improve the ranges that are highlighted</li>
+</ul>
+<b>Version 4.0.0</b>
+<ul>
+<li>Updating to use the latest CodeNarc - 1.3</li>
+<li>Additionally the lists of inspections is extracted directly from the embedded codenarc jar</li>
+<li>All original code is from Cédric Champeau and Sean LeBlanc</li>
+</ul>
+<b>Version 3.1</b>
+<ul>
+<li>Updating to work in newer IntelliJ version(s) (Sean LeBlanc) and using latest CodeNarc - 0.27.0</li>
+<li>All original code is from Cédric Champeau</li>
+</ul>
+<b>Version 0.1.17</b>
+<ul>
+<li>Upgrade to CodeNarc 0.17</li>
+<li>Upgrade to GMetricts 0.6</li>
+<li>Works with Intellij 11/12</li>
+</ul>
+<b>Version 0.1.16.1</b>
+<ul>
+<li>Upgrade to CodeNarc 0.16.1</li>
+</ul>
+<b>Version 0.1.14.1</b>
+<ul>
+<li>Upgrade to CodeNarc 0.14</li>
+<li>Inspections are now grouped by ruleset</li>
+</ul>
+<b>Version 0.1.14</b>
+<ul>
+<li>Fixed NPE on empty files or newly created files</li>
+<li>Fixed NPE when a CodeNarc rule doesn't set a line number</li>
+</ul>
+<b>Version 0.1.13</b>
+<ul>
+<li>Upgrade to CodeNarc 0.13</li>
+</ul>
+<b>Version 0.1.1</b>
+<ul>
+<li>Performance improvements</li>
+<li>Fixed inspections not shown if an editor wasn't open on file</li>
+</ul>
+<b>Version 0.1</b>
+<ul>
+<li>Initial release</li>
+<li>Integrates CodeNarc 0.12</li>
+</ul>
+]]></change-notes><idea-version min="n/a" max="n/a" since-build="192.4147"/><depends>com.intellij.modules.java</depends><depends>org.intellij.groovy</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="4734" size="20319" date="1580943996000" updatedDate="1580943996000" url="https://github.com/stokito/IdeaSingletonInspection"><name>Singleton Inspection</name><id>SingletonInspection</id><description><![CDATA[
+    
+        <p>This inspection reports about (probably) inappropriate use of the <a href="https://en.wikipedia.org/wiki/Singleton_pattern">Singleton pattern</a>.</p>
+        <p>Just write <code>getInstance()</code> method, and the inspection will check this class like a Singleton.</p>
+        <p>A Singleton class should be checked for next errors:
+        </p><ul>
+        <li>The class should be final.</li>
+        <li>The class should have private constructor.</li>
+        <li>The <code>getInstance()</code> method must be public and static and return instance of its class.</li>
+        </ul>
+        <p></p>
+    
+    ]]></description><version>1.4</version><vendor email="stokito@gmail.com" url="https://stokito.com/">Sergey Ponomarev</vendor><rating>00</rating><change-notes><![CDATA[]]></change-notes><idea-version min="n/a" max="n/a" since-build="173.0"/><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="67048" size="16175" date="1634387997000" updatedDate="1634387997000" url=""><name>Zero Width Characters locator</name><id>com.ultrahob.zerolength.plugin</id><description><![CDATA[Inspired by <a href="https://stackoverflow.com/q/9868796/579828">this question</a> on Stack Overflow - this plugin adds an inspection that prevents
+        some hard to find bugs related to invisible zero width characters in source code and resources.
+      Usage - make sure that the "Zero width unicode character" inspection is enabled.]]></description><version>0.95</version><vendor email="victorrosenberg@gmail.com" url="https://github.com/harley84/ZeroLengthRadar">Victor Rosenberg</vendor><rating>4.9</rating><change-notes><![CDATA[Version 0.95 - Updating the avoid deprecated APIs<br>
+      Migrating the build to use Gradle]]></change-notes><idea-version min="n/a" max="n/a" since-build="212.0"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1354" size="12512" date="1462030164000" updatedDate="1462030164000" url=""><name>HungarianInspection</name><id>com.kogitune</id><description><![CDATA[This plugin provides hungarian notation inspection .]]></description><version>1.0.2</version><vendor email="takam.dev@gmail.com" url="">takahirom</vendor><rating>4.4</rating><change-notes><![CDATA[1.0.2 Android Studio 2.0 Support(Experimental) 1.0.1 first release
+<br>]]></change-notes><idea-version min="n/a" max="n/a" since-build="131.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="39801" size="48062" date="1643596118000" updatedDate="1643596118000" url=""><name>Hibernate Inspections</name><id>marcglasberg.HibernateInspectionsPlugin</id><description><![CDATA[<p>
+Finds Hibernate bugs that fail silently, and shows them as warnings in your code.
+</p>
+
+<p>
+In some cases Hibernate doesn't work correctly, but doesn't show any error either.
+For example, a field may be <code>null</code> when it shouldn't be, or some data may not be saved.
+Bugs like these are hard to find. This plugin finds some of these cases while you type, and tells you how to fix them.
+</p>
+
+<p>It adds these inspections, under <b>Settings &gt; Editor &gt; Inspections &gt; Hibernate inspections</b>:</p>
+
+<ul>
+    <li><b>Persisted class is final</b>: an entity class declared as <code>final</code>.</li>
+    <li><b>Final method of a persisted class uses direct field access</b>: a <code>final</code> method that reads or writes a field of an entity.</li>
+    <li><b>Embeddable subclasses embeddable</b>: an <code>@Embeddable</code> class that extends another <code>@Embeddable</code> class (only a problem before Hibernate 6.6).</li>
+</ul>
+
+<p>
+Works with <code>jakarta.persistence</code> (Hibernate 6 and newer) and <code>javax.persistence</code> (Hibernate 5 and older) annotations.
+Only classes that use annotations are checked, not XML mappings.
+</p>
+
+<h2>Persisted class is final</h2>
+
+<p>
+To load data only when it's needed ("lazy loading"), Hibernate creates a subclass of your entity, called a <i>proxy</i>.
+It can't create a subclass of a <code>final</code> class, so Hibernate can't load it lazily, which can make your app slower.
+</p>
+
+<p>
+<b>How to fix it:</b> remove <code>final</code> from the class (press <b>Alt+Enter</b> on the warning, and choose
+<b>Remove 'final' modifier</b>). Records are not reported.
+</p>
+
+<h2>Final method of a persisted class uses direct field access</h2>
+
+<p>
+This is almost always a bug, and it fails silently. The proxy that Hibernate creates is a subclass of your class,
+and its fields are always empty. The proxy can't override a <code>final</code> method, so when you call that method
+on a proxy, it reads the proxy's empty fields. You get <code>null</code>, <code>0</code> or <code>false</code>
+instead of the real value, and no error.
+</p>
+
+<pre>@Entity
+public class Cat {
+    private String name;
+    public final String getName() { return name; }   // Warning
+}
+</pre>
+
+<p>
+<b>How to fix it:</b> remove <code>final</code> from the method (<b>Alt+Enter</b>), or don't use fields directly in
+<code>final</code> methods. Static methods and static fields are not reported.
+</p>
+
+<p>
+A <code>final getId()</code> that reads the id from the proxy is a valid exception.
+To turn off the warning for one method, add
+<code>@SuppressWarnings("AccessingFieldFromAFinalMethodOfPersistedClass")</code> to it.
+</p>
+
+<h2>Embeddable subclasses embeddable</h2>
+
+<p>
+Before version 6.6, Hibernate doesn't support an <code>@Embeddable</code> class that extends another
+<code>@Embeddable</code> class. It saves only some of the fields, and may silently set the embedded object to
+<code>null</code> when loading. Hibernate 6.6 and newer
+<a href="https://in.relation.to/2024/07/12/embeddable-inheritance/">support it</a>, so if your project uses
+Hibernate 6.6 or newer, this warning is not shown.
+</p>
+
+<h2>More information</h2>
+
+<ul>
+    <li><a href="https://github.com/marcglasberg/HibernateInspectionsPlugin">Full documentation and source code</a></li>
+    <li><a href="https://github.com/marcglasberg/HibernateInspectionsPlugin/issues">Report a bug or suggest a new inspection</a></li>
+</ul>
+
+<p>
+Created by <b>Marcelo Glasberg</b>:
+<a href="https://glasberg.dev">glasberg.dev</a>,
+<a href="https://github.com/marcglasberg">GitHub</a>,
+<a href="https://www.linkedin.com/in/marcglasberg/">LinkedIn</a>,
+<a href="https://stackoverflow.com/users/3411681/marcg">Stack Overflow</a>.
+</p>]]></description><version>1.6</version><vendor email="marcglasberg@gmail.com" url="https://glasberg.dev">Marcelo Glasberg</vendor><rating>00</rating><change-notes><![CDATA[
+    If you wish to contribute and add more inspections,
+    this plugin is in <a href="https://github.com/marcglasberg/HibernateInspectionsPlugin/tree/master">GitHub</a>.
+    
+    ]]></change-notes><idea-version min="n/a" max="n/a" since-build="231.0"/><depends>com.intellij.java</depends><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="3582" size="19816" date="1459381208000" updatedDate="1459381208000" url=""><name>Robo Hexar</name><id>com.smilingrob.plugin.robohexar</id><description><![CDATA[I am the grammar robot. I have been activated. Missing punctuation and grammar will be punished.]]></description><version>1.11.2</version><vendor email="smilingrob@gmail.com" url="">Robert Wallis</vendor><rating>00</rating><change-notes><![CDATA[<li>1.11.2 - Lowered the severity of warnings, and made RoboHexar more human.</li> 
+<li>1.11.1 - No &quot;Java-Doc&quot; warnings on constructors. Test updates.</li> 
+<li>1.10 - Fix warning filter for testSomething() methods that are in test.</li> 
+<li>1.09 - No longer adding &quot;Java-Doc&quot; warnings to @Test methods.</li> 
+<li>1.08 - Warnings not errors.</li> 
+<li>1.07 - No longer adding &quot;Java-Doc&quot; warnings to getters and setters.</li> 
+<li>1.06 - No longer adding &quot;Java-Doc&quot; warnings methods with @Override.</li> 
+<li>1.05 - Added &quot;Java-Doc&quot; matcher.</li> 
+<li>1.04 - Fixed &quot;Capitalize&quot; error on @ params</li>]]></change-notes><idea-version min="n/a" max="n/a" since-build="131.0"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="64951" size="29953" date="1735905854000" updatedDate="1735905854000" url=""><name>cppcheck</name><id>com.github.johnthagen.cppcheck</id><description><![CDATA[
+      A plugin for JetBrains IDEs to provide inspections for C/C++ files utilizing the static analyzer Cppcheck.<br><br>
+
+      <b>Features:</b><br>
+      <ul>
+        <li>Runs Cppcheck on the fly while you write code</li>
+        <li>Highlights lines and displays Cppcheck error messages</li>
+        <li>Supports passing options to Cppcheck</li>
+      </ul>
+      <br>
+
+      <b>Usage:</b><br>
+        Please refer to <a href="https://github.com/johnthagen/clion-cppcheck#installation">Installation</a>.<br>
+
+      <b>Known issues:</b><br>
+        Please refer to <a href="https://github.com/johnthagen/clion-cppcheck#known-issueslimitations">Known Issues</a>.<br>
+    ]]></description><version>1.6.6</version><vendor email="johnthagen@gmail.com" url="http://github.com/johnthagen">johnthagen</vendor><rating>3.5</rating><change-notes><![CDATA[
+    - Fixed `no location` error notifications for `checkersReport` when `information` is enabled.
+    
+  ]]></change-notes><idea-version min="n/a" max="n/a" since-build="201.0"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="8411" size="17591468" date="1530032121000" updatedDate="1530032121000" url=""><name>RedPen Plugin</name><id>cc.redpen.intellij</id><description><![CDATA[
+      <p><a href="http://redpen.cc/" rel="nofollow">RedPen</a> is a proofreading tool to help writers or programmers who write technical documents or manuals that need to adhere to a writing standard.</p>
+      <p>The plugin validates text files with RedPen by adding a 'RedPen' inspection, which is enabled by default after installation.</p>
+      <p>Some errors can be fixed via quick fixes (Alt + Enter)</p>
+      <p>Language and variant are autodetected per file, however you can manually override them in IDEA status bar.</p>
+      <p>RedPen settings can be configured and imported/exported using native RedPen config format. All settings are stored per project.</p>
+      <p>Custom RedPen dictionaries can be put to <i>.idea/redpen</i> directory and JavaScriptValidator scripts can be put to <i>.idea/redpen/js</i>.</p>
+
+      <p>The following file types are supported (provided you have necessary plugins installed):
+      </p><ul>
+        <li>Plain text</li>
+        <li>Properties</li>
+        <li>Markdown</li>
+        <li>AsciiDoc</li>
+        <li>Re:VIEW</li>
+        <li>LaTeX</li>
+        <li>reStructuredText</li>
+      </ul>
+
+      <p>Please report any issues on <a href="https://github.com/redpen-cc/redpen-intellij-plugin/issues" rel="nofollow">GitHub</a>.</p>
+    ]]></description><version>1.8.2</version><vendor email="" url="http://redpen.cc">RedPen</vendor><rating>00</rating><change-notes><![CDATA[Try adding version number in the plugin zip file]]></change-notes><idea-version min="n/a" max="n/a" since-build="143.2281"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="36902" size="11712" date="1465648549000" updatedDate="1465648549000" url=""><name>HTML Entity</name><id>HtmlEntity</id><description><![CDATA[Reports any occurrences of illegal HTML characters and provides
+        a quick fix to replace them by their equivalent HTML entity,
+        e.g. replaces '©' with '&amp;copy;'.]]></description><version>1.1</version><vendor email="martin@fuhrer.com" url="https://www.fuhrer.com">Fuhrer Engineering, Inc.</vendor><rating>4.1</rating><change-notes><![CDATA[]]></change-notes><idea-version min="n/a" max="n/a" since-build="145.0"/><depends>com.intellij.modules.xml</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="5127" size="48391" date="1513252911000" updatedDate="1513252911000" url=""><name>nullability-annotations-inspection</name><id>com.stylismo.nullability-annotations-inspection</id><description><![CDATA[nullability-annotations-inspections 
+<br> 
+<p> Reports fields, parameters and return values of methods which do not have a nullability annotation, like <b>@NotNull</b> or <b>@Nullable</b>.<sup><a rel="nofollow">[1]</a></sup> </p> 
+<br> 
+<p> Quick fixes are presented to add one of the annotations to the elements with a problem. </p> 
+<br> 
+<p> When your project uses 'default' annotations like <b>@ParamsAreNonnulByDefault</b><sup><a rel="nofollow">[1]</a></sup> by means of JSR305' <span>javax.annotation.meta.TypeQualifierDefault</span>, a quick fix will be presented to apply the annotation to the current package by adding the annotation to the <span>package-info.java</span>. If a <span>package-info.java</span> doesn't exist yet it will be created automatically. </p> 
+<br> 
+<p> Only annotations registered with IntelliJ will be suggested in the quick fixes. Go to <span>Preferences | Build | Compiler | Configure annotations ...</span> to register your own. </p> 
+<br> 
+<br> 
+<p> [1]: Any nullability annotation can be used, like JSR-305, JetBrains' or your own as long as you configure them in IDEA. </p>]]></description><version>0.0.10</version><vendor email="j.e.schonewille@gmail.com" url="http://github.com/stylismo/nullability-annotations-inspection">stylismo</vendor><rating>4.4</rating><change-notes><![CDATA[<a href="https://github.com/stylismo/nullability-annotations-inspection/releases/tag/0.0.10" rel="nofollow">Changes in 0.0.10</a> (2017-09-12) 
+<br> 
+<br> 
+<ul> 
+ <li> <a href="https://github.com/stylismo/nullability-annotations-inspection/issues/11" rel="nofollow">[#11]</a> Support nullability annotations on type-parameter-typed declarations </li> 
+</ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="162.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1913" size="43113" date="1490967702000" updatedDate="1490967702000" url=""><name>equals() and hashCode() reloaded</name><id>net.omikron.equalsandhashcodereloaded</id><description><![CDATA[Contains inspections: "Field not used in 'equals()/hashCode()' method": Will check if equals() and hashCode() implementations cover all class fields.]]></description><version>1.0</version><vendor email="wirch.eduard@gmail.com" url="http://www.omikron.net">Omikron Data Quality GmbH</vendor><rating>00</rating><change-notes><![CDATA[]]></change-notes><idea-version min="n/a" max="n/a" since-build="145.0"/><depends>com.intellij.modules.java</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="2696" size="15047" date="1787766858000" updatedDate="1787766858000" url=""><name>Find duplicates inspection</name><id>com.example.intellijidea.plugins.findduplicates</id><description><![CDATA[Inspection to find duplicated Java classes with the same fully qualified name in the
+    project classpath. For each duplicate, the plugin provides a diff quick-fix
+    and, when the local file is writable, a quick-fix to remove it.
+    <p>
+    Requires IntelliJ IDEA 2024.3 or later.
+    </p><p>
+    File issues or fork the project at <a href="https://github.com/markiewb/idea-find-duplicate-class-inspection-plugin">Github</a></p>]]></description><version>1.3.1</version><vendor email="benno.markiewicz@googlemail.com" url="">markiewb</vendor><rating>4.4</rating><change-notes><![CDATA[1.3.1:
+<ul>
+  <li>Removed the upper IntelliJ Platform compatibility limit.</li>
+</ul>
+
+1.3.0:
+<ul>
+  <li>Modernized inspection registration using the IntelliJ Platform local inspection API. No more deprecated API usage.</li>
+  <li>Added tests.</li>
+  <li>Raised the minimum supported platform build to 243.</li>
+</ul>
+
+Previous:
+1.2.1: Fixed compatibility warnings from the Plugin Portal.
+1.2: Some renames.
+1.1: Initial release.]]></change-notes><idea-version min="n/a" max="n/a" since-build="243.0"/><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1046" size="10365" date="1501977828000" updatedDate="1501977828000" url=""><name>MiniPlugin</name><id>me.minidigger.miniplugin</id><description><![CDATA[Small Plugin that makes my life easier, most notably includes an inspection to find missing nullability annotations]]></description><version>1.0</version><vendor email="admin@benndorf.dev" url="https://benndorf.dev">MiniDigger</vendor><rating>00</rating><change-notes><![CDATA[No changes yet]]></change-notes><idea-version min="n/a" max="n/a" since-build="145.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1886" size="1858310" date="1683225520000" updatedDate="1683225520000" url=""><name>Remove Recursion Inspection</name><id>com.remove.recursion.inspection</id><description><![CDATA[This plugin adds a complex inspection which detects and reports recursive calls which may exhaust stack space.
+      Methods which make recursive calls can be replaced with methods that don't make recursive calls, by simulating
+      the call stack in the user program code. The initial method code is replaced with a while statement
+      containing a switch statement that jumps between basic blocks of code in the original method.]]></description><version>0.3.0</version><vendor email="andreisilviudragnea@gmail.com" url="">Andrei Silviu Dragnea</vendor><rating>4.6</rating><change-notes><![CDATA[Initial release.]]></change-notes><idea-version min="n/a" max="n/a" since-build="231.0"/><depends>com.intellij.modules.java</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="2211" size="7290" date="1524989835000" updatedDate="1524989835000" url=""><name>Clean Code Inspections</name><id>me.maiyuan.cleancode</id><description><![CDATA[A few clean code inspections.]]></description><version>1.0</version><vendor email="4registration@gmail.com" url="http://www.maiyuan.me">Yuan Inc.</vendor><rating>00</rating><change-notes><![CDATA[]]></change-notes><idea-version min="n/a" max="n/a" since-build="145.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="44953" size="38999" date="1753277625000" updatedDate="1753277625000" url="https://github.com/binxio/cfn-lint-plugin"><name>cfn-lint</name><id>io.binx.cfnlint.plugin</id><description><![CDATA[Analyze CloudFormation templates with cfn-lint. Templates must include AWSTemplateFormatVersion]]></description><version>0.2.21</version><vendor email="mvanholsteijn@xebia.com" url="https://xebia.com">binx.io</vendor><rating>3.2</rating><change-notes><![CDATA[<p>0.2.1 support for cfn-lint 1.20 by Philippe Jandot</p>
+       <p>0.2.0 2025.* support by Philippe Jandot</p>
+       <p>0.1.28 2024.* support by Philippe Jandot</p>
+       <p>0.1.27 2023.* support, improve highlights, refactor and remove deprecated code to pass JetBrains plugin validation by Philippe Jandot</p>
+       <p>0.1.26 2023.1 support, handle informational lints, fix partial highlights, removed some deprecated usages by Philippe Jandot</p>
+       <p>0.1.25 fixed IntelliJ 2022.3 support by Andreas Franz</p>
+       <p>0.1.24 fixed IntelliJ 2022.2 support by Philippe Jandot</p>
+       <p>0.1.23 fixed IntelliJ 2022.1 support by Michael Brewer</p>
+       <p>0.1.22 fixed IntelliJ 2021.3 support by Philippe Jandot</p>
+       <p>0.1.21 fixed IntelliJ 2021.2 support by Michael Brewer</p>
+       <p>0.1.20 fixed IntelliJ 2021.1 support by Philippe Jandot</p>
+       <p>0.1.19 support IntelliJ 2021.1</p>
+       <p>0.1.18 support IntelliJ 2020.2.4</p>
+       <p>0.1.17 support IntelliJ 2020.3</p>
+       <p>0.1.16 support IntelliJ 2020.2.2</p>
+       <p>0.1.15 support IntelliJ 2020.2</p>
+       <p>0.1.14 support IntelliJ 2020.1.4</p>
+       <p>0.1.13 support IntelliJ 2020.1.3</p>
+       <p>0.1.12 support IntelliJ 2020.1.2</p>
+       <p>0.1.11 support IntelliJ 2020.1</p>
+       <p>0.1.10 support IntelliJ 2019.3.4</p>
+       <p>0.1.9 support IntelliJ 2019.3.3</p>
+       <p>0.1.8 support IntelliJ 2019.3</p>
+       <p>0.1.7 support IntelliJ 2019.2</p>
+       <p>0.1.6 fix Broken pipe errors by Philippe Jandot</p>
+       <p>0.1.5 official build for 2019.1</p>
+       <p>0.1.3 process all json and yaml files with "AWSTemplateFormatVersion" in it</p>
+       <p>0.1.2 official build for 2018.2</p>
+       <p>0.1.1 updated to support from build 181 and upwards</p>
+       <p>0.1.0 First experimental version based upon <a href="https://github.com/pwielgolaski/shellcheck-plugin">shellcheck</a></p>]]></change-notes><idea-version min="n/a" max="n/a" since-build="251.0"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="2217" size="12273" date="1534447841000" updatedDate="1534447841000" url=""><name>Search string constants</name><id>search-constant-strings</id><description><![CDATA[
+      The purpose of this plugin is to search for string literals in your code and replace them with existing constants from your code, SDK or libraries.
+      It does so via a new inspection. For example: You create a REST service and filter http requests based on Content-type header.
+      It's always better to use a constant for things like header names and values. And most probably you already have it somewhere in your http libraries.
+      But which class, how to find them? Right, using this plugin and its inspection.
+    ]]></description><version>0.1.1</version><vendor email="serg.bloim@gmail.com" url="https://github.com/serg-bloim/idea-rebase-guru">Serhii Bilonozhko</vendor><rating>4.3</rating><change-notes><![CDATA[
+      Fixed cache initialization error
+    
+  ]]></change-notes><idea-version min="n/a" max="n/a" since-build="173.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="2142" size="69342" date="1536855206000" updatedDate="1536855206000" url=""><name>Inspection Compare Plugin</name><id>Inspection.Compare.Plugin</id><description><![CDATA[
+      <em>Compare your offline inspection results</em>
+    ]]></description><version>1.02</version><vendor email="xelexerx@gmail.com" url="">Alexey Kozyakov</vendor><rating>4.6</rating><change-notes><![CDATA[compatibility with other IDEs, preserving problems order in XML files]]></change-notes><idea-version min="n/a" max="n/a" since-build="173.0"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="433139" size="2179896" date="1728286654000" updatedDate="1728286654000" url=""><name>Pylint</name><id>com.leinardi.pycharm.pylint</id><description><![CDATA[<p>This plugin provides both real-time and on-demand scanning of Python files with Pylint from within the PyCharm IDE.</p>]]></description><version>0.16.4</version><vendor email="leinardi@gmail.com" url="">Roberto Leinardi</vendor><rating>3.6</rating><change-notes><![CDATA[<ul>
+<li>Defined action update thread for actions for ScrollToSource</li>
+</ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="233.15325"/><depends>com.intellij.modules.python</depends><depends>PythonCore</depends><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1808" size="8867" date="1545930904000" updatedDate="1545930904000" url=""><name>Flares - Kotlin Inspections</name><id>com.magicbytes.flares</id><description><![CDATA[
+    This Plugin offers multiple inspections for Kotlin. It includes inspection as:
+    <li>Sorting Enum cases alphabetically </li>
+    ]]></description><version>0.1.1</version><vendor email="cebotari.alex@gmail.com" url="https://www.facebook.com/magycBytes/">MagicBytes</vendor><rating>00</rating><change-notes><![CDATA[
+      Added support for sorting enum cases alphabetically or in reverse order.]]></change-notes><idea-version min="n/a" max="n/a" since-build="162.0"/><depends>org.jetbrains.kotlin</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="51642" size="175368" date="1768737090000" updatedDate="1768737090000" url="https://meanmail.dev"><name>Python Annotations</name><id>ru.meanmail.plugin.pyannotations</id><description><![CDATA[<h2>Smart Code Inspections for Python Type Annotations</h2>
+
+<p>Simplify, modernize, and validate your Python type hints with <b>21 intelligent inspections</b> and one-click quick fixes.</p>
+
+<h3>Union &amp; Optional Simplification</h3>
+<ul>
+    <li><code>Union[int, None]</code> → <code>Optional[int]</code></li>
+    <li><code>Union[X, object]</code> → <code>object</code></li>
+    <li><code>Union[X, Any]</code> → <code>Any</code></li>
+    <li><code>Union[dict]</code> → <code>dict</code></li>
+    <li><code>Optional[Optional[X]]</code> → <code>Optional[X]</code></li>
+    <li><code>Union[int, int, str]</code> → <code>Union[int, str]</code> (remove duplicates)</li>
+    <li><code>Union[int, bool]</code> → <code>int</code> (bool is subtype of int)</li>
+    <li><code>Union[Union[A, B], C]</code> → <code>Union[A, B, C]</code> (flatten nested)</li>
+    <li>Detect invalid <code>Union[]</code></li>
+</ul>
+
+<h3>Modern Pipe Syntax (Python 3.10+)</h3>
+<ul>
+    <li><code>X | object</code> → <code>object</code></li>
+    <li><code>X | Any</code> → <code>Any</code></li>
+    <li><code>(X | Y) | Z</code> → <code>X | Y | Z</code></li>
+    <li><code>(X) | Y</code> → <code>X | Y</code></li>
+</ul>
+
+<h3>Syntax Conversion (disabled by default)</h3>
+<ul>
+    <li><b>Modernization:</b> <code>Union[X, Y]</code> → <code>X | Y</code>, <code>Optional[X]</code> → <code>X | None</code></li>
+    <li><b>Backward compatibility:</b> <code>X | Y</code> → <code>Union[X, Y]</code></li>
+    <li><b>PEP 585:</b> <code>List[int]</code> → <code>list[int]</code></li>
+    <li><b>PEP 695:</b> <code>TypeAlias</code> → <code>type</code> statement</li>
+</ul>
+
+<h3>Advanced Inspections (disabled by default)</h3>
+<ul>
+    <li>Missing <code>Optional</code> for parameters with <code>None</code> default</li>
+    <li>Simplify <code>Callable[..., Any]</code> → <code>Callable</code></li>
+    <li>Redundant <code>Generic[T]</code> in class definitions</li>
+    <li>Unbound TypeVar (used only once)</li>
+    <li>Protocol methods without type annotations</li>
+</ul>
+
+<p><a href="https://github.com/meanmail-dev/PyAnnotations">GitHub</a> | <a href="https://github.com/meanmail-dev/PyAnnotations/issues">Report Issue</a></p>]]></description><version>2026.1</version><vendor email="plugin@meanmail.dev" url="https://meanmail.dev">meanmail.dev</vendor><rating>4.4</rating><change-notes><![CDATA[<h3>2026.1 (January 18, 2026)</h3>
+<p><b>Major update with 16 new inspections!</b></p>
+
+<h4>New: Pipe Syntax Support (Python 3.10+)</h4>
+<ul>
+    <li><code>X | object</code> → <code>object</code></li>
+    <li><code>X | Any</code> → <code>Any</code></li>
+    <li>Flatten nested pipe unions: <code>(X | Y) | Z</code> → <code>X | Y | Z</code></li>
+    <li>Remove redundant parentheses: <code>(X) | Y</code> → <code>X | Y</code></li>
+</ul>
+
+<h4>New: Syntax Conversion</h4>
+<ul>
+    <li>Convert <code>Union[X, Y]</code> → <code>X | Y</code> (modernization)</li>
+    <li>Convert <code>Optional[X]</code> → <code>X | None</code> (modernization)</li>
+    <li>Convert <code>X | Y</code> → <code>Union[X, Y]</code> (backward compatibility)</li>
+    <li>Convert <code>X | None</code> → <code>Optional[X]</code> (backward compatibility)</li>
+    <li>Convert <code>List[X]</code>, <code>Dict[K, V]</code>, etc. to built-in generics (PEP 585)</li>
+    <li>Convert <code>TypeAlias</code> to <code>type</code> statement (PEP 695)</li>
+</ul>
+
+<h4>New: Additional Union Inspections</h4>
+<ul>
+    <li>Remove duplicate types: <code>Union[int, int, str]</code> → <code>Union[int, str]</code></li>
+    <li>Remove subtypes: <code>Union[int, bool]</code> → <code>int</code></li>
+    <li>Flatten nested Unions: <code>Union[Union[A, B], C]</code> → <code>Union[A, B, C]</code></li>
+    <li>Detect invalid empty Union</li>
+</ul>
+
+<h4>New: Advanced Inspections</h4>
+<ul>
+    <li>Missing <code>Optional</code> for parameters with <code>None</code> default</li>
+    <li>Simplify <code>Callable[..., Any]</code></li>
+    <li>Redundant <code>Generic[T]</code> in class definitions</li>
+    <li>Unbound TypeVar detection</li>
+    <li>Protocol methods without annotations</li>
+</ul>
+
+<h4>Improvements</h4>
+<ul>
+    <li>Improved error handling in all quick fixes</li>
+    <li>Better logging for debugging</li>
+    <li>Package migrated to <code>dev.meanmail</code></li>
+</ul>
+
+<h3>2025.1 (August 5, 2025)</h3>
+<ul>
+    <li>Added RedundantOptionalInspection</li>
+    <li>Added AnyInUnionInspection</li>
+    <li>Updated to support IDE version 2025.1</li>
+</ul>
+
+<h3>2022.2 (December 25, 2022)</h3>
+<ul>
+    <li>Fix: deprecated constructor warning</li>
+</ul>
+
+<h3>2022.1 (October 16, 2022)</h3>
+<p>Update IDE build</p>
+
+<h3>2021.2 (July 30, 2021)</h3>
+<p>Update IDE build</p>
+
+<h3>2020.1 (April 19, 2020)</h3>
+<p>Update IDE build</p>
+
+<h3>2019.1.3 (December 04, 2019)</h3>
+<ul>
+    <li>Version for IntelliJ 2019.3.*</li>
+    <li>jvmTarget 11</li>
+</ul>
+
+<h3>2019.1.2 (July 28, 2019)</h3>
+<p>Update IDE build</p>
+
+<h3>2019.1.1 (March 29, 2019)</h3>
+<p>Update IDE build</p>
+
+<h3>0.1 (March 01, 2019)</h3>
+<p>First version</p>]]></change-notes><idea-version min="n/a" max="n/a" since-build="252.0"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="5439" size="50216856" date="1558649052000" updatedDate="1558649052000" url=""><name>PoliDroid-AS - Privacy Policy Verification</name><id>edu.utsa.cs.sefm.privacypolicyplugin</id><description><![CDATA[Detects potential Android privacy policy misalignments.]]></description><version>v1.0.3</version><vendor email="sefm.utsa@gmail.com" url="http://polidroid.org">UTSA SEFM Research Group</vendor><rating>00</rating><change-notes><![CDATA[Fixed bug that occurred when no policy violations were detected]]></change-notes><idea-version min="n/a" max="n/a" since-build="131.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="22556" size="8915631" date="1791298419000" updatedDate="1791298419000" url=""><name>PVS-Studio for Java</name><id>com.pvsstudio</id><description><![CDATA[
+        <p><a href="https://pvs-studio.com/en/pvs-studio/">PVS-Studio</a> is a static code analyzer for Enterprise (C, C++, C#, Go, and Java) and Web (JS and TS) development.
+        It works under 64-bit systems in Windows, Linux and macOS environments, and can analyze source code intended for 32-bit, 64-bit and embedded ARM platforms.</p>
+        <br>
+        <p>The analyzer supports integration with <a href="https://plugins.jetbrains.com/plugin/14480-pvs-studio-for-rider">JetBrains Rider</a>, IntelliJ IDEA, Android Studio, <a href="https://plugins.jetbrains.com/plugin/16924-pvs-studio-for-clion">JetBrains CLion</a>, and <a href="https://pvs-studio.com/en/docs/manual/6522/">Visual Studio</a> IDEs.</p>
+        <br>
+        <p><strong>To get trial license for the analyzer please follow <a href="https://pvs-studio.com/en/pvs-studio/download/">PVS-Studio Download Page</a> and fill out the form. We'll send you the trial license shorty.</strong></p>
+        <h2>PVS-Studio Java analyzer</h2>
+        <p>PVS-Studio Java analyzer supports analyzing Java projects under Windows, Linux and macOS. A full list of diagnostic rules provided by the analyzer is available <a href="https://pvs-studio.com/en/docs/warnings/">here</a>.</p>
+        <h3>PVS-Studio Java Features</h3>
+        <ul>
+            <li><strong>Online reference guide</strong> for all of the diagnostic rules, that is available locally, on our web site, and as a single .pdf file. More than 700 pages of documentation are available</li>
+            <li><strong>Automatic (incremental) analysis</strong> of individual files right after their recompilation in IDE.</li>
+            <li><strong>Intuitive interface</strong> - easy navigation along the warnings issued for the code. Everything you need is at your fingertips - warnings sorted by severity level, highlighted code fragments which require additional revision, and quick access to the documentation. PVS-Studio documentation suggests ways of how to fix the detected error.</li>
+            <li><strong>Great scalability</strong> - PVS-Studio supports multi-core and multi-processor systems with the ability to specify the number of cores to use; can be used together with Incredibuild.</li>
+            <li><strong>Baselining analysis results</strong> - suppression of "old" messages on the existing code, so that the analyzer issues 0 warnings for it. This allows to integrate static analysis easily at any point of the development lifecycle. It is especially helpful in case you need to check only newly written code fragments.</li>
+            <li><strong>Interactive filtering of the analysis results</strong> (log file) in PVS-Studio IDE/Standalone window: the issued warnings are sorted by diagnostic number, file name, the word in the text of the diagnostic, plus the ability to exclude files from the analysis by name, folder, or mask.</li>
+            <li><strong>Automatic notification of developers.</strong> The Blame Notifier tool allows you to send e-mail notifications to the developers about bugs that PVS-Studio found during a night run based on the blame information from version control system.</li>
+            <li><strong>Analysis of commits, merge and pull requests</strong> - analyzer can be configured to analyze only the modified files. This allows to quickly and automatically analyze every commit to version control system.</li>
+            <li><strong>Suppress false positives</strong> - use code markup to suppress a certain diagnostic in a particular code fragment.</li>
+            <li><strong>Analysis from command line</strong>: helps integrate PVS-Studio into nightly builds, CI/CD services.</li>
+            <li><strong>Portability of analysis results</strong> - view analysis results on different machines thanks to the use of relative paths.</li>
+            <li><strong>Static Application Security Testing (SAST)</strong> - the analyzer provides mappings for its warnings to Common Weakness Enumeration, SEI CERT Coding Standards, OWASP Top 10, and supports OWASP ASVS standard.</li>
+            <li><strong>Integration with SonarQube</strong> - an open-source platform, designed for continuous analysis and measurement of code quality.</li>
+        </ul>
+        <p>Detailed reference on using command line PVS-Studio Java analyzer is available <a href="https://pvs-studio.com/en/docs/manual/6703">here.</a></p>
+        <h2>PVS-Studio plugin for IDEA and Android Studio</h2>
+        <p>PVS-Studio plugin for IDEA and Android Studio provides a convenient graphical interface for using PVS-Studio Java analyzer to analyze Java projects from within the IDE. The plugin allows you to analyze projects and individual files, as well as work with the analyzer's warnings. Detailed description of PVS-Studio for IDEA and Android Studio plug-in is available <a href="https://pvs-studio.com/en/docs/manual/6704/">here</a>.</p>
+      ]]></description><version>8.01.110581</version><vendor email="eremeev@pvs-studio.com" url="https://pvs-studio.com/">PVS-Studio</vendor><rating>00</rating><change-notes><![CDATA[
+		<ul>
+			<li><a href="https://pvs-studio.com/en/docs/warnings/v5341/">V5341</a>. V5341. A cookie was created without enabling the 'Secure' attribute. This may lead to the exposure of sensitive data.</li>
+                        <li><a href="https://pvs-studio.com/en/docs/warnings/v5342/">V5343</a>. V5342. Potentially tainted data is stored in an object that can be used as a source of trusted data.</li>
+                        <li><a href="https://pvs-studio.com/en/docs/warnings/v5343/">V5343</a>. V5343. A cryptographically weak random number is used for sensitive data.</li>
+                </ul>
+            ]]></change-notes><idea-version min="n/a" max="n/a" since-build="222.0"/><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="5701" size="27304" date="1566386157000" updatedDate="1566386157000" url=""><name>CodeHelper</name><id>com.troyanovsky.idea.CodeHelper</id><description><![CDATA[
+	Code highlight helper for PHP/GO developers
+	]]></description><version>1.4</version><vendor email="mtroyanovsky@yandex.ru" url="">Misha Troyanovsky</vendor><rating>3.7</rating><change-notes><![CDATA[]]></change-notes><idea-version min="n/a" max="n/a" since-build="191.0"/><depends>com.intellij.modules.platform</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="2474" size="34366" date="1613665374000" updatedDate="1613665374000" url="https://github.com/stevejagodzinski/akka-log-inspection-intellij-plugin"><name>Akka Log Inspections</name><id>com.github.stevejagodzinski.akka-log-inspection-plugin</id><description><![CDATA[
+      Provides code inspections to highlight invocations to Akka's logging framework where the number of message placeholders do not match the number of arguments passed to the log method.
+    ]]></description><version>1.2.9</version><vendor email="steve.jagodzinski@gmail.com" url="https://github.com/stevejagodzinski/">Steve Jagodzinski</vendor><rating>00</rating><change-notes><![CDATA[
+        - 1.2.9: Fix IntelliJ version 2020.3+ support
+    ]]></change-notes><idea-version min="n/a" max="n/a" since-build="203.0"/><depends>com.intellij.modules.java</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="2559" size="11630887" date="1582969996000" updatedDate="1582969996000" url=""><name>aDoctor</name><id>it.unisa.plugin.adoctor</id><description><![CDATA[
+      Android Studio plugin for Android-specific energy smell detection and refactoring.
+    ]]></description><version>0.4.2</version><vendor email="e.iannone16@studenti.unisa.it" url="">Emanuele Iannone</vendor><rating>00</rating><change-notes><![CDATA[
+    Min build changed from 193 to 192 to allow usage in Android Studio 192 build (latest in AUR).
+    Update IntelliJ Platform SDK from 192 to 193.
+    For more details on changes visit https://github.com/emaiannone/aDoctor
+    
+    ]]></change-notes><idea-version min="n/a" max="n/a" since-build="192.0"/><depends>com.intellij.modules.java</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1169" size="3830" date="1576504058000" updatedDate="1576504058000" url=""><name>FixSgC</name><id>com.yxf.plugin.fix.sgc</id><description><![CDATA[
+      Used to fix the conflict with sou gou input method that it would change language when using "Ctrl + Alt + [*]" shortcut if "Ctrl" is set as the shortcut for changing language in sou gou input method.<br>
+      It is just available for Windows.<br>
+    ]]></description><version>1.0.0</version><vendor email="1083223454@qq.com" url="https://github.com/dqh147258">Freelance</vendor><rating>00</rating><change-notes><![CDATA[
+
+    
+    ]]></change-notes><idea-version min="n/a" max="n/a" since-build="173.0"/><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><depends>com.intellij.modules.vcs</depends><depends>com.intellij.modules.xdebugger</depends><depends>com.intellij.modules.xml</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1410" size="20635507" date="1581882826000" updatedDate="1581882826000" url=""><name>Comment Parser</name><id>hu.rb.commentparser-intellij</id><description><![CDATA[
+    <p>Comment Parser is a Java library that can be used to extract comments from a source code.
+    It can also be used to grouping comments together and the results can be exported to various formats.</p>
+    <br>
+    <a href="https://github.com/balintrudas/commentparser">Learn More</a>
+    <br><br>
+    <p>The following features are available:</p>
+    <ul>
+    <li>Comment parsing inside methods</li>
+    <li>Comment parsing outside methods</li>
+    <li>Comment parsing outside classes</li>
+    <li>Comment grouping with javadoc tags</li>
+    <li>Comment grouping with predefined annotations</li>
+    <li>Comment grouping with custom annotations</li>
+    <li>Inheritance between groups</li>
+    <li>Comment marking with predefined markers</li>
+    <li>Comment marking with custom markers</li>
+    <li>Comment exclusion with predefined markers</li>
+    <li>Comment exclusion with custom markers</li>
+    <li>Exporting to formats like Excel (.xlsx), Csv (.csv), Markdown (.md), AsciiDoc (.adoc)</li>
+    </ul>
+    ]]></description><version>1.0.0</version><vendor email="balintrudas@gmail.com" url="https://github.com/balintrudas">Bálint Rudas</vendor><rating>00</rating><change-notes><![CDATA[]]></change-notes><idea-version min="n/a" max="n/a" since-build="181.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="20279" size="11475004" date="1768894291000" updatedDate="1768894291000" url="https://github.com/b333vv/metricstree"><name>MetricsTree</name><id>org.b333vv.metricstree</id><description><![CDATA[
+            <p>
+               MetricsTree is an IDE extension that helps to evaluate quantitative properties of Java and Kotlin code.
+               It supports the ultimate sets of metrics at the project, package, class, and method levels.
+            </p>
+            <h3>Core metrics sets</h3>
+            <ul>
+                <li>
+                   Project level: MOOD &amp; QMOOD metrics sets, general statistics, Halstead metrics set, Maintainability Index
+                </li>
+                <li>
+                   Package level: Robert C. Martin metrics set, general statistics, Halstead metrics set
+                </li>
+                <li>
+                   Class and method levels: Chidamber-Kemerer, Lorenz-Kidd, Li-Henry and Lanza-Marinescu, Halstead, G. Ann Campbell metrics sets
+                </li>
+            </ul>
+            <h3>Features</h3>
+            <ul>
+                <li>
+                    Represents metrics calculation results in forms of trees and treemaps
+                </li>
+                <li>
+                    Builds trees with metrics for class open in the editor or for the entire project
+                </li>
+                <li>
+                    Supports controlling calculated metrics values
+                </li>
+                <li>
+                    Implements metric fitness functions at the package level (e.g. for detecting coupling and cohesion problems) and at the class level (e.g. for recognizing 'god class', 'feature envy' antipatterns)
+                </li>
+                <li>
+                    Displays various metrics properties (distributions, correlations) in charts
+                </li>
+            </ul>
+        ]]></description><version>2026.0.0</version><vendor email="b333vv@gmail.com" url="https://github.com/b333vv">b333vv</vendor><rating>4.2</rating><change-notes><![CDATA[<ul>
+            <li>2026.0.0:
+                <ul>
+                    <li>Added Kotlin support.</li>
+                </ul>
+            </li>
+            <li>2025.2.1:
+                <ul>
+                    <li>Bug fixes.</li>
+                </ul>
+            </li>
+            <li>2025.2.0:
+                <ul>
+                    <li>Modules support added.</li>
+                </ul>
+            </li>
+            <li>2025.1.4:
+                <ul>
+                    <li>The internal structure continued to be improved.</li>
+                </ul>
+            </li>
+            <li>2025.1.3:
+                <ul>
+                    <li>Improvement of internal structure.</li>
+                </ul>
+            </li>
+            <li>2025.1.2:
+                <ul>
+                    <li>Fix for IDEA 2025.1 compatibility.</li>
+                </ul>
+            </li>
+            <li>2025.1.1:
+                <ul>
+                    <li>Bug fixes.</li>
+                </ul>
+            </li>
+            <li>2025.1.0:
+                <ul>
+                    <li>Added metric fitness functions at the package and class levels.</li>
+                </ul>
+            </li>
+            <li>2024.2.0:
+                <ul>
+                    <li>Added output of metrics whose values are outside the reference intervals in the form of hints for classes directly in the editor.</li>
+                </ul>
+                <ul>
+                    <li>Improved support for current IDE versions.</li>
+                </ul>
+            </li>
+            <li>2024.1.1:
+                <ul>
+                    <li>Improved support for current IDE versions.</li>
+                </ul>
+                <ul>
+                    <li>Added metrics for cognitive complexity at the method and class levels.</li>
+                </ul>
+            </li>
+            <li>2024.1.0:
+                <ul>
+                    <li>Added lines of code metric at class level.</li>
+                </ul>
+                <ul>
+                    <li>Bug fixes.</li>
+                </ul>
+            </li>
+            <li>2023.3.0:
+                <ul>
+                    <li>Added ability to export package metrics to csv file.</li>
+                </ul>
+                <ul>
+                    <li>Added ability to export method metrics to csv file.</li>
+                </ul>
+                <ul>
+                    <li>Bug fixes.</li>
+                </ul>
+            </li>
+            <li>2023.2.4:
+                <ul>
+                    <li>NPE fixed.</li>
+                </ul>
+            </li>
+            <li>2023.2.3:
+                <ul>
+                    <li>Calculation functions are optimized.</li>
+                </ul>
+            </li>
+            <li>2023.2.2:
+                <ul>
+                    <li>The range of compatible IDE versions is extended.</li>
+                </ul>
+            </li>
+            <li>2023.2.1:
+                <ul>
+                    <li>Maintainability Index added at the package, class and method level.</li>
+                </ul>
+            </li>
+            <li>2023.2.0:
+                <ul>
+                    <li>Maintainability Index added at the project level.</li>
+                </ul>
+            </li>
+            <li>2023.1.0:
+                <ul>
+                    <li>Halstead metric set added.</li>
+                </ul>
+            </li>
+            <li>2022.1.2:
+                <ul>
+                    <li>Fixed function to calculate LOC metrics for methods.</li>
+                </ul>
+            </li>
+            <li>2022.1.1:
+                <ul>
+                    <li>Working with classes that do not belong to any package has been fixed.</li>
+                </ul>
+            </li>
+            <li>2022.1.0:
+                <ul>
+                    <li>Added functions to show the evolution of metric values at project level.</li>
+                </ul>
+            </li>
+            <li>2020.1.12:
+                <ul>
+                    <li>QMOOD quality attributes set added.</li>
+                </ul>
+            </li>
+            <li>2020.1.11:
+                <ul>
+                    <li>Fixed bug with displaying distribution of classes by metric profiles chart.</li>
+                </ul>
+            </li>
+            <li>2020.1.10:
+                <ul>
+                    <li>Fixed bug with NPE.</li>
+                </ul>
+            </li>
+            <li>2020.1.9:
+                <ul>
+                    <li>Added ability to group metrics by its sets
+                    (Chidamber-Kemerer, Robert C. Martin etc.) on project metrics tree.</li>
+                    <li>A minor bug fixed.</li>
+                </ul>
+            </li>
+            <li>2020.1.8: The following set of metrics:
+                <ul>
+                    <li>Lines Of Code</li>
+                    <li>Non-Commenting Source Statements</li>
+                    <li>Number Of Concrete Classes</li>
+                    <li>Number Of Abstract Classes</li>
+                    <li>Number Of Static Classes</li>
+                    <li>Number Of Interfaces</li>
+                </ul>
+                at both package and project levels implemented.
+            </li>
+            <li>2020.1.7:
+                <ul>
+                    <li>Added treemaps with metric values and profiles distributions, displaying classes proportionally
+                    "Non-Commenting Source Statements" metric value.</li>
+                    <li>Several charts displaying distribution and correlation of metric values and metric
+                    profiles added.</li>
+                </ul>
+            </li>
+        </ul>
+        <ul>
+            <li>2020.1.6:
+                <ul>
+                    <li>Distances from main sequence chart for package level metrics developed.</li>
+                    <li>Performance improved.</li>
+                </ul>
+            </li>
+        </ul>
+        <ul>
+            <li>2020.1.5:
+                <ul>
+                    <li>Mechanisms for identifying and searching anti-patterns was developed.</li>
+                    <li>Ability to export classes metrics (in csv format) and all levels metrics (in xml format) was added.</li>
+                    <li>Several new class and methods levels metrics added.</li>
+                </ul>
+            </li>
+        </ul>
+        <ul>
+            <li>2020.1.4 - Charts with class distributions by metrics values was added.</li>
+        </ul>
+        <ul>
+            <li>2020.1.3 - Metrics tree with class distribution by metric values was added.</li>
+        </ul>
+        <ul>
+            <li>2020.1.2 - Metrics evolution data is now embedded in the class metrics tree.</li>
+        </ul>
+        <ul>
+            <li>2020.1.1 - Class metrics values evolution tree based on 'git log' added.</li>
+        </ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="223.0"/><depends>Git4Idea</depends><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.platform</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="6332" size="9741499" date="1585651113000" updatedDate="1585651113000" url=""><name>Aladdin Logcat</name><id>com.aladdin.debugger.idea.plugin</id><description><![CDATA[adds support for logcat]]></description><version>0.0.3</version><vendor email="jiaxin.du@wuren.com" url="https://github.com/zdstly/aladdin">aladdin</vendor><rating>00</rating><change-notes><![CDATA[Screenshot at breakpoint]]></change-notes><idea-version min="n/a" max="n/a" since-build="183.0"/><depends>com.intellij.modules.platform</depends><depends>org.jetbrains.android</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="683915" size="24583536" date="1774708308000" updatedDate="1774708308000" url=""><name>Alibaba Java Coding Guidelines(XenoAmess TPM)</name><id>com.alibaba.p3c.xenoamess</id><description><![CDATA[<p><b>Alibaba Java Coding Guidelines plugin support.(XenoAmess TPM)</b></p>
+<br>
+<p><b>Third-party maintenance by XenoAmess.</b></p>
+<br>
+<p>This Third-party maintenance(TPM) here is forked from original <a href="https://github.com/alibaba/p3c">alibaba/p3c</a></p>
+<br>
+<p>Follows Apache license described in <a href="https://github.com/XenoAmess/p3c/blob/xenoamess_maintain_fork/license.txt">license</a></p>
+<br>
+<p>Sources can be found https://github.com/XenoAmess/p3c</p>
+<br>
+<p>Releases can be found at https://plugins.jetbrains.com/plugin/14109-alibaba-java-coding-guidelines-xenoamess-tpm-</p>
+<br>
+<p>This TPM aims to help maintain alibaba/p3c, fix bugs, and add improvements, as the original developer is too busy to handle them.</p>
+<br>
+<p>This TPM is NOT created, or maintained, or controlled by any alibaba employee, in other words it is not a TPM, not an official branch.</p>
+<br>
+<p>TPM maintainer XenoAmess have no knowledge with eclipse plugin development.</p>
+<br>
+<p>TPM maintainer XenoAmess suggest you only create pr for module idea-plugin and p3c-pmd, unless you really have a strong reason.</p>
+<br>]]></description><version>2.3.0</version><vendor email="xenoamess@gmail.com" url="">XenoAmess</vendor><rating>4.5</rating><change-notes><![CDATA[<ul>2.3.0
+            <li>(unstable) add config to enable/disable background analyzing</li>
+        </ul>
+        <ul>2.2.4.3x
+            <li>fix https://github.com/XenoAmess/p3c/issues/784</li>
+        </ul>
+        <ul>2.2.4.2x
+            <li>fix https://github.com/XenoAmess/p3c/issues/782 (thanks to zzqo)</li>
+        </ul>
+        <ul>2.2.4.1x
+            <li>fix https://github.com/XenoAmess/p3c/issues/778</li>
+        </ul>
+        <ul>2.2.3.0x
+            <li>Fix 2024.1 compatibility issue</li>
+            <li>Fix 2024.2 compatibility issue</li>
+            <li>upgrade gradle &amp; building jdk &amp; intellij plugin version</li>
+        </ul>
+        <ul>2.2.2.0x
+            <li>Fix 2023.2 compatibility issue</li>
+        </ul>
+        <ul>2.2.1.0x
+            <li>Fix @Override missing error</li>
+        </ul>
+        <ul>2.2.0.0x
+            <li>Fix idea 2023.1 2023.2 2023.3 compatibility issue</li>
+        </ul>
+        <ul>2.1.1.6x-SNAPSHOT
+            <li>Fix idea 2023.1-EAP compatibility issue</li>
+        </ul>
+        <ul>2.1.1.5x
+            <li>Migrate deprecated/removal idea function usages</li>
+        </ul>
+        <ul>2.1.1.4x
+            <li>Fix idea 2022.1 Ultimate compatibility issue</li>
+        </ul>
+        <ul>2.1.1.3x
+            <li>pmd upgrade to 6.44.0</li>
+            <li>fix bugs of SneakyThrowsWithoutExceptionTypeRule</li>
+            <li>add com.alibaba.p3c.pmd.config&gt;package_blacklist config. see https://github.com/XenoAmess/p3c/issues/211</li>
+        </ul>
+        <ul>2.1.1.2x
+            <li>pmd upgrade to 6.41.0</li>
+            <li>now allow use json for configuration too (p3c_config.json). see https://github.com/XenoAmess/p3c/issues/144</li>
+            <li>add addition rules mechanism</li>
+            <li>add an addition rule to detect using lombok.SneakyThrow annotation while not specify the type of exception to throw.</li>
+            <li>update deprecated pmd grammars in ServiceOrDaoClassShouldEndWithImplRule : @Image to @SimpleName</li>
+            <li>update deprecated pmd grammars in TestClassShouldEndWithTestNamingRule : to suite codes changes in AbstractJUnitRule</li>
+        </ul>
+        <ul>2.1.1.1x
+            <li>sync some minor fix in 2.1.1</li>
+            <li>pmd upgrade to 6.37.0</li>
+            <li>update deprecated grammars in PojoMustOverrideToStringRule</li>
+            <li>update deprecated pmd grammars in AvoidNewDateGetTimeRule : @ArgumentCount to @Size</li>
+            <li>update deprecated pmd grammars in BooleanPropertyShouldNotStartWithIsRule : @Image to @Name</li>
+            <li>update deprecated pmd grammars in BooleanPropertyShouldNotStartWithIsRule : @Image to @SimpleName</li>
+            <li>update missing attribute language="java" for some ruleset xml.</li>
+            <li>update deprecated pmd grammars in AvoidComplexConditionRule : @Ternary to null(@Ternary is always true in new versions of PMD)</li>
+            <li>update deprecated pmd grammars in StringConcatRule : @Image to @Operator</li>
+            <li>update deprecated pmd grammars in PojoMustOverrideToStringRule : MethodDeclarator[@ParameterCount] to @Arity</li>
+            <li>update deprecated pmd grammars in PojoMustOverrideToStringRule : MethodDeclarator[@Image] to @Name</li>
+        </ul>
+        <ul>2.1.1
+            <li>Fix idea 2021.2 Ultimate compatibility issue</li>
+        </ul>
+        <ul>2.1.0.7x
+            <li>pmd upgrade to 6.36.0</li>
+            <li>upgrade other dependencies</li>
+            <li>fix https://github.com/alibaba/p3c/issues/832</li>
+            <li>fix https://github.com/XenoAmess/p3c/issues/118</li>
+            <li>fix https://github.com/alibaba/p3c/issues/757</li>
+        </ul>
+        <ul>2.1.0.6x
+            <li>pmd upgrade to 6.33.0</li>
+            <li>upgrade other dependencies</li>
+        </ul>
+        <ul>2.1.0.5x
+            <li>bugfix about LockShouldWithTryFinallyRule will throw NPE when node.type == null</li>
+        </ul>
+        <ul>2.1.0.4x
+            <li>pmd upgrade to 6.31.0</li>
+            <li>upgrade other dependencies</li>
+        </ul>
+        <ul>2.1.0.3x
+            <li>fix bugs about wrongly think new BigDecimal(Double.toString(0.0)) illegal. See: https://github.com/alibaba/p3c/issues/782</li>
+        </ul>
+        <ul>2.1.0.2x
+            <li>fix logics in rule LowerCamelCaseVariableNamingRule. Now we do not alarm in function with @Override</li>
+            <li>move package 'com.alibaba.p3c.pmd' to 'com.xenoamess.p3c.pmd'</li>
+        </ul>
+        <ul>2.1.0.1x
+            <li>pmd upgrade to 6.26.0</li>
+            <li>Kotlin upgrade to 1.4.0</li>
+        </ul>
+        <ul>2.1.0
+            <li>Fix idea 2020.2 Ultimate compatibility issue</li>
+            <li>Minimum supported idea version up to 2018.3</li>
+            <li>Kotlin upgrade to 1.3.72</li>
+            <li>Disable real time inspect if file lines more than 3000 lines</li>
+            <li>Fix https://github.com/alibaba/p3c/issues/722</li>
+            <li>Fix https://github.com/alibaba/p3c/issues/620</li>
+        </ul>
+        <ul>2.0.2.6x
+            <li>fix code smells.</li>
+            <li>upgrade dependencies.</li>
+        </ul>
+        <ul>2.0.2.5x
+            <li>ignore AbstractMethodOrInterfaceMethodMustUseJavadocRule check for function who have @inheritdoc in javadoc.</li>
+            <li>fix some typos.</li>
+            <li>fix code smells.</li>
+            <li>upgrade dependencies.</li>
+        </ul>
+        <ul>2.0.2.4x
+            <li>add config mechanism to idea highlight.</li>
+            <li>upgrade x8l version.</li>
+            <li>fix code smells.</li>
+        </ul>
+        <ul>2.0.2.3x
+            <li>add config mechanism to both p3c-pmd and idea-plugin.</li>
+            <li>down priority EqualsHashCodeRule to 4.</li>
+            <li>EqualsHashCodeRule now only check non-Abstract class.</li>
+        </ul>
+        <ul>2.0.2.2x
+            <li>add SwitchExpressionRule to deal with switch expression, which is experimental in java 12 and 13, and finally public in java 14.Added a rule for checking SwitchExpression MUST have a default branch.</li>
+            <li>I'm new to pmd and XPATH thing, so if there be bug/false positive in the new added rule, please e-mail me or open issue on github.</li>
+        </ul>
+        <ul>2.0.2.1x
+            <li>learn from 2.0.2</li>
+            <li>update version of pmd from 6.18.0 to 6.22.0.</li>
+            <li>update version of kotlin from 1.3.71 to 1.3.72.</li>
+            <li>Bugfix about output some excess infos when analyze before commit. Thanks to geasskid@163.com 's bug report.</li>
+        </ul>
+        <ul>2.0.2
+        <li>Fix idea 2020.1 Ultimate compatibility issue</li>
+        </ul>
+        <ul>
+        <ul>2.0.1.4x
+            <li>add a Exception catch for some code to make sure will not corrupt when idea lib adds some more functions in future.</li>
+            <li>update version of pmd from 6.17.0 to 6.18.0.</li>
+            <li>code changes due to pmd upgrade.</li>
+        </ul>
+        <ul>2.0.1.3x
+            <li>move groupID from com.alibaba.p3c to com.xenoamess.p3c, as I have no right to release an alibaba project in maven central.</li>
+            <li>bugfix for gitbook; add markdown guidelines.</li>
+            <li>remake pom for p3c-pmd.</li>
+            <li>reformat some kotlin codes</li>
+            <li>add travis-ci</li>
+            <li>add sonarcloud</li>
+        </ul>
+        <ul>2.0.1.2x
+            <li>reviews all pending prs before 2020/04/11 , and merged/improved some of them.</li>
+            <li>merged pr: special camel rule for MybatisGenerator's DOMapper classes.</li>
+            <li>merged pr: fix for check of BeanUtils' copyProperties, and add more tests for it.</li>
+            <li>merged pr: forbid Object Varargs, and change its priority from 1 to 4.</li>
+            <li>merged pr: forbid Object Varargs, and change its priority from 1 to 4.</li>
+            <li>upgrade some dependencies.</li>
+            <li>remake pom.xml in p3c-pmd.</li>
+            <li>fix some javadoc in p3c-pmd.</li>
+            <li>fix code smells.</li>
+            <li>fix some wrongly formatted xmls, including this plugin.xml.</li>
+            <li>add WARNING and WEAK_WARNING.</li>
+        </ul>
+        <ul>2.0.1.1x
+            <li>Fix idea 2020.1 compatibility issue</li>
+            <li>fix javadoc in p3c-cmd</li>
+            <li>fix clinic dependency in p3c-cmd</li>
+            <li>upgrade gradle wrapper</li>
+            <li>upgrade idea-plugin version</li>
+            <li>upgrade some dependencies</li>
+        </ul>
+        <ul>2.0.1
+            <li>Fix idea 2019.3 compatibility issue</li>
+            <li>fix https://github.com/alibaba/p3c/issues/540</li>
+            <li>fix https://github.com/alibaba/p3c/issues/209</li>
+            <li>fix https://github.com/alibaba/p3c/issues/579</li>
+            <li>Add code style rule of lock</li>
+        </ul>
+        <ul>2.0.0
+            <li>supported min idea version 2016.1(145.258.11)</li>
+            <li>supported min jdk version 1.8</li>
+            <li>fix persistent compatibility issue</li>
+            <li>fix https://github.com/alibaba/p3c/issues/430</li>
+            <li>fix https://github.com/alibaba/p3c/issues/454</li>
+            <li>fix https://github.com/alibaba/p3c/issues/409</li>
+            <li>add rule To judge the equivalence of floating-point numbers.</li>
+            <li>add annotation process for rule ClassMustHaveAuthorRule</li>
+        </ul>
+        <ul>1.0.6
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/337">https://github.com/alibaba/p3c/issues/337</a>  do not check annotation </li>
+            <li>PojoMustOverrideToStringRule do not check interface </li>
+            <li>Performance improvement</li>
+        </ul>
+        <ul>1.0.5
+            <li>Add rule [Recommended] The total number of lines for a method should not be more than 80.</li>
+            <li>Add rule [Recommended] Avoid using the negation operator '!'.</li>
+            <li>Add rule [Mandatory] When doing date formatting, "y" should be written in lowercase for "year" in a pattern statement</li>
+            <li>https://github.com/alibaba/p3c/issues/264</li>
+        </ul>
+        <ul>1.0.4
+            <li>fix https://github.com/alibaba/p3c/issues/217</li>
+            <li>fix https://github.com/alibaba/p3c/issues/208</li>
+            <li>fix https://github.com/alibaba/p3c/issues/195</li>
+        </ul>
+        <ul>1.0.3
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/191">https://github.com/alibaba/p3c/issues/191</a></li>
+        </ul>
+        <ul>1.0.2
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/185">https://github.com/alibaba/p3c/issues/185</a></li>
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/189">https://github.com/alibaba/p3c/issues/189</a></li>
+        </ul>
+        <ul>1.0.1
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/149">https://github.com/alibaba/p3c/issues/149</a></li>
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/60">https://github.com/alibaba/p3c/issues/60</a></li>
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/58">https://github.com/alibaba/p3c/issues/58</a></li>
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/68">https://github.com/alibaba/p3c/issues/68</a></li>
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/68">https://github.com/alibaba/p3c/issues/68</a></li>
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/112">https://github.com/alibaba/p3c/issues/112</a></li>
+            <li>fix <a href="https://github.com/alibaba/p3c/issues/127">https://github.com/alibaba/p3c/issues/127</a></li>
+        </ul></ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="251.23774"/><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><depends>com.intellij.modules.vcs</depends><depends>com.intellij.modules.xdebugger</depends><depends>com.intellij.modules.xml</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="835" size="23343" date="1586758010000" updatedDate="1586758010000" url=""><name>Drom code inspections</name><id>ru.drom</id><description><![CDATA[
+      Plugin written in Kotlin for Kotlin syntax check to ensure that exceptions are checked
+    ]]></description><version>1.0.1</version><vendor email="moogle.andrew@gmail.com" url="https://www.drom.ru/">Drom</vendor><rating>00</rating><change-notes><![CDATA[
+      Release notes : Initial release of a plugin
+    
+	]]></change-notes><idea-version min="n/a" max="n/a" since-build="192.0"/><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><depends>org.jetbrains.kotlin</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="824" size="11323771" date="1587320914000" updatedDate="1587320914000" url=""><name>VITRuM</name><id>it.unisa.vitrum</id><description><![CDATA[
+      Plugin that calculates and visualize certain Test-Related Factors of a Java project.
+    ]]></description><version>1.0</version><vendor email="mario.azzo8@gmail.com" url="http://www.sesa.unisa.it/">SESA Lab.</vendor><rating>00</rating><change-notes><![CDATA[
+      Version 1.0: Initial release of the plugin.
+    
+  ]]></change-notes><idea-version min="n/a" max="n/a" since-build="173.0"/><tags>Inspection</tags></idea-plugin><idea-plugin downloads="2664" size="6567" date="1600002165000" updatedDate="1600002165000" url=""><name>JReader</name><id>com.github.artsiomch.JReader</id><description><![CDATA[
+    Helps visually separate <code>public</code>, <code>private</code> and <code>abstract</code> keywords in java/kotlin source. <br>
+    For <code>abstract</code> keywords also shows marks on the right scrollbar to easily navigate there in large java files. <br>
+    Planing to provide possibility of customisation of fonts and colors. <br>
+    Also generification of highlighting rules could be done using regex search rules.
+
+    ]]></description><version>1.3</version><vendor email="achapialiou@gmail.com" url="http://github.com/ArtsiomCh">Artsiom Chapialiou</vendor><rating>00</rating><change-notes><![CDATA[
+      1.3 - Kotlin support
+      1.2 - Initial public release
+      ]]></change-notes><idea-version min="n/a" max="n/a" since-build="201.0" until-build="999.0"/><depends>com.intellij.modules.java</depends><depends>com.intellij.modules.platform</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="1009" size="3588" date="1594105649000" updatedDate="1594105649000" url=""><name>Exclude ComponentN</name><id>justbucket.excludeComponentN</id><description><![CDATA[
+      Plugin to filter out Kotlin componentN() methods
+    ]]></description><version>0.1</version><vendor email="justbucket416@gmail.com" url="">JustBucket</vendor><rating>00</rating><change-notes><![CDATA[]]></change-notes><idea-version min="n/a" max="n/a" since-build="201.3803.71"/><depends>com.intellij.modules.lang</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="10560" size="122858825" date="1729070241000" updatedDate="1729070241000" url=""><name>Embold</name><id>com.embold.intellij</id><description><![CDATA[
+        
+        <p>
+<a href="https://www.embold.io">Embold</a> is an AI-based software analytics platform that helps teams analyse and improve software quality.
+It analyses source code across 4 dimensions: code issues, design issues, metrics and duplication, and
+surfaces issues which impact stability, robustness, security, and maintainability.
+The Embold Score helps teams understand risk areas and prioritise the most important fixes.
+</p>
+<br>
+<b>Embold Autodoc </b>
+<br>
+<img src="https://github.com/Pooja0504/java/blob/master/autodoc.gif?raw=true" height="450" width="650">
+<br>
+<p>
+<b>The Embold IntelliJ plugin</b> uncovers potential bugs, vulnerabilities, anti-patterns and <a href="https://docs.embold.io/code-issues/#embold-java-issues">code smells in Java.</a>
+With the fast scanners and the instant feedback, you can edit the code with suggested quick fixes even before the code is committed.
+The plugin also uncovers hard-to-detect <a href="https://docs.embold.io/anti-patterns/">anti-patterns</a> that make your code difficult to maintain and
+can lead to error-prone solutions.
+</p>
+<br>
+<p>
+More info on Embold: <a href="https://www.embold.io">www.embold.io</a>
+</p>
+        
+      ]]></description><version>0.9.14.69</version><vendor email="info@embold.io" url="https://embold.io">Embold</vendor><rating>4.8</rating><change-notes><![CDATA[
+        
+        0.9.14.69
+        <ul>
+            <li> Added pmd scans support </li>
+            <li> Bug fixes and improvements </li>
+        </ul>
+
+        0.9.13.60
+        <ul>
+            <li> Bug fixes and improvements </li>
+        </ul>
+
+        0.9.12.28
+        <ul>
+            <li> Bug fixes and improvements </li>
+        </ul>
+
+        0.9.11.238
+        <ul>
+            <li> We have added a lot of new Java rules that will make your code more secure.
+                <p> New checks added:
+                </p><ol>
+                    <li>Avoid Using Predictable Random Values</li>
+                    <li>Avoid Using RSA Alogorithm Without OAEP</li>
+                    <li>Cipher with no integrity</li>
+                    <li>Comparison of object reference instead of object contents</li>
+                    <li>finalize method declare public</li>
+                    <li>public method return private data structure</li>
+                </ol>
+            </li>
+        </ul>
+
+        0.9.10.216
+        <ul>
+            <li> We have added a lot of new Java rules that will make your code more secure.
+                <p> New checks added:
+                </p><ol>
+                    <li> Missing Default Case In Switch</li>
+                    <li> public Cloneable method without final</li>
+                    <li> Avoid catching generic exception</li>
+                    <li> Error Message Containing Sensitive Data </li>
+                </ol>
+            </li>
+        </ul>
+
+        0.9.9.196
+        <ul>
+            <li> We have added a lot of new Java rules that will make your code more secure.
+                <p> New checks added:
+                </p><ol>
+                    <li> Do Not Call SystemExit </li>
+                    <li> Redirect Without Exit </li>
+                    <li> Sensitive Data In Serializable Class </li>
+                    <li> Missing Required Cryptographic Step </li>
+                    <li> Avoid Throwing Generic Exception </li>
+                    <li> Static Final Array Should Be Private </li>
+                    <li> Error Message Containing Sensitive Data </li>
+                </ol>
+            </li>
+        </ul>
+
+        0.9.8.181
+        <ul>
+            <li> Fixed <a href="https://www.cve.org/CVERecord?id=CVE-2021-44228"> log4shell (CVE-2021-44228) </a> security vulnerability </li>
+            <li> Bug fixes and improvements </li>
+        </ul>
+
+        0.9.7.176
+        <ul>
+            <li> Bug fixes and improvements </li>
+        </ul>
+
+        0.9.6.166
+        <ul>
+           <li> We have added a lot of new Java rules that will make your code more secure.
+                <p> New checks added:
+                </p><ol>
+                    <li> Clone Without Super </li>
+                    <li> Unencrypted Socket </li>
+                    <li> Weak SSLContext </li>
+                    <li> Improper Validation Of ArrayIndex </li>
+                    <li> Unencrypted Server Socket </li>
+                    <li> Avoid NullCipher </li>
+                    <li> Missing Throw In Catch Block </li>
+                    <li> Finalize Without Super </li>
+                    <li> Mutable Object Should Not Reference Public </li>
+                    <li> Non Serializable In Session </li>
+                    <li> Empty Synchronized Block </li>
+                    <li> Explicit Call To Finalize </li>
+                    <li> Missing Break Statement In Switch </li>
+                    <li> Public Static Field Should Be Final </li>
+                </ol>
+            </li>
+            <li> Bug fixes and improvements </li>
+
+        </ul>
+
+        0.9.5.137
+        <ul>
+           <li> Introducing an Embold AutoDoc feature (Beta version) that automatically generates documentation comments for a method using AI.
+           Applicable to Java language currently. Support to more languages coming soon!
+            </li>
+            <li> Bug fixes and improvements </li>
+
+        </ul>
+
+         0.9.4.114
+        <ul>
+           <li> We have added a lot of new Java rules which will make your code more secure.
+                <p> New checks added:
+                </p><ol>
+                    <li> Avoid Catching NPE </li>
+                    <li> Avoid FilecreateTempFile </li>
+                    <li> Avoid Non Case Labels In Switch Statement </li>
+                    <li> Mismatch Regex Boundaries Should Not Be Used </li>
+                    <li> Empty String Should Not Be Used </li>
+                    <li> Exceptions Should Not Be Thrown In Finally Block </li>
+                    <li> Shortcircuit Logic Should Be Used In Boolean Contexts </li>
+                    <li> Main Should Not Throw Anything </li>
+                    <li> Maps With Enum Values Replace With EnumMap </li>
+                    <li> Avoid Concatenating Char As String </li>
+                    <li> Avoid Synchronized At Method Level </li>
+                    <li> Big Integer Instantiation </li>
+                </ol>
+            </li>
+            <li> Clickable graphical representation enhanced with in-depth granularity. Each section is segregated according to criticality and issue type (i.e. code issues and anti-patterns) displayed in a new tab.</li>
+            <li> Bug fixes and improvements </li>
+
+        </ul>
+
+	    0.9.2.75
+        <ul>
+            <li>New checks added:
+                <ol>
+                    <li> Exclude SpringBootApplication And ComponentScan From The Default Package </li>
+                    <li> Externalizable Must Have No Arguments Constructor </li>
+                    <li> Getters And Setters Should Access The Expected Fields </li>
+                    <li> Run Should Not Be Called Directly </li>
+                    <li> RunFinalizersOnExit Should Not Be Called </li>
+                    <li> Variables Should Not Be Self Assigned </li>
+                </ol>
+            </li>
+            <li>Now you can sync repository configurations that you make on Embold cloud with plugin in just 2 steps.</li>
+	        <li>Bug fixes and improvements</li>
+        </ul>
+
+        0.9.1.56-beta
+        <ul>
+           <li> We have added a lot of new Java rules which will make your code more secure.
+                <p> New checks added:
+                </p><ol>
+                    <li> Potential Command Injection </li>
+                    <li> Authenticate LDAP Connection </li>
+                    <li> Web Application Contains Main Method </li>
+                    <li> Should Not Use getRequestedSessionId API </li>
+                    <li> Potential Path Traversal </li>
+                    <li> Accessing Android External Storage </li>
+                    <li> Unsafe Jackson Deserialization </li>
+                    <li> Setting Java Bean Properties </li>
+                </ol>
+                <p> See our <a href="https://docs.embold.io/standard-compliances/#owasp">OWASP top 10</a> and
+                <a href="https://docs.embold.io/standard-compliances/#cwe">CWE</a> support for more details.
+            </p></li>
+
+            <li> Bug fixes and improvements </li>
+        </ul>
+
+        0.9.0.85-beta
+        <ul>
+            <li>Support Java anti-patterns</li>
+            <li>Graphical representation of code issues and anti-patterns</li>
+        </ul>
+
+        0.9.0.56-beta1 - Beta release for Embold IntelliJ Plugin.
+        <ul>
+            <li>Real-time scan for Java files</li>
+            <li>Selectively enable and disable Java code checks</li>
+        </ul>
+       
+    ]]></change-notes><idea-version min="n/a" max="n/a" since-build="193.5233.102"/><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><tags>Inspection</tags></idea-plugin><idea-plugin downloads="460622" size="69693587" date="1784320644000" updatedDate="1784320644000" url=""><name>Ktlint</name><id>com.nbadal.ktlint</id><description><![CDATA[<p>Formats code with <a href="https://ktlint.github.io/ktlint/">KtLint</a> after IntelliJ IDEA formatting or on save of file.</p>
+
+<p>Ktlint is an anti bikeshedding linter/formatter for Kotlin code based on the <a href="https://kotlinlang.org/docs/coding-conventions.html">Kotlin Coding Conventions</a>, <a href="https://developer.android.com/kotlin/style-guide">Android Kotlin Style Guide</a>, and other best practices.</p>
+
+<p>Ktlint is configured in the <code>.editorconfig</code> file (see <a href="https://ktlint.github.io/ktlint/latest/rules/configuration-ktlint/">KtLint configuration</a>). Next to this, the plugin itself has a few configuration options. The plugin can run in distinct modes.</p>
+
+<p>In the recommended 'distract free' mode, lint violations are automatically corrected when possible. Combined with formatting on save, ktlint enhances your developer experience greatly. Violations that can not be autocorrected are displayed as error.</p>
+
+<p>In the 'manual' mode, ktlint format is not run automatically. Format can still be invoked manually for the entire file (via the refactor menu). If autocorrect for an individual violation is supported by the rule, the autocorrect option is also shown as Quick Fix. All violations found by ktlint are displayed as warning.</p>
+
+<p>This plugin was formerly known as the "Ktlint (unofficial)" plugin, developed by <a href="https://github.com/nbadal">Nick Badal</a>. In collaboration with KtLint maintainer <a href="https://github.com/paul-dingemans">Paul Dingemans</a>, the plugin has now been reworked and rebranded as (official) "KtLint" Plugin. The plugin now puts more focus on the automatic formatting of Kotlin code. This results in more consistent code, better performance in IntelliJ IDEA, and developers spending less time on fixing errors which can be autocorrected. Finally, the plugin will be updated in same release cycle as KtLint itself.</p>
+
+<p>The plugin currently runs with ktlint version <code>1.8.0</code> by default (see ktlint preferences to alter the ruleset version).</p>
+
+<p>Enable and configure in <code>Preferences</code> &gt; <code>Tools</code> &gt; <code>KtLint</code>.</p>]]></description><version>0.30.5</version><vendor email="me@nbad.al" url="https://nbad.al">Nick Badal</vendor><rating>4.1</rating><change-notes><![CDATA[<h1>Noteworthy changes</h1>
+
+<ul><li>Prevent exception from being thrown after opening a project</li></ul>
+
+<h1>Requirements</h1>
+
+<ul><li>IntelliJ IDEA Platform 2025.1 - 2026.2</li></ul>]]></change-notes><idea-version min="n/a" max="n/a" since-build="251.0" until-build="262.*"/><depends>com.intellij.modules.platform</depends><depends>org.editorconfig.editorconfigjetbrains</depends><depends>org.jetbrains.kotlin</depends><tags>Inspection</tags></idea-plugin></plugin-repository>

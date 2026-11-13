@@ -249,7 +249,9 @@ module JBUpdater
           Utils.extract_zip(tmp_zip, dest)
           Log.success("#{plugin_num} #{xml_id} installed successfully")
         rescue ex
-          Log.fail("[#{xml_id}] installation failed: #{ex.message}")
+          msg, hint = Log.explain(ex)
+          Log.fail("[#{xml_id}] installation failed: #{msg}")
+          Log.info("  → #{hint}") if hint
         ensure
           FileUtils.rm_rf(tmp_zip) if tmp_zip && File.exists?(tmp_zip)
         end
@@ -260,11 +262,28 @@ module JBUpdater
     end
 
     # Checks all installed plugins for updates and downloads newer versions.
+    #
+    # With `--only-incompatible`, plugins already compatible with the
+    # current build are skipped.
     private def update_plugins : Nil
       plugins = installed_plugins
       if plugins.empty?
         Log.info "No plugins found in #{@opts.plugins_dir}"
         return
+      end
+
+      if @opts.only_incompatible?
+        build = @build || raise("build not set")
+        before = plugins.size
+        plugins = plugins.reject do |_, meta|
+          Utils.build_in_range?(build, meta.since, meta.until_build)
+        end
+        skipped = before - plugins.size
+        Log.info "Skipping #{skipped} compatible plugin#{skipped == 1 ? "" : "s"} (--only-incompatible)"
+        if plugins.empty?
+          Log.success("All plugins already compatible with build #{build}. Nothing to do.")
+          return
+        end
       end
 
       Log.header("Checking #{plugins.size} plugin#{plugins.size > 1 ? "s" : ""} for updates (build #{@build})")
@@ -273,7 +292,9 @@ module JBUpdater
         Log.info "[#{idx + 1}/#{plugins.size}] #{meta.id} current=#{meta.version}"
         update_plugin(meta)
       rescue ex
-        Log.fail "[#{meta.id}] update failed: #{ex.message}"
+        msg, hint = Log.explain(ex)
+        Log.fail("[#{meta.id}] update failed: #{msg}")
+        Log.info("  → #{hint}") if hint
       end
 
       puts

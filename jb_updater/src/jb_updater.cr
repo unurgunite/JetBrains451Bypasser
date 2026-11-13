@@ -5,5 +5,5 @@ require "./jb_updater/ide_releases"
 require "./jb_updater/gui_actions"
 
 module JbUpdater
-  VERSION = "0.1.0"
+  VERSION = "1.2.0"
 end

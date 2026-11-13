@@ -1,6 +1,7 @@
 require "json"
 require "http/client"
 require "xml"
+require "set"
 
 module JBUpdater
   # Strips HTML tags and decodes common HTML entities from a string.
@@ -137,10 +138,13 @@ module JBUpdater
       rating = node_text(plugin_node, "rating").to_f rescue 0.0
 
       categories = [] of String
+      seen = Set(String).new
       if tag_node = plugin_node.xpath_node("tags")
         tag_node.content.split(",").each do |tag|
           t = tag.strip
-          categories << t unless t.empty? || categories.includes?(t)
+          if !t.empty? && seen.add?(t)
+            categories << t
+          end
         end
       end
 

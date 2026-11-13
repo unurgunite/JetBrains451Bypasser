@@ -1,5 +1,7 @@
 require "http/client"
 require "uri"
+require "digest/md5"
+require "digest/sha256"
 
 module JBUpdater
   # Low-level HTTP client used for plugin and IDE downloads.
@@ -92,9 +94,9 @@ module JBUpdater
 
     # Follows an HTTP redirect by parsing the Location header.
     private def self.follow_redirect(response : HTTP::Client::Response, uri : URI, dest_path : String, depth : Int32) : Nil
-      raise "Too many redirects: #{depth}" if depth > 5
+      raise RuntimeError.new("Too many redirects: #{depth}") if depth > 5
       loc = response.headers["Location"]?
-      raise "redirect without Location header for #{uri}" unless loc
+      raise RuntimeError.new("redirect without Location header for #{uri}") unless loc
       next_uri = URI.parse(loc)
       unless next_uri.absolute?
         next_uri = URI.new(
@@ -107,22 +109,73 @@ module JBUpdater
       download(next_uri, dest_path, depth + 1)
     end
 
+    # Maximum download attempts (initial try + retries).
+    MAX_RETRIES = 3
+
+    # Base delay (seconds) for exponential backoff between retries.
+    RETRY_BASE_DELAY = 1.0
+
     # Downloads a file to disk with streaming, progress tracking, and redirect handling.
     #
     # Follows HTTP 301/302 redirects (up to 5). Shows a TTY progress bar
     # unless suppressed via `no_tty_progress_bar=`. Fires `on_progress`
     # callbacks in 16 KB chunks.
     #
+    # Retries transient failures (connection errors, 5xx, 429) up to
+    # `MAX_RETRIES` times with exponential backoff. Resumes partial
+    # downloads via `Range` requests when the server supports them.
+    # Writes to `<dest>.part` and renames atomically on success, so a
+    # failed download never leaves a corrupt file at `dest_path`.
+    #
     # @param uri [URI] Resource to download
     # @param dest_path [String] Local file path to write to
     # @param depth [Int32] Internal redirect counter (do not pass)
-    # @raise [RuntimeError] On too many redirects, missing Location header, or non-200 status
-    def self.download(uri : URI, dest_path : String, depth = 0) : Nil
-      raise "Too many redirects: #{depth}" if depth > 5
+    # @param expected_sha256 [String?] Optional hex SHA-256 to verify after download
+    # @raise [RuntimeError] On too many redirects, missing Location header, non-200 status, or checksum mismatch
+    def self.download(uri : URI, dest_path : String, depth = 0, expected_sha256 : String? = nil) : Nil
+      raise RuntimeError.new("Too many redirects: #{depth}") if depth > 5
+      attempt_download(uri, dest_path, depth, expected_sha256)
+    end
+
+    private def self.attempt_download(uri : URI, dest_path : String, depth : Int32, expected_sha256 : String?) : Nil
+      last_error : Exception? = nil
+      (1..MAX_RETRIES).each do |attempt|
+        begin
+          single_download(uri, dest_path, depth, expected_sha256)
+          return
+        rescue ex : IO::Error | Socket::Error | OpenSSL::SSL::Error
+          last_error = ex
+        rescue ex : RuntimeError
+          # Retry only transient HTTP failures (5xx, 429); anything else raises immediately.
+          raise ex unless ex.message =~ /HTTP (429|5\d\d)/
+          last_error = ex
+        end
+        if attempt < MAX_RETRIES
+          delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
+          Log.warn "Download attempt #{attempt}/#{MAX_RETRIES} failed (#{last_error.try(&.message)}), retrying in #{delay}s..."
+          sleep delay.seconds
+        end
+      end
+      last = last_error
+      raise(last) if last
+      raise RuntimeError.new("Download failed for #{uri}")
+    end
+
+    private def self.single_download(uri : URI, dest_path : String, depth : Int32, expected_sha256 : String?) : Nil
+      raise RuntimeError.new("Too many redirects: #{depth}") if depth > 5
       fname = File.basename(dest_path)
+      part_path = "#{dest_path}.part"
       Log.info "Downloading: #{fname} ← #{uri}"
       notify_request("GET", uri.to_s)
       headers = HTTP::Headers{"User-Agent" => USER_AGENT}
+
+      # Resume: if a partial file exists, ask the server for the remainder.
+      resume_from = File.exists?(part_path) ? File.size(part_path) : 0_i64
+      if resume_from > 0
+        headers["Range"] = "bytes=#{resume_from}-"
+        Log.info "Resuming #{fname} from #{Utils.format_bytes(resume_from)}"
+      end
+
       client = HTTP::Client.new(uri)
       client.read_timeout = 60.seconds
       client.connect_timeout = 15.seconds
@@ -132,12 +185,17 @@ module JBUpdater
         client.get(uri.request_target, headers: headers) do |response|
           case response.status_code
           when 200
-            downloaded = stream_to_file(response, dest_path, fname)
-            notify_download_complete(fname, dest_path, downloaded)
+            # Server ignored Range (or fresh download): restart from scratch.
+            File.delete(part_path) if resume_from > 0
+            downloaded = stream_to_file(response, part_path, fname, 0_i64)
+            finish_download(part_path, dest_path, fname, downloaded, expected_sha256, response.headers["ETag"]?)
+          when 206
+            downloaded = stream_to_file(response, part_path, fname, resume_from)
+            finish_download(part_path, dest_path, fname, downloaded, expected_sha256, nil)
           when 301, 302
             follow_redirect(response, uri, dest_path, depth)
           else
-            raise "HTTP #{response.status_code} #{response.status_message} for #{uri}"
+            raise RuntimeError.new("HTTP #{response.status_code} #{response.status_message} for #{uri}")
           end
         end
       ensure
@@ -145,13 +203,76 @@ module JBUpdater
       end
     end
 
-    private def self.stream_to_file(response : HTTP::Client::Response, dest_path : String, fname : String) : Int64
-      length_header = response.headers["Content-Length"]?
-      total = length_header ? length_header.to_i64 : 0_i64
-      Log.info "Download started: #{fname} (#{total > 0 ? Utils.format_bytes(total) : "unknown size"})"
-      downloaded = 0_i64
+    # Extracts the MD5 hex from an ETag header, or `nil`.
+    #
+    # Only plain 32-hex ETags (single-part S3 objects) qualify;
+    # multipart (`<hex>-<n>`) and weak (`W/`) ETags are skipped.
+    private def self.plain_etag_md5(etag : String?) : String?
+      return unless etag
+      clean = etag.strip.strip('"')
+      return unless clean =~ /\A[0-9a-fA-F]{32}\z/
+      clean.downcase
+    end
 
-      File.open(dest_path, "wb") do |file|
+    # Verifies file SHA-256 against the expected hex.
+    private def self.verify_sha256(path : String, fname : String, expected : String) : Nil
+      digest = Digest::SHA256.new
+      hash_file(path, digest)
+      actual = digest.final.hexstring
+      unless actual.downcase == expected.downcase
+        File.delete(path) rescue nil
+        raise RuntimeError.new("SHA-256 mismatch for #{fname}: expected #{expected}, got #{actual}")
+      end
+      Log.info "Checksum OK (SHA-256): #{fname}"
+    end
+
+    # Verifies file MD5 against the ETag hex.
+    private def self.verify_md5(path : String, fname : String, expected : String) : Nil
+      digest = Digest::MD5.new
+      hash_file(path, digest)
+      actual = digest.final.hexstring
+      unless actual.downcase == expected.downcase
+        File.delete(path) rescue nil
+        raise RuntimeError.new("MD5 mismatch for #{fname}: expected #{expected}, got #{actual}")
+      end
+      Log.info "Checksum OK (ETag MD5): #{fname}"
+    end
+
+    # Feeds a file into a digest in 64 KB chunks.
+    private def self.hash_file(path : String, digest : Digest) : Nil
+      File.open(path, "rb") do |file|
+        buf = Bytes.new(65536)
+        loop do
+          n = file.read(buf)
+          break if n == 0
+          digest.update(buf[0, n])
+        end
+      end
+    end
+
+    #
+    # Falls back to ETag MD5 verification: S3/CloudFront return the file
+    # MD5 as a plain 32-hex ETag for single-part objects. Multipart ETags
+    # (`<hex>-<n>`) are skipped. No verification on resumed (206) downloads
+    # since the ETag describes the whole object, not the range.
+    private def self.finish_download(part_path : String, dest_path : String, fname : String, downloaded : Int64, expected_sha256 : String?, etag : String? = nil) : Nil
+      if sha = expected_sha256
+        verify_sha256(part_path, fname, sha)
+      elsif etag_md5 = plain_etag_md5(etag)
+        verify_md5(part_path, fname, etag_md5)
+      end
+      # Windows rename fails when the target exists (POSIX overwrites).
+      Utils.atomic_replace(part_path, dest_path)
+      notify_download_complete(fname, dest_path, downloaded)
+    end
+
+    private def self.stream_to_file(response : HTTP::Client::Response, dest_path : String, fname : String, start_at : Int64 = 0_i64) : Int64
+      length_header = response.headers["Content-Length"]?
+      total = length_header ? length_header.to_i64 + start_at : 0_i64
+      Log.info "Download started: #{fname} (#{total > 0 ? Utils.format_bytes(total) : "unknown size"})"
+      downloaded = start_at
+
+      File.open(dest_path, start_at > 0 ? "ab" : "wb") do |file|
         bar_width = 40
 
         if stream = response.body_io
