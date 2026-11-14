@@ -231,6 +231,22 @@ jobs:
         run: |
           crystal build src/main.cr --release --no-debug -o jb_updater.exe
           crystal build src/gui/main_gui.cr --release -Dpreview_mt --no-debug --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
+      - name: Bundle Crystal runtime DLLs
+        shell: pwsh
+        run: |
+          # Crystal runtime DLLs must ship alongside the EXEs on Windows,
+          # otherwise the process exits with 0xC0000135 (STATUS_DLL_NOT_FOUND).
+          $crystalPath = (Get-Command crystal).Source
+          $crystalRoot = Split-Path (Split-Path $crystalPath -Parent) -Parent
+          $dllSource = Join-Path $crystalRoot "embedded" "bin"
+          if (Test-Path $dllSource) {
+            Copy-Item "$dllSource\*.dll" jb_updater\
+            Write-Host "Copied DLLs from $dllSource"
+            Get-ChildItem jb_updater\*.dll | ForEach-Object { Write-Host "  → $($_.Name)" }
+          } else {
+            Write-Host "::warning::Crystal DLL directory not found at $dllSource"
+          }
+
       - name: Smoke test — CLI binary loads
         working-directory: jb_updater
         shell: cmd
