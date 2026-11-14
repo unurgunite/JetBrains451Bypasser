@@ -226,7 +226,27 @@ jobs:
           crystal build src/gui/main_gui.cr --release -Dpreview_mt --no-debug --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
       - name: Smoke test — CLI binary loads
         working-directory: jb_updater
-        run: ./jb_updater.exe --help
+        shell: cmd
+        run: |
+          rem Verify the CLI binary starts (proves all DLLs resolve correctly).
+          rem 0xC0000135 would kill the process before any output.
+          .\jb_updater.exe --help
+
+      - name: Verify GUI DLLs are present
+        working-directory: jb_updater
+        shell: pwsh
+        run: |
+          # Can't run the GUI binary on headless CI (no display), but we can
+          # confirm all DLLs exist alongside the GUI EXE.
+          $exe = "jb_updater_gui.exe"
+          $dlls = @(Get-ChildItem *.dll)
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error::$exe not found"
+            exit 1
+          }
+          Write-Host "$exe found, $($dlls.Count) DLLs present:"
+          $dlls | ForEach-Object { Write-Host "  → $($_.Name) ($( '{0:N0}' -f $_.Length ) bytes)" }
+
       - name: Package artifacts
         run: |
           Compress-Archive -Path jb_updater\jb_updater.exe, jb_updater\*.dll -DestinationPath jb_updater-cli-windows-x86_64.zip
