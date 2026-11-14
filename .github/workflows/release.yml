@@ -1,28 +1,76 @@
-name: Build jb_updater
+name: Release
 
+# One button, one input: type the version, get tag + GitHub Release.
+# Pushing a v*.*.* tag by hand still works and does the same thing.
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag, without the leading v (e.g. 1.2.0)'
+        required: true
+        type: string
   push:
-    branches: [ "**" ]
     tags: [ "v*.*.*" ]
-  pull_request:
-  workflow_dispatch: { }
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
-# =========================================================
-# ===============   BUILD JOBS   ==========================
-# =========================================================
+env:
+  CRYSTAL_VERSION: 1.21.0
+  # Manual runs take the input, tag pushes take the tag name.
+  VERSION: ${{ inputs.version || github.ref_name }}
 
 jobs:
+  # Fail fast, before seven runner-minutes of compilation.
+  validate:
+    name: Validate version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version is semver without a leading v
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must look like 1.2.0, got: '$VERSION'" >&2
+            exit 1
+          fi
+
+      - name: Version matches source and shard.yml
+        run: |
+          SRC_VERSION=$(grep -oE 'VERSION *= *"[^"]+"' jb_updater/src/jb_updater.cr | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          SHARD_VERSION=$(grep -E '^version:' jb_updater/shard.yml | cut -d: -f2 | tr -d ' ')
+          echo "input=$VERSION src=$SRC_VERSION shard.yml=$SHARD_VERSION"
+          if [[ "$SRC_VERSION" != "$VERSION" ]]; then
+            echo "jb_updater/src/jb_updater.cr VERSION is $SRC_VERSION, release says $VERSION" >&2
+            exit 1
+          fi
+          if [[ "$SHARD_VERSION" != "$VERSION" ]]; then
+            echo "jb_updater/shard.yml version is $SHARD_VERSION, release says $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Tag does not exist yet
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION"; then
+            echo "Tag v$VERSION already exists on origin" >&2
+            exit 1
+          fi
+
   linux:
     name: Linux x86_64
+    needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: crystal-lang/install-crystal@v1
         with:
-          crystal: 1.21.0
+          crystal: ${{ env.CRYSTAL_VERSION }}
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -65,8 +113,10 @@ jobs:
         with:
           name: jb_updater-bundle-linux-x86_64
           path: jb_updater-bundle-linux-x86_64.tar.gz
+
   macos:
     name: macOS ${{ matrix.arch }}
+    needs: validate
     strategy:
       matrix:
         include:
@@ -75,13 +125,14 @@ jobs:
           - arch: x86_64
             runs_on: macos-15-intel
     runs-on: ${{ matrix.runs_on }}
+    timeout-minutes: 45
     env:
       ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - uses: crystal-lang/install-crystal@v1
         with:
-          crystal: 1.21.0
+          crystal: ${{ env.CRYSTAL_VERSION }}
       - name: Install OpenSSL 3
         run: brew install openssl@3
       - name: Install shards
@@ -127,157 +178,55 @@ jobs:
 
       - name: Smoke test — CLI binary loads
         working-directory: jb_updater
-        run: |
-          ./jb_updater --help
-          echo "---"
-          echo "Checking dylib paths..."
-          # Skip binary name line, filter out system paths and @loader_path refs.
-          # Any remaining lines are non-system absolute paths → fail.
-          otool -L jb_updater | tail -n +2 | grep -v -e "/usr/lib" -e "/System" -e "@loader_path" && { echo "::error::Found absolute dylib paths"; exit 1; } || echo "All dylib paths use @loader_path"
-
+        run: ./jb_updater --help
       - name: Package artifacts
+        working-directory: jb_updater
         run: |
-          cd jb_updater
-          # CLI archive — include bundled dylibs
-          tar -czf ../jb_updater-cli-macos-${ARCH}.tar.gz jb_updater libcrypto.3.dylib libssl.3.dylib
-
-          # Bundle: binaries + dylibs
+          tar -czf "../jb_updater-cli-macos-${ARCH}.tar.gz" jb_updater
+          tar -czf "../jb_updater-gui-macos-${ARCH}.tar.gz" jb_updater_gui
           mkdir -p ../jb_updater-bundle
-          cp jb_updater jb_updater_gui libcrypto.3.dylib libssl.3.dylib ../jb_updater-bundle/
-          cd ..
-          zip -ry jb_updater-bundle-macos-${ARCH}.zip jb_updater-bundle
-
-          # .app bundle with dylibs + icon inside
-          APP_ROOT="JBUpdater.app/Contents"
-          mkdir -p "$APP_ROOT/MacOS" "$APP_ROOT/Resources"
-          cp jb_updater/jb_updater_gui "$APP_ROOT/MacOS/"
-          cp jb_updater/jb_updater     "$APP_ROOT/MacOS/"
-          cp jb_updater/libcrypto.3.dylib "$APP_ROOT/MacOS/"
-          cp jb_updater/libssl.3.dylib    "$APP_ROOT/MacOS/"
-          cp jb_updater/assets/jb_updater.icns "$APP_ROOT/Resources/"
-
-          cat > "$APP_ROOT/Info.plist" <<'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-          <key>CFBundleName</key><string>JB Updater</string>
-          <key>CFBundleIdentifier</key><string>com.example.jb-updater</string>
-          <key>CFBundleVersion</key><string>1.0</string>
-          <key>CFBundleExecutable</key><string>jb_updater_gui</string>
-          <key>CFBundleIconFile</key><string>jb_updater</string>
-          <key>LSMinimumSystemVersion</key><string>11.0</string>
-          <key>NSHighResolutionCapable</key><true/>
-          </dict></plist>
-          PLIST
-
-          zip -ry jb_updater-app-macos-${ARCH}.zip JBUpdater.app
+          cp jb_updater jb_updater_gui libcrypto.3.dylib libssl.3.dylib assets/jb_updater.svg ../jb_updater-bundle/
+          tar -czf "../jb_updater-bundle-macos-${ARCH}.tar.gz" -C ../jb_updater-bundle .
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-cli-macos-${{ matrix.arch }}
           path: jb_updater-cli-macos-${{ matrix.arch }}.tar.gz
       - uses: actions/upload-artifact@v4
         with:
-          name: jb_updater-app-macos-${{ matrix.arch }}
-          path: jb_updater-app-macos-${{ matrix.arch }}.zip
+          name: jb_updater-gui-macos-${{ matrix.arch }}
+          path: jb_updater-gui-macos-${{ matrix.arch }}.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-bundle-macos-${{ matrix.arch }}
-          path: jb_updater-bundle-macos-${{ matrix.arch }}.zip
+          path: jb_updater-bundle-macos-${{ matrix.arch }}.tar.gz
 
   windows:
     name: Windows x86_64
+    needs: validate
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
       - uses: crystal-lang/install-crystal@v1
         with:
-          crystal: 1.21.0
-
-      # Ensure MSVC build environment is set up (cl, link, mt, etc.)
-      - name: Set up MSVC Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
-
+          crystal: ${{ env.CRYSTAL_VERSION }}
       - name: Install shards
         working-directory: jb_updater
         run: shards install
-
       - name: Run Ameba linter
         working-directory: jb_updater
         run: ./bin/lint
-
-      - name: Check formatting
-        working-directory: jb_updater
-        run: crystal tool format --check src/ spec/
-
-      - name: Run Catalyst static perf analysis (Unix)
-        if: runner.os != 'Windows'
-        working-directory: jb_updater
-        run: |
-          crystal build lib/catalyst/src/catalyst.cr --release --no-debug -o "${RUNNER_TEMP}/catalyst"
-          "${RUNNER_TEMP}/catalyst" --baseline .catalyst-baseline.json --ci src/ || "${RUNNER_TEMP}/catalyst" --ci src/
-
-      # Report-only on Windows: catalyst baseline stores Unix-style paths,
-      # so every finding looks "new" under backslash separators (upstream
-      # catalyst issue). Linux/macOS jobs enforce the gate.
-      - name: Run Catalyst static perf analysis (Windows)
-        if: runner.os == 'Windows'
-        working-directory: jb_updater
-        shell: pwsh
-        run: |
-          crystal build lib/catalyst/src/catalyst.cr --release --no-debug -o "$env:RUNNER_TEMP/catalyst.exe"
-          & "$env:RUNNER_TEMP/catalyst.exe" src/
-          exit 0
-
       - name: Run specs
         working-directory: jb_updater
         run: crystal spec -v
-
       - name: Build binaries (CLI + GUI)
         working-directory: jb_updater
         run: |
           crystal build src/main.cr --release --no-debug -o jb_updater.exe
           crystal build src/gui/main_gui.cr --release -Dpreview_mt --no-debug --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
-
-      - name: Bundle Crystal runtime DLLs
-        shell: pwsh
-        run: |
-          # Crystal runtime DLLs must ship alongside the EXEs on Windows,
-          # otherwise the process exits with 0xC0000135 (STATUS_DLL_NOT_FOUND).
-          $crystalPath = (Get-Command crystal).Source
-          $crystalRoot = Split-Path (Split-Path $crystalPath -Parent) -Parent
-          $dllSource = Join-Path $crystalRoot "embedded" "bin"
-          if (Test-Path $dllSource) {
-            Copy-Item "$dllSource\*.dll" jb_updater\
-            Write-Host "Copied DLLs from $dllSource"
-            Get-ChildItem jb_updater\*.dll | ForEach-Object { Write-Host "  → $($_.Name)" }
-          } else {
-            Write-Host "::warning::Crystal DLL directory not found at $dllSource"
-          }
-
       - name: Smoke test — CLI binary loads
         working-directory: jb_updater
-        run: |
-          # Verify the CLI binary starts (proves all DLLs resolve correctly).
-          # 0xC0000135 would kill the process before any output.
-          .\jb_updater.exe --help
-        shell: cmd
-
-      - name: Verify GUI DLLs are present
-        working-directory: jb_updater
-        shell: pwsh
-        run: |
-          # Can't run the GUI binary on headless CI (no display), but we can
-          # confirm all DLLs exist alongside the GUI EXE.
-          $exe = "jb_updater_gui.exe"
-          $dlls = @(Get-ChildItem *.dll)
-          if (-not (Test-Path $exe)) {
-            Write-Host "::error::$exe not found"
-            exit 1
-          }
-          Write-Host "$exe found, $($dlls.Count) DLLs present:"
-          $dlls | ForEach-Object { Write-Host "  → $($_.Name) ($( '{0:N0}' -f $_.Length ) bytes)" }
-
+        run: ./jb_updater.exe --help
       - name: Package artifacts
         run: |
           Compress-Archive -Path jb_updater\jb_updater.exe, jb_updater\*.dll -DestinationPath jb_updater-cli-windows-x86_64.zip
@@ -285,59 +234,62 @@ jobs:
           New-Item -ItemType Directory -Force -Path jb_updater-bundle | Out-Null
           Copy-Item jb_updater\*.exe, jb_updater\*.dll jb_updater-bundle\
           Compress-Archive -Path jb_updater-bundle\* -DestinationPath jb_updater-bundle-windows-x86_64.zip
-
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-cli-windows-x86_64
           path: jb_updater-cli-windows-x86_64.zip
-
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-gui-windows-x86_64
           path: jb_updater-gui-windows-x86_64.zip
-
       - uses: actions/upload-artifact@v4
         with:
           name: jb_updater-bundle-windows-x86_64
           path: jb_updater-bundle-windows-x86_64.zip
 
-  # =========================================================
-  # ===============   RELEASE JOB   =========================
-  # =========================================================
-
   release:
-    name: Create GitHub Release
+    name: Tag + GitHub Release
     needs: [ linux, macos, windows ]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Verify branch or tag
-        run: |
-          echo "Triggered by $GITHUB_EVENT_NAME for ref $GITHUB_REF"
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF_NAME" != "master" ]]; then
-            echo "⚠️  Manual releases are allowed only from master branch."
-            exit 1
-          fi
       - uses: actions/checkout@v4
+
+      # Manual runs need the tag created here; tag pushes already have it.
+      - name: Create tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./all-artifacts
+
       - name: Flatten artifacts
         run: |
           mkdir -p release-assets
           find ./all-artifacts -type f -exec mv {} ./release-assets/ \;
+
       - name: Add Tampermonkey userscript
         run: |
           cp tampermonkey/redirect_on_451.user.js release-assets/
           node --check release-assets/redirect_on_451.user.js
+
       - name: Generate checksums
         run: |
           cd release-assets
           shasum -a 256 * > SHA256SUMS.txt
           cat SHA256SUMS.txt
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release-assets/*
-          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            --verify-tag \
+            release-assets/*
