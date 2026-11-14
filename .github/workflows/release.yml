@@ -1,23 +1,74 @@
-name: Build jb_updater
+name: Release
 
+# One button, one input: type the version, get tag + GitHub Release.
+# Pushing a v*.*.* tag by hand still works and does the same thing.
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag, without the leading v (e.g. 1.2.0)'
+        required: true
+        type: string
   push:
-    branches: [ "**" ]
     tags: [ "v*.*.*" ]
-  pull_request:
-  workflow_dispatch: { }
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
+
+env:
+  # Manual runs take the input, tag pushes take the tag name.
+  VERSION: ${{ inputs.version || github.ref_name }}
 
 # =========================================================
 # ===============   BUILD JOBS   ==========================
 # =========================================================
 
 jobs:
+  # Fail fast, before seven runner-minutes of compilation.
+  validate:
+    name: Validate version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version is semver without a leading v
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must look like 1.2.0, got: '$VERSION'" >&2
+            exit 1
+          fi
+
+      - name: Version matches source and shard.yml
+        run: |
+          SRC_VERSION=$(grep -oE 'VERSION *= *"[^"]+"' jb_updater/src/jb_updater.cr | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          SHARD_VERSION=$(grep -E '^version:' jb_updater/shard.yml | cut -d: -f2 | tr -d ' ')
+          echo "input=$VERSION src=$SRC_VERSION shard.yml=$SHARD_VERSION"
+          if [[ "$SRC_VERSION" != "$VERSION" ]]; then
+            echo "jb_updater/src/jb_updater.cr VERSION is $SRC_VERSION, release says $VERSION" >&2
+            exit 1
+          fi
+          if [[ "$SHARD_VERSION" != "$VERSION" ]]; then
+            echo "jb_updater/shard.yml version is $SHARD_VERSION, release says $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Tag does not exist yet
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION"; then
+            echo "Tag v$VERSION already exists on origin" >&2
+            exit 1
+          fi
+
   linux:
+    needs: validate
     name: Linux x86_64
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: crystal-lang/install-crystal@v1
@@ -66,7 +117,9 @@ jobs:
           name: jb_updater-bundle-linux-x86_64
           path: jb_updater-bundle-linux-x86_64.tar.gz
   macos:
+    needs: validate
     name: macOS ${{ matrix.arch }}
+    timeout-minutes: 45
     strategy:
       matrix:
         include:
@@ -185,8 +238,10 @@ jobs:
           path: jb_updater-bundle-macos-${{ matrix.arch }}.zip
 
   windows:
+    needs: validate
     name: Windows x86_64
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -319,6 +374,16 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
+
+      # Manual runs need the tag created here; tag pushes already have it.
+      - name: Create tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -339,5 +404,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
           files: release-assets/*
           generate_release_notes: true
