@@ -73,7 +73,7 @@ pb_inner.append(plugin_row, false)
 pb_group.child = pb_inner
 root.append(pb_group, false)
 
-sep1 = UIng::Separator.new("horizontal")
+sep1 = UIng::Separator.new(:horizontal)
 root.append(sep1, false)
 
 # Dev-only conveniences (hidden unless JB_UPDATER_DEV is set).
@@ -102,7 +102,7 @@ status_box.append(UIng::Box.new(:horizontal), true)
 status_box.append(ide_badge, false)
 root.append(status_box, false)
 
-sep2 = UIng::Separator.new("horizontal")
+sep2 = UIng::Separator.new(:horizontal)
 root.append(sep2, false)
 
 tabs = UIng::Tab.new
@@ -191,14 +191,14 @@ UIng.timer(150) do
   end
   pct = App.read_progress
   App.plugin_progress.value = pct if pct > 0
-  1
+  true
 end
 
 GuiTabHelpers.apply_plugins_settings(e_plugins_dir, e_build, e_product, e_install_ids, combo_arch, combo_products, chk_dry, log)
 GuiTabHelpers.apply_ide_settings(e_ide_product, e_ide_path, chk_brew)
 
 idx = combo_products.selected
-if idx > 0 && idx <= detected.size
+if idx && idx > 0 && idx <= detected.size
   prod = detected[idx - 1]
   e_ide_product.text = prod.build
   log.append("[GUI] Restored product: #{prod.name} (#{prod.build})\n")
@@ -281,7 +281,7 @@ UIng.timer(1_000) do
       log.append("[Browse] Cache warm failed: #{ex.class}: #{ex.message}\n")
     end
   end
-  0
+  false
 end
 
 # Preload installed plugins on main thread at startup

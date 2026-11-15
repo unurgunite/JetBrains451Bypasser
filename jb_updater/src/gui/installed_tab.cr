@@ -96,33 +96,33 @@ module InstalledTab
 
     btn_uninstall.on_clicked do
       UIng.queue_main do
-        installed_table.selection do |sel|
-          next if sel.num_rows == 0
+        sel = installed_table.selection
+        if sel.num_rows > 0
           row = sel.rows[0]
           plugin = App.installed_plugins_arr[row]?
           if plugin
             # Two-step confirmation guards against accidental deletion.
-            unless App.confirm_uninstall?(plugin.id)
+            if !App.confirm_uninstall?(plugin.id)
               App.arm_uninstall(plugin.id)
               installed_status.text = "Click Uninstall again to confirm deleting #{plugin.id}"
-              next
-            end
-            FileUtils.rm_rf(plugin.path)
-            scanned = JBUpdater::PluginMeta.scan_dir(File.dirname(plugin.path)) rescue nil
-            old_count = App.installed_plugins_arr.size
-            App.installed_plugins = scanned
-            if old_count == 0
-              App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
             else
-              (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
-              if App.installed_plugins_arr.size > old_count
-                (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
-              elsif App.installed_plugins_arr.size < old_count
-                (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
+              FileUtils.rm_rf(plugin.path)
+              scanned = JBUpdater::PluginMeta.scan_dir(File.dirname(plugin.path)) rescue nil
+              old_count = App.installed_plugins_arr.size
+              App.installed_plugins = scanned
+              if old_count == 0
+                App.installed_plugins_arr.each_with_index { |_, i| App.installed_model.try &.row_inserted(i) }
+              else
+                (0...[App.installed_plugins_arr.size, old_count].min).each { |i| App.installed_model.try &.row_changed(i) }
+                if App.installed_plugins_arr.size > old_count
+                  (old_count...App.installed_plugins_arr.size).each { |i| App.installed_model.try &.row_inserted(i) }
+                elsif App.installed_plugins_arr.size < old_count
+                  (App.installed_plugins_arr.size...old_count).reverse_each { |i| App.installed_model.try &.row_deleted(i) }
+                end
               end
+              installed_status.text = "Deleted: #{plugin.id}"
+              btn_uninstall.disable
             end
-            installed_status.text = "Deleted: #{plugin.id}"
-            btn_uninstall.disable
           end
         end
       end
@@ -162,11 +162,9 @@ module InstalledTab
           next
         end
         ids = [] of String
-        installed_table.selection do |sel|
-          sel.rows.each do |row|
-            plugin = App.installed_plugins_arr[row]?
-            ids << plugin.id if plugin
-          end
+        installed_table.selection.rows.each do |row|
+          plugin = App.installed_plugins_arr[row]?
+          ids << plugin.id if plugin
         end
         if ids.empty?
           installed_status.text = "Select at least one installed plugin to update"

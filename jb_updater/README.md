@@ -200,9 +200,8 @@ shards install
 crystal build src/main.cr --release -o jb_updater
 ./jb_updater --help
 
-# GUI (requires -Dpreview_mt so background threads can do network I/O,
-# see "GUI background threads" note below)
-crystal build src/gui/main_gui.cr --release -Dpreview_mt -o jb_updater_gui
+# GUI
+crystal build src/gui/main_gui.cr --release -o jb_updater_gui
 ./jb_updater_gui
 ```
 
@@ -226,7 +225,7 @@ Build optimized binaries:
 
 ```bash
 crystal build src/main.cr --release -o jb_updater
-crystal build src/gui/main_gui.cr --release -Dpreview_mt -o jb_updater_gui
+crystal build src/gui/main_gui.cr --release -o jb_updater_gui
 ```
 
 ---
@@ -264,10 +263,9 @@ GitHub Actions will attach fresh binaries for that tag to the Release page.
 ### GUI background threads
 
 The GUI runs marketplace fetches, plugin search, downloads, and IDE-release queries on background threads and marshals
-UI updates back to the main thread with `UIng.queue_main`. On Crystal >= 1.21 the single-threaded runtime does not
-install a fiber execution context on `Thread.new` threads, so background threads that touch evented I/O fail with
-`Thread#execution_context cannot be nil`. Building the GUI with `-Dpreview_mt` sets up per-thread contexts and makes
-these threads safe.
+UI updates back to the main thread with `UIng.queue_main`. On Crystal >= 1.22 execution contexts are the default, so
+`Thread.new` workers can do evented I/O with no extra build flag. The old `-Dpreview_mt` flag is deprecated and no
+longer used.
 
 GUI button actions run the same logic in-process (no `jb_updater` subprocess), mirroring the CLI argument dispatch.
 This avoids `Process.run` from a background thread, which deadlocks under Crystal 1.21 (child process spawning is only
