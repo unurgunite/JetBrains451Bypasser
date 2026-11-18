@@ -36,7 +36,7 @@ module IdeTab
     ide_actions.append(btn_download_release, false)
     ide_actions.append(btn_upgrade, false)
     ide_tab.append(ide_actions, false)
-    ide_tab.append(UIng::Separator.new("horizontal"), false)
+    ide_tab.append(UIng::Separator.new(:horizontal), false)
 
     release_title = UIng::Label.new("Releases")
     ide_releases_box = UIng::Box.new(:vertical)

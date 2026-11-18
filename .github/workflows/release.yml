@@ -73,7 +73,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: crystal-lang/install-crystal@v1
         with:
-          crystal: 1.21.0
+          crystal: 1.22.3
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -91,7 +91,7 @@ jobs:
         working-directory: jb_updater
         run: |
           crystal build src/main.cr --release --no-debug -o jb_updater
-          crystal build src/gui/main_gui.cr --release -Dpreview_mt --no-debug -o jb_updater_gui
+          crystal build src/gui/main_gui.cr --release --no-debug -o jb_updater_gui
       - name: Smoke test — CLI binary loads
         working-directory: jb_updater
         run: ./jb_updater --help
@@ -134,7 +134,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: crystal-lang/install-crystal@v1
         with:
-          crystal: 1.21.0
+          crystal: 1.22.3
       - name: Install OpenSSL 3
         run: brew install openssl@3
       - name: Install shards
@@ -157,7 +157,7 @@ jobs:
           crystal build src/main.cr --release --no-debug \
             --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
             -o jb_updater
-          crystal build src/gui/main_gui.cr --release -Dpreview_mt --no-debug \
+          crystal build src/gui/main_gui.cr --release --no-debug \
             --link-flags "-L${brew_prefix}/lib -I${brew_prefix}/include" \
             -o jb_updater_gui
 
@@ -247,7 +247,7 @@ jobs:
 
       - uses: crystal-lang/install-crystal@v1
         with:
-          crystal: 1.21.0
+          crystal: 1.22.3
 
       # Ensure MSVC build environment is set up (cl, link, mt, etc.)
       - name: Set up MSVC Developer Command Prompt
@@ -292,7 +292,7 @@ jobs:
         working-directory: jb_updater
         run: |
           crystal build src/main.cr --release --no-debug -o jb_updater.exe
-          crystal build src/gui/main_gui.cr --release -Dpreview_mt --no-debug --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
+          crystal build src/gui/main_gui.cr --release --no-debug --link-flags=/SUBSYSTEM:WINDOWS -o jb_updater_gui.exe
 
       - name: Bundle Crystal runtime DLLs
         shell: pwsh

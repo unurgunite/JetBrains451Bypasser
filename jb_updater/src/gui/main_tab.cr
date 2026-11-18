@@ -78,7 +78,7 @@ module MainTab
     end
     btn_group.append(btn_detect, false)
 
-    btn_group_sep = UIng::Separator.new("horizontal")
+    btn_group_sep = UIng::Separator.new(:horizontal)
     btn_group.append(btn_group_sep, false)
 
     batch_group = UIng::Group.new("Bulk actions", margined: true)
@@ -98,7 +98,7 @@ module MainTab
     combo_products.on_selected do
       UIng.queue_main do
         idx = combo_products.selected
-        if idx > 0
+        if idx && idx > 0
           prod = detected[idx - 1]
           log.append("[GUI] Selected product: #{prod.name} (#{prod.build})\n")
 
@@ -198,11 +198,10 @@ module MainTab
         end
         ids = [] of String
         if table = App.installed_table
-          table.selection do |sel|
-            sel.rows.each do |row|
-              plugin = App.installed_plugins_arr[row]?
-              ids << plugin.id if plugin
-            end
+          sel = table.selection
+          sel.rows.each do |row|
+            plugin = App.installed_plugins_arr[row]?
+            ids << plugin.id if plugin
           end
         end
         if ids.empty?
